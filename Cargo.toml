@@ -1,0 +1,15 @@
+workspace = { members = [ "octizys_common", "octizys_compiler", "octizys_core", "octizys_cst", "octizys_doc", "octizys_formatter","octizys_parser", "octizys_pretty", "octizys_sast"] }
+[package]
+name = "octizys"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lints.rust]
+unused = "allow"
+unsafe_code = "forbid"
+
+[dev-dependencies]
+paste = "1.0.15"
+
