@@ -1,0 +1,2 @@
+# Octizys
+A functional language
