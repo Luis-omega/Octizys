@@ -1,12 +1,9 @@
-use octizys_core::error::Error;
-use octizys_sast::top::Sast;
+use lalrpop_util::lalrpop_mod;
+use octizys_common::error::Error;
+use octizys_cst::cst;
 use std::path::PathBuf;
 
-use lrlex::lrlex_mod;
-use lrpar::lrpar_mod;
-
-lrlex_mod!("lexer.l");
-lrpar_mod!("grammar.y");
+lalrpop_mod!(grammar);
 
 #[derive(Debug)]
 pub enum ParsedFile {}
@@ -20,8 +17,7 @@ impl Into<Error> for ParserError {
     }
 }
 
-fn parse(str: String) -> Result<Sast, ParserError> {
-    let def = calc_l::lexerdef();
+fn parse(str: String) -> Result<(), ParserError> {
     todo!()
 }
 
@@ -33,13 +29,13 @@ fn parse(str: String) -> Result<Sast, ParserError> {
 pub fn parse_file(
     path_name: PathBuf,
     content: String,
-) -> Result<Sast, ParserError> {
+) -> Result<(), ParserError> {
     todo!("parsing file")
 }
 
 pub fn parse_file_imports(
     path_name: PathBuf,
     content: String,
-) -> Result<Sast, ParserError> {
+) -> Result<(), ParserError> {
     todo!("parsing file imports")
 }
