@@ -1,7 +1,9 @@
+use std::rc::Rc;
+
 use crate::error::{error_from_pretty, Error};
 use crate::identifier::{Identifier, IdentifierError};
 use crate::newtype::Newtype;
-use octizys_pretty::types::{Document, NoLineBreaksString, Pretty};
+use octizys_pretty::types::{Document, Pretty};
 
 const MODULE_LOGIC_PATH_SEPARATOR: &str = "::";
 
@@ -10,8 +12,8 @@ pub enum ModuleLogicPathError {
     NotIdentifier,
 }
 
-impl<'a, 'b> Pretty<'a, 'b> for ModuleLogicPathError {
-    fn to_document(&'a self) -> Document<'b> {
+impl Pretty for ModuleLogicPathError {
+    fn to_document(&self) -> Document {
         match self {
             Self::NotIdentifier => {
                 "The passed string contains a non valid Identifier component"
@@ -21,19 +23,17 @@ impl<'a, 'b> Pretty<'a, 'b> for ModuleLogicPathError {
     }
 }
 
-impl<'e> Into<Error<'e>> for ModuleLogicPathError {
-    fn into(self) -> Error<'e> {
+impl Into<Error> for ModuleLogicPathError {
+    fn into(self) -> Error {
         error_from_pretty(&self)
     }
 }
 
 #[derive(Debug)]
-pub struct ModuleLogicPath<'a>(Vec<Identifier<'a>>);
+pub struct ModuleLogicPath(Vec<Identifier>);
 
-impl<'a> ModuleLogicPath<'a> {
-    pub fn make(
-        s: &'a str,
-    ) -> Result<ModuleLogicPath<'a>, ModuleLogicPathError> {
+impl ModuleLogicPath {
+    pub fn make(s: &str) -> Result<ModuleLogicPath, ModuleLogicPathError> {
         let v: Vec<Identifier> = s
             .split(MODULE_LOGIC_PATH_SEPARATOR)
             .map(|x| Identifier::make(x))
@@ -43,32 +43,30 @@ impl<'a> ModuleLogicPath<'a> {
     }
 }
 
-impl<'a> Newtype<ModuleLogicPath<'a>, Vec<Identifier<'a>>>
-    for ModuleLogicPath<'a>
-{
-    fn extract(self) -> Vec<Identifier<'a>> {
+impl Newtype<ModuleLogicPath, Vec<Identifier>> for ModuleLogicPath {
+    fn extract(self) -> Vec<Identifier> {
         self.0
     }
 }
 
-impl<'a> Into<String> for ModuleLogicPath<'a> {
+impl Into<String> for ModuleLogicPath {
     fn into(self) -> String {
         self.extract()
             .into_iter()
             .map(|x| x.extract().extract())
-            .collect::<Vec<&str>>()
+            .collect::<Vec<Rc<str>>>()
             .join(MODULE_LOGIC_PATH_SEPARATOR)
     }
 }
 
-impl<'a> Into<ModuleLogicPath<'a>> for Vec<Identifier<'a>> {
-    fn into(self) -> ModuleLogicPath<'a> {
+impl Into<ModuleLogicPath> for Vec<Identifier> {
+    fn into(self) -> ModuleLogicPath {
         ModuleLogicPath(self)
     }
 }
 
-impl<'a> Into<Vec<Identifier<'a>>> for ModuleLogicPath<'a> {
-    fn into(self) -> Vec<Identifier<'a>> {
+impl Into<Vec<Identifier>> for ModuleLogicPath {
+    fn into(self) -> Vec<Identifier> {
         self.0
     }
 }

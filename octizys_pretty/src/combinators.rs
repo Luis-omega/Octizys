@@ -2,15 +2,15 @@ use crate::types::Document;
 use crate::types::Document::*;
 use crate::types::NoLineBreaksString;
 
-pub fn empty<'a>() -> Document<'a> {
+pub fn empty() -> Document {
     Empty
 }
 
-pub fn concat<'a>(d1: Document<'a>, d2: Document<'a>) -> Document<'a> {
+pub fn concat(d1: Document, d2: Document) -> Document {
     Concat(Box::new(d1), Box::new(d2))
 }
 
-pub fn concat_vec<'a>(docs: Vec<Document<'a>>) -> Document<'a> {
+pub fn concat_vec(docs: Vec<Document>) -> Document {
     let mut doc = empty();
     for new_doc in docs.into_iter().rev() {
         doc = concat(new_doc, doc)
@@ -18,30 +18,30 @@ pub fn concat_vec<'a>(docs: Vec<Document<'a>>) -> Document<'a> {
     doc
 }
 
-pub fn text<'a>(s: NoLineBreaksString<'a>) -> Document<'a> {
+pub fn text(s: NoLineBreaksString) -> Document {
     Text(s)
 }
 
-pub fn nest<'a>(ident: u16, d: Document<'a>) -> Document<'a> {
+pub fn nest(ident: u16, d: Document) -> Document {
     Nest(ident, Box::new(d))
 }
 
 //Rust has break keyword
-pub fn break_<'a>(s: NoLineBreaksString<'a>) -> Document<'a> {
+pub fn break_(s: NoLineBreaksString) -> Document {
     Break(s)
 }
 
-pub fn group<'a>(d: Document<'a>) -> Document<'a> {
+pub fn group(d: Document) -> Document {
     Group(Box::new(d))
 }
 
-pub fn from_str<'a>(s: &'a str) -> Document<'a> {
+pub fn from_str(s: &str) -> Document {
     let v = NoLineBreaksString::decompose(s);
     if v.len() == 0 {
         empty()
     } else {
         if v.len() == 1 {
-            text(v[0])
+            text(v[0].clone())
         } else {
             let mut doc = empty();
             for new_string in v.into_iter().rev() {
@@ -52,8 +52,8 @@ pub fn from_str<'a>(s: &'a str) -> Document<'a> {
     }
 }
 
-impl<'d> Into<Document<'d>> for &'d str {
-    fn into(self) -> Document<'d> {
+impl<'d> Into<Document> for &str {
+    fn into(self) -> Document {
         from_str(self)
     }
 }

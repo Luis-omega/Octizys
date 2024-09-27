@@ -5,13 +5,13 @@ use crate::types::{Document, NoLineBreaksString, Pretty, SimpleDocument};
 // Originally attempt to build a vector of String or $string
 // and then join them, but I got problems with the borrow checker.
 
-fn render_simple_document<'a>(document: SimpleDocument<'a>) -> String {
+fn render_simple_document(document: SimpleDocument) -> String {
     match document {
         SimpleDocument::Empty => String::from(""),
         SimpleDocument::Text(text, remain) => {
             let mut remain = render_simple_document(*remain);
             let out =
-                String::from(NoLineBreaksString::extract(text)) + &*remain;
+                String::from(&*NoLineBreaksString::extract(text)) + &*remain;
             out
         }
         SimpleDocument::Line(nl, remain) => {
@@ -86,10 +86,10 @@ enum Mode {
 }
 
 #[derive(Debug, Clone)]
-struct FitsParam<'a> {
+struct FitsParam {
     ident: u16,
     mode: Mode,
-    doc: Document<'a>,
+    doc: Document,
 }
 
 fn fits(remain_width: Option<usize>, param: &mut Vec<FitsParam>) -> bool {
@@ -153,11 +153,11 @@ fn fits(remain_width: Option<usize>, param: &mut Vec<FitsParam>) -> bool {
     }
 }
 
-fn document_to_simple_document_aux<'a>(
+fn document_to_simple_document_aux(
     width: usize,
     consumed: usize,
-    param: &mut Vec<FitsParam<'a>>,
-) -> SimpleDocument<'a> {
+    param: &mut Vec<FitsParam>,
+) -> SimpleDocument {
     println!("new_iter: {:?}", param);
     println!("params: width={}, consumed={}", width, consumed);
     let next = param.pop();
@@ -193,7 +193,10 @@ fn document_to_simple_document_aux<'a>(
                 println!("text_case: {:?}", s);
                 let remain = document_to_simple_document_aux(
                     width,
-                    consumed + NoLineBreaksString::extract(s).chars().count(),
+                    consumed
+                        + NoLineBreaksString::extract(s.clone())
+                            .chars()
+                            .count(),
                     param,
                 );
                 println!("text_case_remain: {:?}", remain);
@@ -204,7 +207,9 @@ fn document_to_simple_document_aux<'a>(
                     let remain = document_to_simple_document_aux(
                         width,
                         consumed
-                            + NoLineBreaksString::extract(s).chars().count(),
+                            + NoLineBreaksString::extract(s.clone())
+                                .chars()
+                                .count(),
                         param,
                     );
                     SimpleDocument::Text(s, Box::from(remain))
@@ -362,7 +367,7 @@ mod render_tests {
 
 pub fn prettify<'a, 'b>(
     configuration: PrettifierConfiguration,
-    body: &'a impl Pretty<'a, 'b>,
+    body: &'a impl Pretty,
 ) -> String {
     let document = Pretty::to_document(body);
     render(configuration, document)

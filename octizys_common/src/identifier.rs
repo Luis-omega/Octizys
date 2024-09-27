@@ -7,7 +7,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Identifier<'a>(NoLineBreaksString<'a>);
+pub struct Identifier(NoLineBreaksString);
 
 #[derive(Debug)]
 pub enum IdentifierError {
@@ -21,24 +21,24 @@ static IDENTIFER_LAZY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         r"(?x) #ingore spaces and allow comments
         ^ #match from the begin
         # can begin with underscores, but not digits
-        _*  
+        _*
         #  regular \w contains digits, so, we use instead this
         (\p{Alphabetic}|\p{M}|\p{Join_Control})
         # after we found a valid Alphabetic, we can allow underscores and digits
-        (_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})* 
+        (_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*
         $ #match until the end
         ",
     )
     .unwrap()
 });
 
-impl<'a> Identifier<'a> {
-    pub fn make(s: &'a str) -> Result<Identifier<'a>, IdentifierError> {
+impl<'a> Identifier {
+    pub fn make(s: &str) -> Result<Identifier, IdentifierError> {
         let splitted = NoLineBreaksString::decompose(s);
         if splitted.len() == 1 {
-            let zero_element = splitted[0];
-            let zero_string = zero_element.extract();
-            if IDENTIFER_LAZY_REGEX.is_match(zero_string) {
+            let zero_element = splitted[0].clone();
+            let zero_string = zero_element.clone().extract();
+            if IDENTIFER_LAZY_REGEX.is_match(&zero_string.clone()) {
                 Ok(Identifier(zero_element))
             } else {
                 return Err(IdentifierError::ContainsInvalidCodePoint);
@@ -54,20 +54,20 @@ impl<'a> Identifier<'a> {
     }
 }
 
-impl<'a> Newtype<Identifier<'a>, NoLineBreaksString<'a>> for Identifier<'a> {
-    fn extract(self) -> NoLineBreaksString<'a> {
+impl<'a> Newtype<Identifier, NoLineBreaksString> for Identifier {
+    fn extract(self) -> NoLineBreaksString {
         self.0
     }
 }
 
-impl<'a, 'b> Pretty<'a, 'b> for Identifier<'b> {
-    fn to_document(&'a self) -> Document<'b> {
-        text(self.0)
+impl Pretty for Identifier {
+    fn to_document(&self) -> Document {
+        text(self.0.clone())
     }
 }
 
-impl<'a, 'b> Pretty<'a, 'b> for IdentifierError {
-    fn to_document(&'a self) -> Document<'b> {
+impl Pretty for IdentifierError {
+    fn to_document(&self) -> Document {
         match self {
             Self::ContainsInvalidCodePoint => {
                 "The passed string is not a valid identifier, it contains invalid characters".into()
@@ -79,14 +79,14 @@ impl<'a, 'b> Pretty<'a, 'b> for IdentifierError {
     }
 }
 
-impl<'a, 'b> Pretty<'a, 'b> for &IdentifierError {
-    fn to_document(&self) -> Document<'b> {
+impl Pretty for &IdentifierError {
+    fn to_document(&self) -> Document {
         (*self).to_document()
     }
 }
 
-impl<'e> Into<Error<'e>> for IdentifierError {
-    fn into(self) -> Error<'e> {
+impl Into<Error> for IdentifierError {
+    fn into(self) -> Error {
         error_from_pretty(&self)
     }
 }
@@ -143,7 +143,7 @@ mod tests {
                         Err(_)=>
                             assert!(false, "s = {}, result = {:?}", s, result),
                         Ok(value)=>
-                            assert!(value.0.extract() == s, "s = {}, value = {:?}", s, value),
+                            assert!(*value.0.clone().extract() == *s, "s = {}, value = {:?}", s, value),
                     }
                 }
             }
