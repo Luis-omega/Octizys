@@ -4,10 +4,17 @@ use octizys_pretty::combinators::text;
 use octizys_pretty::types::{Document, NoLineBreaksString, Pretty};
 
 use regex::Regex;
+use std::rc::Rc;
 use std::sync::LazyLock;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Identifier(NoLineBreaksString);
+
+impl Into<Rc<str>> for Identifier {
+    fn into(self) -> Rc<str> {
+        self.0.into()
+    }
+}
 
 #[derive(Debug)]
 pub enum IdentifierError {

@@ -29,7 +29,7 @@ impl Into<Error> for ModuleLogicPathError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleLogicPath(Vec<Identifier>);
 
 impl ModuleLogicPath {

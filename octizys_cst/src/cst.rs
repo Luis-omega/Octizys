@@ -6,7 +6,7 @@ use octizys_common::{
 use octizys_pretty::types::NoLineBreaksString;
 
 #[derive(Debug)]
-struct StringArena {
+pub struct StringArena {
     arena: HashSet<Rc<str>>,
 }
 
@@ -31,20 +31,37 @@ impl StringArena {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Position {
-    source_index: u64,
+    pub source_index: usize,
 }
 
-#[derive(Debug)]
+impl From<usize> for Position {
+    fn from(value: usize) -> Self {
+        Position {
+            source_index: value,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Span {
-    start: Position,
-    end: Position,
+    pub start: Position,
+    pub end: Position,
 }
 
-#[derive(Debug)]
+impl From<(usize, usize)> for Span {
+    fn from(value: (usize, usize)) -> Self {
+        Span {
+            start: value.0.into(),
+            end: value.1.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentLineContent {
-    content: NoLineBreaksString,
+    pub content: NoLineBreaksString,
 }
 
 impl CommentLineContent {
@@ -52,15 +69,37 @@ impl CommentLineContent {
         let content = NoLineBreaksString::make(&value)?;
         Ok(CommentLineContent { content })
     }
+
+    pub fn decompose(value: &str) -> Vec<Self> {
+        NoLineBreaksString::decompose(value)
+            .into_iter()
+            .map(|x| CommentLineContent { content: x })
+            .collect()
+    }
 }
 
-#[derive(Debug)]
+impl From<CommentLineContent> for Rc<str> {
+    fn from(value: CommentLineContent) -> Self {
+        value.content.into()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommentKind {
     Documentation,
     NonDocumentation,
 }
 
-#[derive(Debug)]
+impl From<CommentKind> for &'static str {
+    fn from(value: CommentKind) -> Self {
+        match value {
+            CommentKind::Documentation => " |",
+            _ => "",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommentBraceKind {
     // "{- asdf -}"
     Brace0,
@@ -71,8 +110,18 @@ pub enum CommentBraceKind {
     // "{---- asdf ----}"
     Brace3,
 }
+impl CommentBraceKind {
+    pub fn len(self) -> usize {
+        match self {
+            Self::Brace0 => 2,
+            Self::Brace1 => 3,
+            Self::Brace2 => 4,
+            Self::Brace3 => 5,
+        }
+    }
+}
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LineCommentStart {
     // --
     DoubleHypen,
@@ -80,64 +129,106 @@ pub enum LineCommentStart {
     DoubleSlash,
 }
 
-#[derive(Debug)]
+impl From<LineCommentStart> for char {
+    fn from(value: LineCommentStart) -> Self {
+        match value {
+            LineCommentStart::DoubleHypen => '-',
+            LineCommentStart::DoubleSlash => '/',
+        }
+    }
+}
+
+impl From<LineCommentStart> for &'static str {
+    fn from(value: LineCommentStart) -> Self {
+        match value {
+            LineCommentStart::DoubleHypen => "--",
+            LineCommentStart::DoubleSlash => "//",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentBlock {
     kind: CommentKind,
     brace: CommentBraceKind,
     content: Vec<CommentLineContent>,
     span: Span,
 }
-
-#[derive(Debug)]
-pub struct CommentLine {
-    kind: CommentKind,
-    start: LineCommentStart,
-    content: CommentLineContent,
-    span: Span,
-}
-impl CommentLine {
-    fn trim(s: &str) -> &str {
-        let start = 2;
-        let end = s.len() - 1;
+impl CommentBlock {
+    fn trim(s: &str, kind: CommentKind, brace: CommentBraceKind) -> &str {
+        let comment_bracket_len = brace.len();
+        let start = comment_bracket_len
+            + match kind {
+                CommentKind::Documentation => 2,
+                CommentKind::NonDocumentation => 0,
+            };
+        let end = s.len() - comment_bracket_len;
         &s[start..end]
     }
 
     pub fn make(
-        arena: &mut StringArena,
         kind: CommentKind,
-        start: LineCommentStart,
+        brace: CommentBraceKind,
         full_text: &str,
         start_pos: Position,
         end_pos: Position,
-    ) -> Result<Self, String> {
-        let cut_text: &str = CommentLine::trim(full_text);
-        let text_rc: Rc<str> = arena.insert(cut_text);
-        let content = CommentLineContent::make(text_rc)?;
-        Ok(CommentLine {
+    ) -> Self {
+        let cut_text: &str = CommentBlock::trim(full_text, kind, brace);
+        let content = CommentLineContent::decompose(cut_text);
+        CommentBlock {
             kind,
-            start,
+            brace,
             content,
             span: Span {
                 start: start_pos,
                 end: end_pos,
             },
-        })
+        }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommentLine {
+    pub kind: CommentKind,
+    pub start: LineCommentStart,
+    pub content: CommentLineContent,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Comment {
     Line(CommentLine),
     Block(CommentBlock),
 }
 
-#[derive(Debug)]
-pub struct CommentsInfo {
-    before: Vec<Comment>,
-    after: Option<Comment>,
+impl From<CommentLine> for Comment {
+    fn from(value: CommentLine) -> Self {
+        Comment::Line(value)
+    }
 }
 
-#[derive(Debug)]
+impl From<CommentBlock> for Comment {
+    fn from(value: CommentBlock) -> Self {
+        Comment::Block(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommentsInfo {
+    pub before: Vec<Comment>,
+    pub after: Option<Comment>,
+}
+
+impl CommentsInfo {
+    pub fn empty() -> Self {
+        CommentsInfo {
+            before: vec![],
+            after: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenInfo {
     pub comments: CommentsInfo,
     pub span: Span,
@@ -145,9 +236,9 @@ pub struct TokenInfo {
 
 impl TokenInfo {
     pub fn make(
-        start: u64,
-        end: u64,
         comments_info: CommentsInfo,
+        start: usize,
+        end: usize,
     ) -> TokenInfo {
         TokenInfo {
             comments: comments_info,
@@ -167,10 +258,10 @@ pub struct Token<T> {
     pub info: TokenInfo,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 //TODO: Smart constructor, it only allows combinations
 //of +-*?<>=/@~#"
-pub struct OperatorName(String);
+pub struct OperatorName(pub String);
 
 #[derive(Debug)]
 pub enum NamedVariable {
@@ -187,51 +278,72 @@ pub enum NamedVariable {
 }
 
 #[derive(Debug)]
-pub struct NamedItem<T> {
-    pub name: T,
-    pub comments: CommentsInfo,
-    pub Span: Span,
-}
-
-#[derive(Debug)]
 pub struct Between<T> {
     pub left: TokenInfo,
     pub right: TokenInfo,
     pub value: T,
 }
 
-pub struct SepByItem<T> {
-    pub item: T,
+#[derive(Debug)]
+pub struct TrailingListItem<T> {
     pub separator: TokenInfo,
+    pub item: T,
 }
 
-pub struct SepBy<T> {
-    pub items: Vec<SepByItem<T>>,
-    pub final_item: T,
-    pub final_comma: Option<TokenInfo>,
+#[derive(Debug)]
+pub struct TrailingList<T> {
+    pub first: T,
+    pub items: Vec<TrailingListItem<T>>,
+    pub trailing_sep: Option<TokenInfo>,
+}
+
+impl<T, ToInfo> Into<TrailingList<T>> for (T, Vec<(ToInfo, T)>, Option<ToInfo>)
+where
+    ToInfo: Into<TokenInfo>,
+{
+    fn into(self) -> TrailingList<T> {
+        let items = self
+            .1
+            .into_iter()
+            .map(|(separator, item)| TrailingListItem {
+                separator: separator.into(),
+                item,
+            })
+            .collect();
+        let first = self.0;
+        let trailing_sep = self.2;
+        TrailingList {
+            first,
+            items,
+            trailing_sep: trailing_sep.map(|x| x.into()),
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum ImportItem {
-    Variable(NamedItem<Identifier>),
-    Operator(NamedItem<OperatorName>),
-    TypeOperator(NamedItem<OperatorName>),
+    Variable(Token<Identifier>),
+    Operator(Token<OperatorName>),
+    TypeOperator(TokenInfo, Token<OperatorName>),
 }
 
 #[derive(Debug)]
 pub struct Import {
-    module_path: NamedItem<ModuleLogicPath>,
-    unqualified_allowed: Option<TokenInfo>,
-    import_list: Option<Between<Vec<ImportItem>>>,
-    qualified_name: Option<Identifier>,
+    // import unqualified S.O.M.E.Path(a,b,c) as N.A.Me
+    pub import: TokenInfo,
+    pub unqualified: Option<TokenInfo>,
+    pub module_path: Token<ModuleLogicPath>,
+    pub import_list: Option<Between<TrailingList<ImportItem>>>,
+    // "as name"
+    pub qualified_path: Option<(TokenInfo, Token<ModuleLogicPath>)>,
 }
 
 #[derive(Debug)]
 pub enum PatternMatch {
-    Variable(NamedItem<Identifier>),
-    AnonHole(NamedItem<()>),
-    NamedHole(NamedItem<Identifier>),
-    Application(NamedItem<Identifier>, Vec<PatternMatch>),
+    Variable(Token<Identifier>),
+    AnonHole(Token<()>),
+    NamedHole(Token<Identifier>),
+    Application(Token<Identifier>, Vec<PatternMatch>),
     Parens(Between<Box<PatternMatch>>),
 }
 
@@ -279,24 +391,24 @@ pub struct Case {
 pub struct BinaryOperator {
     left: Box<Expression>,
     right: Box<Expression>,
-    name: NamedItem<OperatorName>,
+    name: Token<OperatorName>,
 }
 
 #[derive(Debug)]
 struct LambdaExpression {
-    variable: NamedItem<Identifier>,
+    variable: Token<Identifier>,
     expression: Box<Expression>,
 }
 
 #[derive(Debug)]
 struct ApplicationExpression {
     start: Box<Expression>,
-    Remain: Vec<Expression>,
+    remain: Vec<Expression>,
 }
 
 #[derive(Debug)]
 pub enum Expression {
-    Variable(NamedItem<NamedVariable>),
+    Variable(Token<NamedVariable>),
     Let(Let),
     Case(Case),
     BinaryOperator(BinaryOperator),

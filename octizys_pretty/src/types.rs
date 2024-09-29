@@ -3,8 +3,14 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct NoLineBreaksString(Rc<str>);
 
-impl<'a> NoLineBreaksString {
-    pub fn make(s: &'a str) -> Result<NoLineBreaksString, String> {
+impl From<NoLineBreaksString> for Rc<str> {
+    fn from(value: NoLineBreaksString) -> Self {
+        value.0.clone()
+    }
+}
+
+impl NoLineBreaksString {
+    pub fn make(s: &str) -> Result<NoLineBreaksString, String> {
         if s.find("\n").is_some() {
             Err(String::from("Malformed string"))
         } else {
@@ -20,7 +26,7 @@ impl<'a> NoLineBreaksString {
         }
     }
 
-    pub fn decompose(s: &'a str) -> Vec<NoLineBreaksString> {
+    pub fn decompose(s: &str) -> Vec<NoLineBreaksString> {
         s.split('\n')
             .map(|x| NoLineBreaksString(Rc::from(x)))
             .collect()
