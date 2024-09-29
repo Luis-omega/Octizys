@@ -1,0 +1,303 @@
+use std::str::FromStr;
+use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,OperatorName};
+use octizys_common::module_logic_path::ModuleLogicPath;
+use octizys_common::identifier::Identifier;
+use crate::lexer;
+
+grammar;
+
+extern {
+    type Location = usize;
+    type Error = lexer::LexerError;
+
+    enum lexer::Token {
+      "," => lexer::Token::Comma(TokenInfo)
+      ,":" => lexer::Token::Colon(TokenInfo)
+      ,";" => lexer::Token::StatementEnd(TokenInfo)
+      ,"." => lexer::Token::FieldAccessor(TokenInfo)
+      ,"::" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"|" => lexer::Token::CaseSeparator(TokenInfo)
+      ,"(" => lexer::Token::LParen(TokenInfo)
+      ,")" => lexer::Token::RParen(TokenInfo)
+      ,"{" => lexer::Token::LBrace(TokenInfo)
+      ,"}" => lexer::Token::RBrace(TokenInfo)
+      ,"[" => lexer::Token::LBracket(TokenInfo)
+      ,"]" => lexer::Token::RBracket(TokenInfo)
+      ,"->" => lexer::Token::RightArrow(TokenInfo)
+      ,"<-" => lexer::Token::LeftArrow(TokenInfo)
+      ,Import => lexer::Token::Import(TokenInfo)
+      ,Export => lexer::Token::Export(TokenInfo)
+      ,Data => lexer::Token::Data(TokenInfo)
+      ,Newtype => lexer::Token::Newtype(TokenInfo)
+      ,Alias => lexer::Token::Alias(TokenInfo)
+      ,As => lexer::Token::As(TokenInfo)
+      ,Unqualified => lexer::Token::Unqualified(TokenInfo)
+      ,Forall => lexer::Token::Forall(TokenInfo)
+      ,Type => lexer::Token::Type(TokenInfo)
+      ,Bool => lexer::Token::Bool(TokenInfo)
+      ,True => lexer::Token::True(TokenInfo)
+      ,False => lexer::Token::False(TokenInfo)
+      ,Unit => lexer::Token::Unit(TokenInfo)
+      ,U8 => lexer::Token::U8(TokenInfo)
+      ,U16 => lexer::Token::U16(TokenInfo)
+      ,U32 => lexer::Token::U32(TokenInfo)
+      ,U64 => lexer::Token::U64(TokenInfo)
+      ,I8 => lexer::Token::I8(TokenInfo)
+      ,I16 => lexer::Token::I16(TokenInfo)
+      ,I32 => lexer::Token::I32(TokenInfo)
+      ,I64 => lexer::Token::I64(TokenInfo)
+      ,F32 => lexer::Token::F32(TokenInfo)
+      ,F64 => lexer::Token::F64(TokenInfo)
+      ,StringLiteral => lexer::Token::StringLiteral(TokenInfo,String)
+      ,UintLiteral => lexer::Token::UintLiteral(TokenInfo,String)
+      ,UFloatLiteral=> lexer::Token::UFloatLiteral(TokenInfo,String)
+      ,Identifier=> lexer::Token::Identifier(TokenInfo,String)
+      ,OperatorName=> lexer::Token::OperatorName(TokenInfo,String)
+      ,ModuleLogicPath=> lexer::Token::ModuleLogicPath(TokenInfo,String)
+    }
+}
+
+/*
+
+match {
+  r"-- \|.*\n" => LineCommentDashD,
+  r"// \|.*\n" => LineCommentSlashD,
+  r"\{- \|(.|\n)*-\}"=>BlockCommentD0,
+  r"( |	)*" => SimpleSpaces
+} else {
+  r"\{-(.|\n)*-\}"=>BlockComment0,
+  r"--.*\n" => LineCommentDash,
+  r"//.*\n" => LineCommentSlash,
+  r"\s*" => AllSpaces,
+  _
+}
+
+all_spaces :()= {SimpleSpaces,AllSpaces};
+
+makeTokenInfo<T>: TokenInfo =
+  //<before:comment*>
+  all_spaces
+  <start:@L>
+  T
+  <end:@R>
+  //SimpleSpaces
+  //<after:SingleLineComment?>
+  //all_spaces
+  =>
+  TokenInfo::make(CommentsInfo{before:before,after}start,end);
+
+makeToken<T>: Token =
+  <before:comment*>
+  all_spaces
+  <start:@L>
+  <t:T>
+  <end:@R>
+  SimpleSpaces
+  <after:SingleLineComment?>
+  all_spaces
+  =>
+  Token{value:t,info:TokenInfo::make(CommentsInfo{before:before,after}start,end)};
+
+//Simple terminals
+
+
+// Symbols
+Comma :Token = <","> => <>;
+Colon :Token = makeTokenInfo<":"> => <>;
+StatementEnd :Token = makeTokenInfo<";"> => <>;
+FieldAccessor :Token = <"."> => <>;
+ModuleSeparator :Token = "::" => <>;
+CaseSeparator : Token =  makeTokenInfo<"|"> => <>;
+LParen : Token = makeTokenInfo<"("> => <>;
+RParen : Token = makeTokenInfo<")"> => <>;
+LBracket : Token = makeTokenInfo<"["> => <>;
+RBracket : Token = makeTokenInfo<"]"> => <>;
+LBrace: Token = makeTokenInfo<"{"> => <>;
+RBrace: Token = makeTokenInfo<"}"> => <>;
+RightArrow: Token = makeTokenInfo<"->"> => <>;
+LeftArrow: Token = makeTokenInfo<"<-"> => <>;
+
+//Keywords
+Import :Token = makeTokenInfo<"import"> => <>;
+Export :Token = makeTokenInfo<"export"> => <>;
+Data :Token = makeTokenInfo<"data"> => <>;
+Newtype :Token = makeTokenInfo<"newtype"> => <>;
+Alias :Token = makeTokenInfo<"alias"> => <>;
+As :Token = makeTokenInfo<"as"> => <>;
+Unqualified :Token = makeTokenInfo<"unqualified"> => <>;
+Forall :Token = makeTokenInfo<"forall"> => <>;
+Type :Token = makeTokenInfo<"type"> => <>;
+
+Bool :Token = makeToken<"Bool"> => <>;
+True :Token = makeToken<"True"> => <>;
+False :Token = makeToken<"False"> => <>;
+Unit :Token = makeToken<"Unit"> => <>;
+U8 :Token = makeToken<"U8"> => <>;
+U16 :Token = makeToken<"U16"> => <>;
+U32 :Token = makeToken<"U32"> => <>;
+U64 :Token = makeToken<"U64"> => <>;
+I8 :Token = makeToken<"U8"> => <>;
+I16 :Token = makeToken<"U16"> => <>;
+I32 :Token = makeToken<"U32"> => <>;
+I64 :Token = makeToken<"U64"> => <>;
+F32 :Token = makeToken<"F32"> => <>;
+F64 :Token = makeToken<"F64"> => <>;
+
+
+
+//Complex terminals
+pub MultiLineString : String = r#""""(.|\n)*""""# => <>.to_string();
+pub OneLineString : String = r#""([^"\n]|((\\\\)*\\\"))*""# => <>.to_string();
+
+pub UintLiteral : String = r"0[0_]*|[1-9][0-9_]+" => <>.to_string();
+pub UFloatLiteral : String = UintLiteral "." UintLiteral => <>.to_string();
+
+pub BlockComment : CommentBlock = {
+  <start:@L> BlockComment0 <end:@R> => CommentBlock::make(
+    CommentKind::NonDocumentation,
+    CommentBraceKind::Brace0,
+    <>,
+    start,
+    end
+  ) ,
+  <start:@L> BlockCommentD0 <end:@R> => CommentBlock::make(
+    CommentKind::Documentation,
+    CommentBraceKind::Brace0,
+    <>,
+    start,
+    end
+  ) ,
+}
+
+pub SingleLineComment : CommentLine ={
+  <start:@L> LineCommentDash <end:@R> => CommentLine::make(
+    arena,
+    CommentKind::NonDocumentation,
+    LineCommentStart::DoubleHypen,
+    <>,
+    start,
+    end
+    ),
+  <start:@L> LineCommentSlash <end:@R> => CommentLine::make(
+    arena,
+    CommentKind::NonDocumentation,
+    LineCommentStart::DoubleSlash,
+    <>,
+    start,
+    end
+    ),
+  <start:@L> LineCommentDashD <end:@R> => CommentLine::make(
+    arena,
+    CommentKind::Documentation,
+    LineCommentStart::DoubleHypen,
+    <>,
+    start,
+    end
+    ),
+  <start:@L> LineCommentSlashD <end:@R> => CommentLine::make(
+    arena,
+    CommentKind::Documentation,
+    LineCommentStart::DoubleSlash,
+    <>,
+    start,
+    end
+    )
+  }
+
+comment :Comment = {SingleLineComment => Comment::Line(<>), BlockComment => Comment::Block(<>)};
+
+pub Identifier : (Token,String) =
+  r"_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*"
+  =>
+some;
+pub Operator : (Token,String) =
+  r"(-|\+|\*|/|=|<|>)+" => some;
+
+pub ModuleLogicPath : (Token,ModuleLogicPath) =
+  (Identifier ModuleSeparator)* Identifier => some;
+*/
+
+//Macros
+
+//sepBy1<T,sep> : (Vec<SepByItem<T>>,t) = {
+//  <mut acc: (T sep)*> <t:T> <s:sep> => {acc.0.push(SepByItem{item:acc.1,separator:s}); (acc.0,t)},
+//};
+
+
+separated_list<T,sep>: TrailingList<T> ={
+  <t:T> <mut acc: (sep T)*>=> (t,acc,None).into()
+  };
+
+terminated_list<T,sep> : TrailingList<T> =
+  <t:T> <mut acc: (sep T)*> <s:sep>=> (t,acc,Some(s)).into();
+
+trailing_list<T,sep> : TrailingList<T> = {separated_list<T,sep>,terminated_list<T,sep>}
+
+between<left,T,right> : Between<T> =
+  <l:left> <t:T> <r:right>
+  => Between{left:l.into(),right:r.into(),value:t};
+
+//Non terminals
+
+pub string = StringLiteral;
+
+
+//Imports
+
+//TODO: Add constructors
+
+module_path : Token<ModuleLogicPath>  =
+  ModuleLogicPath =>? lexer::module_token_to_token(<>);
+
+identifier : Token<Identifier> = Identifier =>? lexer::identifier_token_to_token(<>);
+operator : Token<OperatorName> = OperatorName =>? lexer::operator_token_to_token(<>);
+
+import_item : ImportItem ={
+  identifier => ImportItem::Variable(<>),
+  operator => ImportItem::Operator(<>),
+  <t:Type> <o:operator> => ImportItem::TypeOperator(t.into(),o)
+};
+
+import_list : TrailingList<ImportItem> =
+  trailing_list<import_item,","> => <>;
+  //sepBy1<import_item,Comma> => some;
+  //{
+  //import_list Comma import_item => some,
+  //import_item => some
+  //};
+
+//pub import_declaration : Import =
+//  <i:Import> <u:Unqualified?> <p:ModuleLogicPath> between<LParen,<l:import_list>,RParen> <a:(As ModuleLogicPath)?>
+//  => some;
+
+import_as : (TokenInfo,Token<ModuleLogicPath>) =
+  <a:As> <p:module_path>
+  => (a.into(),p);
+
+pub import_declaration : Import =
+  <import:Import> <unqualified:Unqualified?> <module_path:module_path>
+  <import_list:between<"(",<l:import_list>,")">?>
+  <qualified_path:import_as?>
+  => Import{
+    import:import.into(),
+    unqualified:unqualified.map(|x| x.into())
+    ,module_path,import_list,qualified_path};
+
+/*
+type_basic : Type = {
+  U8 => some,
+  U16 => some,
+  U32 => some,
+  U64 => some,
+  I8 => some,
+  I16 => some,
+  I32 => some,
+  I64 => some,
+  F32 => some,
+  F64 => some,
+  Bool => some,
+};
+*/
+
+
+

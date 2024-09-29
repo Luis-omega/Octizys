@@ -15,22 +15,35 @@
 %token Import 'Import'
 %token Export 'Export'
 %token Data 'Data'
+%token Dot 'Dot'
 %token Newtype 'Newtype'
 %token Alias 'Alias'
+%token As 'As'
+%token Unqualified 'Unqualified'
 %token Fn 'Fn'
+%token Forall 'Forall'
+%token Type 'Type'
 %token ModuleSeparator "ModuleSeparator"
+%token LParen "LParen"
+%token RParen "RParen"
 %token MultiLineString "MultiLineString"
 %token String "String"
 %token Uint 'Uint'
 %token Spaces 'Spaces'
 %token LineComment "LineComment"
+%token BlockComment "BlockComment0"
+%token BlockComment1 "BlockComment1"
+%token BlockComment2 "BlockComment2"
+%token BlockComment3 "BlockComment3"
 %token EOL "EOL"
 %token Identifier "Identifier"
+%token Operator "Operator"
+%token RightArrow "RightArrow"
 
 %%
 
 /* (spaces | EOL)+ */
-all_spaces -> Result<(),ParserError>: 
+all_spaces -> Result<(),ParserError>:
     Spaces
   | EOL
   | Spaces all_spaces
@@ -39,8 +52,14 @@ all_spaces -> Result<(),ParserError>:
 
 /* ';' all_spaces? */
 colon -> Result<(),ParserError>:
-  ';' all_spaces 
-  | ';' 
+  ';' all_spaces
+  | ';'
+  ;
+
+/* ';' all_spaces? */
+dot -> Result<(),ParserError>:
+  Dot all_spaces
+  | Dot
   ;
 
 /* LineComment all_spaces? */
@@ -49,11 +68,32 @@ line_comment ->Result<(),ParserError>:
   | LineComment
   ;
 
+block_comment -> Result<(),ParserError>:
+    BlockComment all_spaces
+  | BlockComment
+  ;
+
+maybe_block_comment -> Result<(),ParserError>:
+    all_spaces line_comment
+  | line_comment
+  | all_spaces
+  ;
+
 /* line_comment | all_spaces */
 maybe_line_comment ->Result<(),ParserError>:
     all_spaces line_comment
   | line_comment
   | all_spaces
+  ;
+
+comment_or_spaces -> Result<(),ParserError>:
+  maybe_line_comment
+  | maybe_block_comment
+  ;
+
+comments_or_spaces -> Result<(),ParserError>:
+  comments_or_spaces comment_or_spaces
+  | comment_or_spaces
   ;
 
 /* Uint line_comment?  */
@@ -69,9 +109,37 @@ uint -> Result<u64,ParserError> :
   }
  ;
 
-identifier -> a: 
+identifier -> a:
   Identifier all_spaces
   | Identifier ;
+
+operator -> a:
+  Operator all_spaces
+  | Operator ;
+
+type_keyword -> a:
+  Type all_spaces
+  | Type ;
+
+unqualified -> a:
+  Unqualified all_spaces
+  | Unqualified ;
+
+lpar -> a:
+  LParen all_spaces
+  | LParen ;
+
+rpar -> a:
+  RParen all_spaces
+  | RParen ;
+
+forall -> a:
+  Forall all_spaces
+  | Forall ;
+
+comma -> a:
+  "," all_spaces
+  | "," ;
 
 string ->a :
     String all_spaces
@@ -80,11 +148,11 @@ string ->a :
   | MultiLineString all_spaces
   ;
 
-base_type_raw -> Result<BaseType,ParserError> : 
-  U8 {U8} 
+base_type_raw -> Result<BaseType,ParserError> :
+  U8 {U8}
   | U16 {U16}
   | U32 {U32}
-  | U64 {U64}  
+  | U64 {U64}
   | I8  {I8}
   | I16 {I16}
   | I32 {I32}
@@ -96,7 +164,7 @@ base_type_raw -> Result<BaseType,ParserError> :
 
 base_type -> Result<(),ParserError>:
     base_type_raw maybe_line_comment
-  | base_type_raw 
+  | base_type_raw
   ;
 
 
@@ -121,7 +189,7 @@ named_variable_with_path_raw -> a:
   ;
 
 named_variable_alone_raw -> a:
-  Identifier 
+  Identifier
   ;
 
 named_variable_raw -> a :
@@ -131,10 +199,15 @@ named_variable_raw -> a :
 
 named_variable -> a:
     named_variable_raw maybe_line_comment
-  | named_variable_raw 
+  | named_variable_raw
   ;
-   
 
+
+
+as -> a :
+    As
+  | As maybe_line_comment
+  ;
 
 
 import -> a :
@@ -142,13 +215,39 @@ import -> a :
   | Import
   ;
 
-
-import_declaration -> Result<()>,ParserError> :
-    import named_variable
+imports_list_item -> Result<(),ParserError> :
+    identifier
+  | operator
+  | type_keyword operator
   ;
 
+imports_list_recursive -> Result<(),ParserError>:
+    imports_list_recursive comma imports_list_item
+  | imports_list_recursive comments_or_spaces comma imports_list_item
+  | imports_list_recursive comma comments_or_spaces imports_list_item
+  | imports_list_recursive comments_or_spaces comma comments_or_spaces imports_list_item
+  | imports_list_item
+  ;
 
+/*TODO: fix comments, they must be abled Between items*/
+imports_list -> Result<(),ParserError>:
+    lpar imports_list_recursive rpar
+  |  lpar imports_list_recursive comma rpar
+  | lpar comma rpar
+  ;
 
+/* import unqualified? named_variable imports_list? (as identifier)? */
+import_declaration -> Result<()>,ParserError> :
+    import named_variable
+  | import named_variable as identifier
+  | import named_variable imports_list
+/*  | import named_variable imports_list as identifier
+  | import unqualified named_variable
+  | import unqualified named_variable imports_list
+  | import unqualified named_variable as identifier
+  | import unqualified named_variable imports_list as identifier
+*/
+  ;
 
 
 export -> a :
@@ -156,9 +255,39 @@ export -> a :
   | Export
   ;
 
-export_declaration -> Result<()>,ParserError> : export;
+type_variable -> a:
+    named_variable
+  ;
 
+type_atom -> a :
+    type_variable
+  | base_type
+  | lpar type_expression rpar
+  ;
 
+forall_variables -> Result<(),ParserError>:
+    forall_variables identifier
+  | forall_variables comments_or_spaces identifier
+  | identifier
+  ;
+
+type_forall  -> Result<(),ParserError>:
+    forall forall_variables dot type_expression
+  ;
+
+type_application_recusive -> Result<(),ParserError>:
+  type_atom type_application_recusive
+  | type_atom
+  ;
+
+type_application -> Result<(),ParserError>:
+  type_expression type_application_recusive
+  ;
+
+type_expression  -> a:
+    type_application
+  | type_forall
+  ;
 
 data -> a :
     Data maybe_line_comment
@@ -186,7 +315,7 @@ alias_declaration -> Result<()>,ParserError> : alias;
 
 fn -> a :
     Fn maybe_line_comment
-  | Fn 
+  | Fn
   ;
 
 function_definition_and_declaration -> Result<()>,ParserError> : fn;
@@ -194,12 +323,11 @@ function_definition_and_declaration -> Result<()>,ParserError> : fn;
 
 
 top_element -> a :
-    import_declaration
-  | export_declaration
-  | data_declaration
-  | newtype_declaration
-  | alias_declaration
-  | function_definition_and_declaration
+    import_declaration colon
+  | data_declaration colon
+  | newtype_declaration colon
+  | alias_declaration colon
+  | function_definition_and_declaration colon
   ;
 
 /*TODO: change this*/

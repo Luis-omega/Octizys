@@ -16,10 +16,17 @@ False "False"
 import "Import"
 export "Export"
 data "Data"
+\. "Dot"
 newtype "Newtype"
+as "As"
+unqualified "Unqualified"
 alias "Alias"
 fn "Fn"
+forall "Forall"
+type "Type"
 :: "ModuleSeparator"
+\( "LParen"
+\) "RParen"
 
 
 \"\"\".*\"\"\" "MultiLineString"
@@ -30,8 +37,17 @@ fn "Fn"
 
 (--|//)[^\n]*\n "LineComment"
 
+\{-.*-\}  "BlockComment0"
+\{--.*--\}  "BlockComment1"
+\{---.*---\}  "BlockComment2"
+\{----.*----\}  "BlockComment3"
+
 \n "EOL"
 
 ; ";"
+, ","
+-> "RightArrow"
 
-_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})* "Identifier" 
+_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})* "Identifier"
+
+(-|\+|\*|/|=|<|>)+ "Operator"

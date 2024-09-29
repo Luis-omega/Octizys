@@ -1,4 +1,4 @@
-use cfgrammar::yacc::YaccKind;
+/*use cfgrammar::yacc::YaccKind;
 use lrlex::CTLexerBuilder;
 
 fn main() {
@@ -12,4 +12,8 @@ fn main() {
         .unwrap()
         .build()
         .unwrap();
+}
+*/
+fn main() {
+    lalrpop::process_root().unwrap();
 }

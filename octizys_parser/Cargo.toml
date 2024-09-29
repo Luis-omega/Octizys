@@ -6,17 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+octizys_common = {path = "../octizys_common"}
 octizys_core = {path = "../octizys_core"}
-octizys_sast = {path = "../octizys_sast"}
+octizys_cst = {path = "../octizys_cst"}
+octizys_pretty = {path = "../octizys_pretty"}
 
-cfgrammar = "0.13"
-lrlex = "0.13"
-lrpar = "0.13"
+lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
+paste = "1.0.15"
+
 
 [build-dependencies]
 cfgrammar = "0.13"
-lrlex = "0.13"
-lrpar = "0.13"
+lalrpop = "0.21.0"
 
 [lints.rust]
 unused = "allow"
