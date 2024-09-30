@@ -352,6 +352,7 @@ dependencies = [
  "octizys_cst",
  "octizys_pretty",
  "paste",
+ "regex",
 ]
 
 [[package]]

@@ -1,12 +1,15 @@
 use lalrpop_util::ParseError;
 use octizys_common::identifier::Identifier;
 use octizys_common::module_logic_path::ModuleLogicPath;
+use regex::Regex;
 use std::str::CharIndices;
+use std::sync::LazyLock;
 use std::{collections::VecDeque, rc::Rc};
 
 use octizys_cst::cst::{
-    self, Comment, CommentBlock, CommentKind, CommentLine, CommentLineContent,
-    CommentsInfo, LineCommentStart, OperatorName, Position, Span, TokenInfo,
+    self, Comment, CommentBlock, CommentBraceKind, CommentKind, CommentLine,
+    CommentLineContent, CommentsInfo, LineCommentStart, OperatorName, Position,
+    Span, TokenInfo,
 };
 
 use paste::paste;
@@ -17,6 +20,8 @@ pub enum LexerErrorType {
     UnbalancedComment,
     CantTranslateToToken(Token),
     InvaliedSequenceOfCharacters(String),
+    CantConvertIdentifierTextToIdentifier(String, TokenInfo),
+    CantConvertToModuleLogicPath(String, TokenInfo),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -30,7 +35,7 @@ pub enum Token {
     Comma(TokenInfo),
     Colon(TokenInfo),
     StatementEnd(TokenInfo),
-    FieldAccessor(TokenInfo),
+    Dot(TokenInfo),
     ModuleSeparator(TokenInfo),
     CaseSeparator(TokenInfo),
     LParen(TokenInfo),
@@ -41,6 +46,8 @@ pub enum Token {
     RBrace(TokenInfo),
     RightArrow(TokenInfo),
     LeftArrow(TokenInfo),
+    Interrogation(TokenInfo),
+    Exclamation(TokenInfo),
     Import(TokenInfo),
     Export(TokenInfo),
     Data(TokenInfo),
@@ -79,7 +86,7 @@ impl From<Token> for TokenInfo {
             Token::Comma(info) => info,
             Token::Colon(info) => info,
             Token::StatementEnd(info) => info,
-            Token::FieldAccessor(info) => info,
+            Token::Dot(info) => info,
             Token::ModuleSeparator(info) => info,
             Token::CaseSeparator(info) => info,
             Token::LParen(info) => info,
@@ -90,6 +97,8 @@ impl From<Token> for TokenInfo {
             Token::RBrace(info) => info,
             Token::RightArrow(info) => info,
             Token::LeftArrow(info) => info,
+            Token::Interrogation(info) => info,
+            Token::Exclamation(info) => info,
             Token::Import(info) => info,
             Token::Export(info) => info,
             Token::Data(info) => info,
@@ -146,54 +155,6 @@ make_lexer_token_to_token!(module, ModuleLogicPath);
 make_lexer_token_to_token!(identifier, Identifier);
 make_lexer_token_to_token!(operator, OperatorName);
 
-//TODO: Make those UTF8.
-
-fn is_digit(c: char) -> bool {
-    '0' <= c && c <= '9'
-}
-
-fn is_letter(c: char) -> bool {
-    ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
-}
-
-fn is_underscore(c: char) -> bool {
-    c == '_'
-}
-
-// Non linebreak spaces
-fn is_simple_space(c: char) -> bool {
-    c == ' ' || c == '\t'
-}
-
-fn is_linebreak(c: char) -> bool {
-    c == '\n' || c == '\r'
-}
-
-// All kind of blanks
-fn is_space(c: char) -> bool {
-    is_simple_space(c) || is_linebreak(c)
-}
-
-fn is_identifier_start(c: char) -> bool {
-    is_underscore(c) || is_letter(c)
-}
-
-fn is_identifier_body(c: char) -> bool {
-    is_identifier_start(c) || is_digit(c)
-}
-
-fn is_operator_start(c: char) -> bool {
-    match c {
-        '+' | '*' | '/' | '^' | '%' | '=' | '&' | '~' | '#' | '!' | '$'
-        | '?' => true,
-        _ => false,
-    }
-}
-
-fn is_operator_body(c: char) -> bool {
-    is_operator_start(c) || c == ','
-}
-
 fn match_keyword(s: &str, info: TokenInfo) -> Option<Token> {
     return match s {
         "import" => Some(Token::Import(info)),
@@ -223,173 +184,244 @@ fn match_keyword(s: &str, info: TokenInfo) -> Option<Token> {
     };
 }
 
+static SIMPLE_SPACES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^( |\t)+").unwrap());
+static ALL_SPACES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s+").unwrap());
+static HYPEN_DOCUMENTATION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^-- \|.*\n").unwrap());
+static HYPEN_COMMENT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^--.*\n").unwrap());
+static SLASH_DOCUMENTATION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^// \|.*\n").unwrap());
+static SLASH_COMMENT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^//.*\n").unwrap());
+static COMMENT_BLOCK0: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{-(.|\n)*-\}").unwrap());
+static COMMENT_BLOCK1: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{--(.|\n)*--\}").unwrap());
+static COMMENT_BLOCK2: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{---(.|\n)*---\}").unwrap());
+static COMMENT_BLOCK3: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{----(.|\n)*----\}").unwrap());
+static COMMENT_BLOCKD0: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{- \|(.|\n)*-\}").unwrap());
+static COMMENT_BLOCKD1: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{-- \|(.|\n)*--\}").unwrap());
+static COMMENT_BLOCKD2: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{--- \|(.|\n)*---\}").unwrap());
+static COMMENT_BLOCKD3: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{---- \|(.|\n)*----\}").unwrap());
+//TODO: choose operator hierarchies
+// not_alone ->
+// not_alone <-
+// not_alone ,
+// not_alone :
+// not_alone |
+// not_contains ;
+// TODO: we aren't going to support custom operators but instead
+// would offer a fixed set of operators with know fixities like :
+// +,-, <+>, <<+>>  , ++, ++++,
+//  `a +> b +> c` became  `(a +> b) +> c`
+//  not sure about this, maybe all of them should be left associative?
+//  yes, `a - b - c` must be `(a - b) - c`  and the C language table
+//  uses  all binary ops as left associative, we only need to take care
+//  of the precedences.
+static OPERATOR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(-|\+|\*|/|=|<|>|~|#|!|\?|&|\^|:|%|,|\\)+").unwrap()
+});
+static MULTILINE_STRING: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"^""".*""""#).unwrap());
+static LINE_STRING: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"^"([^"\n]|((\\\\)*\\\"))*""#).unwrap());
+static UINT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^0[0_]*|[1-9][0-9_]+").unwrap());
+static FLOAT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(0[0_]*|[1-9][0-9_]+)\.(0[0_]*|[1-9][0-9_]+)((e|E)(0[0_]*|[1-9][0-9_]+))?").unwrap()
+});
+// For docummentation on this, see the octizys_commmon::identifier::IDENTIFER_LAZY_REGEX
+static IDENTIFIER_STRING: &'static str = r"_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*";
+static IDENTIFER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&format!("^{:}", IDENTIFIER_STRING)).unwrap());
+static MODULE_LOGIC_PATH: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!("^(({re}::)+{re})", re = IDENTIFIER_STRING)).unwrap()
+});
+static ACCESSOR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!("^\\.{re}", re = IDENTIFIER_STRING)).unwrap()
+});
+
 #[derive(Debug)]
 pub struct Lexer<'input> {
     src: &'input str,
-    chars: CharIndices<'input>,
-    current: Option<(usize, char)>,
-    look_ahead: VecDeque<(usize, char)>,
+    offset: usize,
+    found_error: bool,
 }
 
 impl<'input> Lexer<'input> {
     pub fn new(src: &'input str) -> Self {
-        let mut chars = src.char_indices();
-        let current = chars.next();
-        let look_ahead = VecDeque::new();
-
         Lexer {
             src,
-            chars,
-            current,
-            look_ahead,
+            offset: 0,
+            found_error: false,
         }
     }
 
-    pub fn advance(&mut self) -> Option<(usize, char)> {
-        match self.look_ahead.pop_front() {
-            Some(current) => {
-                self.current = Some(current);
+    pub fn satisfy<'a>(
+        self: &'a mut Lexer<'input>,
+        re: &LazyLock<Regex>,
+    ) -> Option<(Span, &'input str)> {
+        println!("re: {:?}", re);
+        let start = self.offset;
+        match re.find(self.src) {
+            Some(m) => {
+                println!("found: {:?}", m);
+                let end = m.end();
+                self.src = &self.src[end..];
+                self.offset += end;
+                Some(((start, self.offset - 1).into(), m.as_str()))
             }
-            None => {
-                self.current = self.chars.next();
-            }
-        }
-        let out = self.current;
-        println!("advance, new: {:?}", out);
-        out
-    }
-
-    pub fn restore(&mut self, acc: Vec<(usize, char)>) -> () {
-        self.look_ahead.extend(acc);
-    }
-
-    pub fn satisfy(
-        &mut self,
-        predicate: fn(char) -> bool,
-    ) -> Option<(usize, char)> {
-        let (pos, c) = self.current?;
-        if predicate(c) {
-            Some((pos, c))
-        } else {
-            None
-        }
-    }
-
-    //If the stream is at the end, return None.
-    //If the first item don't satisfy the predicate, return None.
-    //Otherwise return the start and final position in stream.
-    pub fn take_while(
-        &mut self,
-        acc: &mut Vec<(usize, char)>,
-        predicate: fn(char) -> bool,
-    ) -> Option<(usize, usize)> {
-        let (start_pos, initial_char) = self.satisfy(predicate)?;
-        let mut end_pos = start_pos;
-        acc.push((start_pos, initial_char));
-        self.advance();
-        loop {
-            match self.satisfy(predicate) {
-                Some((new_pos, c)) => {
-                    acc.push((new_pos, c));
-                    end_pos = new_pos;
-                    self.advance();
-                    continue;
-                }
-                None => return Some((start_pos, end_pos)),
-            }
-        }
-    }
-    pub fn discart_while(&mut self, predicate: fn(char) -> bool) {
-        match self.current {
-            Some((_, c)) => {
-                if !predicate(c) {
-                    return;
-                } else {
-                    ()
-                }
-            }
-            None => return,
-        }
-        loop {
-            match self.advance() {
-                Some((_, c)) => {
-                    if !predicate(c) {
-                        return;
-                    } else {
-                        ()
-                    }
-                }
-                None => return,
-            }
+            None => None,
         }
     }
 
     pub fn simple_spaces(&mut self) -> () {
-        self.discart_while(is_simple_space)
+        self.satisfy(&SIMPLE_SPACES);
     }
 
     pub fn all_spaces(&mut self) -> () {
-        self.discart_while(is_space)
-    }
-
-    pub fn take_until_linebreak(&mut self) -> (Option<Span>, String) {
-        println!("linebreak");
-        let mut acc: Vec<(usize, char)> = vec![];
-        self.advance();
-        let span = self
-            .take_while(&mut acc, |c| !is_linebreak(c))
-            .map(Span::from);
-
-        (span, acc.into_iter().map(|(x, y)| y).collect())
+        self.satisfy(&ALL_SPACES);
     }
 
     pub fn single_line_comment_aux(
         &mut self,
-        comment_start: LineCommentStart,
+        re: &LazyLock<Regex>,
+        kind: CommentKind,
+        start: LineCommentStart,
     ) -> Option<CommentLine> {
-        let (pos1, first) = self.current?;
-        let expected_start = char::from(comment_start);
-        println!("first: '{:?}' , expected '{:?}'", first, expected_start);
-        if first == expected_start {
-            self.advance();
-            let (pos2, second) = self.current?;
-            if second == expected_start {
-                let (maybe_span, text) = self.take_until_linebreak();
-                let mut span = maybe_span.unwrap_or(Span::from((pos1, pos2)));
-                let (kind, trimed_text) = match &(text[0..2]) {
-                    " |" => {
-                        span.start.source_index += " |".len();
-                        (CommentKind::Documentation, &text[2..])
-                    }
-                    _ => (CommentKind::NonDocumentation, &text[0..]),
+        println!("single_line with : {:?} {:?}", kind, start);
+        let out = match self.satisfy(re) {
+            Some((span, full_text)) => {
+                let start_offset = match kind {
+                    CommentKind::NonDocumentation => 2,
+                    CommentKind::Documentation => 4,
                 };
-                let content =
-                    CommentLineContent::decompose(&trimed_text)[0].clone();
+                let text = &full_text[start_offset..full_text.len() - 1];
+                let content = CommentLineContent::decompose(&text)[0].clone();
                 Some(CommentLine {
                     kind,
-                    start: comment_start,
+                    start,
                     content,
                     span,
                 })
-            } else {
-                self.restore(vec![(pos1, first)]);
-                None
             }
-        } else {
-            None
-        }
+            None => None,
+        };
+        out
     }
 
     pub fn single_line_comment(&mut self) -> Option<CommentLine> {
-        self.single_line_comment_aux(LineCommentStart::DoubleHypen)
-            .or_else(|| {
-                self.single_line_comment_aux(LineCommentStart::DoubleSlash)
-            })
+        self.single_line_comment_aux(
+            &HYPEN_DOCUMENTATION,
+            CommentKind::Documentation,
+            LineCommentStart::DoubleHypen,
+        )
+        .or_else(|| {
+            self.single_line_comment_aux(
+                &HYPEN_COMMENT,
+                CommentKind::NonDocumentation,
+                LineCommentStart::DoubleHypen,
+            )
+        })
+        .or_else(|| {
+            self.single_line_comment_aux(
+                &SLASH_DOCUMENTATION,
+                CommentKind::Documentation,
+                LineCommentStart::DoubleSlash,
+            )
+        })
+        .or_else(|| {
+            self.single_line_comment_aux(
+                &SLASH_COMMENT,
+                CommentKind::NonDocumentation,
+                LineCommentStart::DoubleSlash,
+            )
+        })
     }
 
     pub fn comment_block(&mut self) -> Option<CommentBlock> {
-        //todo!();
-        None
+        let cases = [
+            (
+                &COMMENT_BLOCKD3,
+                CommentKind::Documentation,
+                CommentBraceKind::Brace3,
+            ),
+            (
+                &COMMENT_BLOCK3,
+                CommentKind::NonDocumentation,
+                CommentBraceKind::Brace3,
+            ),
+            (
+                &COMMENT_BLOCKD2,
+                CommentKind::Documentation,
+                CommentBraceKind::Brace2,
+            ),
+            (
+                &COMMENT_BLOCK2,
+                CommentKind::NonDocumentation,
+                CommentBraceKind::Brace2,
+            ),
+            (
+                &COMMENT_BLOCKD1,
+                CommentKind::Documentation,
+                CommentBraceKind::Brace1,
+            ),
+            (
+                &COMMENT_BLOCK1,
+                CommentKind::NonDocumentation,
+                CommentBraceKind::Brace1,
+            ),
+            (
+                &COMMENT_BLOCKD0,
+                CommentKind::Documentation,
+                CommentBraceKind::Brace0,
+            ),
+            (
+                &COMMENT_BLOCK0,
+                CommentKind::NonDocumentation,
+                CommentBraceKind::Brace0,
+            ),
+        ];
+        let mut result: Option<((Span, &str), CommentKind, CommentBraceKind)> =
+            None;
+        for (re, kind, brace) in cases {
+            match self.satisfy(re) {
+                Some(text) => {
+                    result = Some((text, kind, brace));
+                    break;
+                }
+                None => continue,
+            }
+        }
+
+        let ((span, text), kind, brace) = result?;
+        let len = brace.len();
+        let start_offset = len
+            + match kind {
+                CommentKind::Documentation => 2,
+                _ => 0,
+            };
+        //Spans are inclusive while rust use [a,b) for ranges
+        // so we need a +1
+        let end_offset = span.end.source_index - len + 1;
+        let block = CommentBlock {
+            kind,
+            brace,
+            content: CommentLineContent::decompose(
+                &text[start_offset..end_offset],
+            ),
+            span,
+        };
+        Some(block)
     }
 
     pub fn any_comment(&mut self) -> Option<Comment> {
@@ -421,66 +453,130 @@ impl<'input> Lexer<'input> {
         comment.map(Comment::from)
     }
 
-    pub fn lex_identifier_or_hole_or_keyword(
+    pub fn lex_with_value(
         &mut self,
+        re: &LazyLock<Regex>,
         before: Vec<Comment>,
-    ) -> Option<Token> {
-        let (start_pos, initial_c) = self.satisfy(is_identifier_start)?;
-        self.advance();
-        let mut acc = vec![(start_pos, initial_c)];
-        println!("before");
-        let end_pos = match self.take_while(&mut acc, is_identifier_body) {
-            Some((_, end_pos)) => end_pos,
-            None => start_pos,
-        };
-        println!("iden {:?}", acc);
+        make_token: fn(&str, TokenInfo) -> Result<Token, LexerError>,
+    ) -> Option<Result<Token, LexerError>> {
+        let (span, text) = self.satisfy(re)?;
         let after = self.after_comments();
         let comments = cst::CommentsInfo { before, after };
-        let info = TokenInfo::make(comments, start_pos, end_pos);
-        let text: String = acc.into_iter().map(|(a, b)| b).collect();
-        println!("identifier: {:?}", text);
-        match match_keyword(&text, info.clone()) {
-            Some(tok) => Some(tok),
-            None => match Identifier::make(&text) {
-                Ok(identifier) => Some(Token::Identifier(info, identifier)),
-                //TODO: implement holes
-                Err(_) => None,
-            },
-        }
+        let info = TokenInfo { comments, span };
+        Some(make_token(text, info))
     }
 
-    pub fn lex_uint_or_float(&mut self, before: Vec<Comment>) -> Option<Token> {
-        println!("uint: {:?}", self.current);
-        None
+    pub fn identifier_or_keyword(
+        &mut self,
+        before: Vec<Comment>,
+    ) -> Option<Result<Token, LexerError>> {
+        //let (span, text) = self.satisfy(&IDENTIFER)?;
         //let after = self.after_comments();
         //let comments = cst::CommentsInfo { before, after };
-        //let info = TokenInfo::make(comments, start_pos, end_pos);
-        //let text: String = acc.into_iter().collect();
-        //todo!();
+        //let info = TokenInfo { comments, span };
+        self.lex_with_value(&IDENTIFER, before, |text, info| {
+            match match_keyword(text, info.clone()){
+                Some(x) => Ok(x),
+                None =>{
+                    match Identifier::make(text) {
+                        Ok(identifier) => Ok(Token::Identifier(info, identifier)),
+                        Err(_) => {let position = info.span.start; Err(LexerError {
+                            error_type:
+                                LexerErrorType::CantConvertIdentifierTextToIdentifier(
+                                    text.into(),
+                                    info,
+                                ),
+                            position,
+                        })},
+                    }
+                }
+            }
+        })
+    }
+
+    pub fn lex_uint(
+        &mut self,
+        before: Vec<Comment>,
+    ) -> Option<Result<Token, LexerError>> {
+        self.lex_with_value(&UINT, before, |text, info| {
+            //TODO: check boundaries of UINT?
+            Ok(Token::UintLiteral(info, String::from(text)))
+        })
+    }
+
+    pub fn lex_float(
+        &mut self,
+        before: Vec<Comment>,
+    ) -> Option<Result<Token, LexerError>> {
+        self.lex_with_value(&FLOAT, before, |text, info| {
+            //TODO: check boundaries of FLOAT?
+            Ok(Token::UFloatLiteral(info, String::from(text)))
+        })
+    }
+
+    pub fn lex_module_logic_path(
+        &mut self,
+        before: Vec<Comment>,
+    ) -> Option<Result<Token, LexerError>> {
+        self.lex_with_value(&MODULE_LOGIC_PATH, before, |text, info| {
+            match ModuleLogicPath::make(text) {
+                Ok(path) => Ok(Token::ModuleLogicPath(info, path)),
+                Err(_) => {
+                    let position = info.span.start;
+                    Err(LexerError {
+                        error_type:
+                            LexerErrorType::CantConvertToModuleLogicPath(
+                                String::from(text),
+                                info,
+                            ),
+                        position,
+                    })
+                }
+            }
+        })
     }
 
     pub fn lex_symbol_or_operator(
         &mut self,
         before: Vec<Comment>,
-    ) -> Option<Token> {
-        println!("operator: {:?}", self.current);
-        None
-        //let after = self.after_comments();
-        //let comments = cst::CommentsInfo { before, after };
-        //let info = TokenInfo::make(comments, start_pos, end_pos);
-        //let text: String = acc.into_iter().collect();
-        //todo!()
+    ) -> Option<Result<Token, LexerError>> {
+        self.lex_with_value(&OPERATOR, before, |text, info| match text {
+            "," => Ok(Token::Comma(info)),
+            ":" => Ok(Token::Colon(info)),
+            ";" => Ok(Token::StatementEnd(info)),
+            "." => Ok(Token::Dot(info)),
+            "::" => Ok(Token::ModuleSeparator(info)),
+            "|" => Ok(Token::CaseSeparator(info)),
+            "->" => Ok(Token::RightArrow(info)),
+            "<-" => Ok(Token::LeftArrow(info)),
+            "?" => Ok(Token::Interrogation(info)),
+            "!" => Ok(Token::Exclamation(info)),
+            _ => {
+                Ok(Token::OperatorName(info, OperatorName(String::from(text))))
+                //if Regex::new("--+").unwrap().is_match(text) {
+                //    Ok(todo!())
+                //} else {
+                //    Ok(Token::OperatorName(
+                //        info,
+                //        OperatorName(String::from(text)),
+                //    ))
+                //}
+            }
+        })
     }
 
-    pub fn one_token(&mut self) -> Result<Token, Vec<Comment>> {
+    pub fn one_token(
+        &mut self,
+    ) -> Result<Result<Token, LexerError>, Vec<Comment>> {
         let before = self.before_comments();
         //TODO: is there a way to remove the clone of before?
         //well, it can be if we return a function that consumes
         //a before and construct a token instead of the token..
         let out = self
-            .lex_symbol_or_operator(before.clone())
-            .or_else(|| self.lex_uint_or_float(before.clone()))
-            .or_else(|| self.lex_identifier_or_hole_or_keyword(before.clone()))
+            .identifier_or_keyword(before.clone())
+            .or_else(|| self.lex_float(before.clone()))
+            .or_else(|| self.lex_uint(before.clone()))
+            .or_else(|| self.lex_symbol_or_operator(before.clone()))
             .ok_or(before);
         println!("out : {:?}", out);
         out
@@ -491,19 +587,31 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = Result<(Position, Token, Position), LexerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current.is_none() {
+        println!("new_next : {:?}", self);
+        match self.src {
+            "" => return None,
+            _ => (),
+        }
+        if self.found_error {
             return None;
-        };
+        }
         match self.one_token() {
-            Ok(token) => {
+            Ok(Ok(token)) => {
                 let info = TokenInfo::from(token.clone());
                 let out = Some(Ok((info.span.start, token, info.span.start)));
                 return out;
             }
-            //TODO: Inject last comment as a token here
+            Ok(Err(error_token)) => {
+                self.found_error = true;
+                Some(Err(error_token))
+            }
             Err(comments) => {
                 let token = Token::LastComments(comments);
                 let s = TokenInfo::from(token.clone()).span;
+                //TODO: this is a hack to make lexer to stop if we couldn't identify a token
+                //To fix it, we need to get a notion of "we tried everithing and we didn't find
+                //anything and we still have input" and check for it
+                self.found_error = true;
                 return Some(Ok((s.start, token, s.end)));
             }
         }
@@ -620,7 +728,8 @@ mod lexer_tests {
         let start_str: &'static str = start.into();
         let trailing_string: String = vec![start_str, kind.into()].join("");
         let start_gap = trailing_string.len();
-        let raw_string: String = trailing_string.clone() + content_string;
+        let raw_string: String =
+            trailing_string.clone() + content_string + "\n";
         let lex = Lexer::new(&raw_string);
         let result: Vec<Result<Token, LexerError>> =
             lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
@@ -632,7 +741,7 @@ mod lexer_tests {
             start,
             content,
             // -1 here as the len give us a bigger index
-            span: (start_gap, start_gap + content_string.len() - 1).into(),
+            span: (0, raw_string.len() - 1).into(),
         };
         let token = Token::LastComments(vec![comment_line.into()]);
         let expected = vec![Ok(token)];
@@ -644,7 +753,7 @@ mod lexer_tests {
     #[test]
     fn line_comment_hypen() {
         make_line_comment_documentation_test(
-            " some string ra>msf-- asfer832*cvssdfs=were#' commenting things",
+            " some",
             CommentKind::NonDocumentation,
             LineCommentStart::DoubleHypen,
         )
@@ -675,5 +784,105 @@ mod lexer_tests {
             CommentKind::Documentation,
             LineCommentStart::DoubleSlash,
         )
+    }
+
+    fn make_block_test(
+        content_string: &'static str,
+        kind: CommentKind,
+        brace: CommentBraceKind,
+    ) {
+        let kind_as_str: &str = kind.into();
+        println!("kind: {:?} {:?}", kind, kind_as_str);
+        let (start_str, end_str): (&'static str, &'static str) = brace.into();
+        let trailing_string: String = vec![start_str, kind_as_str].join("");
+        let start_gap = trailing_string.len();
+        let content = CommentLineContent::decompose(content_string);
+        let lexer_string = [&trailing_string, content_string, end_str].join("");
+        let lex = Lexer::new(&lexer_string);
+        let block = CommentBlock {
+            kind,
+            brace,
+            content,
+            span: (0, lexer_string.len() - 1).into(),
+        };
+        let result: Vec<Result<Token, LexerError>> =
+            lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
+        let token = Token::LastComments(vec![block.into()]);
+        let expected = vec![Ok(token)];
+        println!("result:   {:?}", result);
+        println!("expected: {:?}", expected);
+        assert!(result == expected)
+    }
+
+    #[test]
+    fn block0_comment() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::NonDocumentation,
+            CommentBraceKind::Brace0,
+        );
+    }
+
+    #[test]
+    fn block1_comment() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::NonDocumentation,
+            CommentBraceKind::Brace1,
+        );
+    }
+
+    #[test]
+    fn block2_comment() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::NonDocumentation,
+            CommentBraceKind::Brace2,
+        );
+    }
+
+    #[test]
+    fn block3_comment() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::NonDocumentation,
+            CommentBraceKind::Brace2,
+        );
+    }
+
+    #[test]
+    fn block0_documentation() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::Documentation,
+            CommentBraceKind::Brace0,
+        );
+    }
+
+    #[test]
+    fn block1_documentation() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::Documentation,
+            CommentBraceKind::Brace1,
+        );
+    }
+
+    #[test]
+    fn block2_documentation() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::Documentation,
+            CommentBraceKind::Brace2,
+        );
+    }
+
+    #[test]
+    fn block3_documentation() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::Documentation,
+            CommentBraceKind::Brace2,
+        );
     }
 }

@@ -23,7 +23,7 @@ pub enum IdentifierError {
 }
 
 /// Keep this in sync with the lexer definition for Identifier
-static IDENTIFER_LAZY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+pub static IDENTIFER_LAZY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?x) #ingore spaces and allow comments
         ^ #match from the begin

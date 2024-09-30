@@ -1,4 +1,4 @@
-use std::{collections::HashSet, rc::Rc};
+use std::{collections::HashSet, ops::Add, rc::Rc};
 
 use octizys_common::{
     identifier::Identifier, module_logic_path::ModuleLogicPath,
@@ -56,6 +56,16 @@ impl From<(usize, usize)> for Span {
             start: value.0.into(),
             end: value.1.into(),
         }
+    }
+}
+
+impl Add for Span {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        let start =
+            std::cmp::max(self.start.source_index, rhs.start.source_index);
+        let end = std::cmp::max(self.end.source_index, rhs.end.source_index);
+        (start, end).into()
     }
 }
 
@@ -121,6 +131,17 @@ impl CommentBraceKind {
     }
 }
 
+impl From<CommentBraceKind> for (&str, &str) {
+    fn from(value: CommentBraceKind) -> Self {
+        match value {
+            CommentBraceKind::Brace0 => ("{-", "-}"),
+            CommentBraceKind::Brace1 => ("{--", "--}"),
+            CommentBraceKind::Brace2 => ("{---", "---}"),
+            CommentBraceKind::Brace3 => ("{----", "----}"),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LineCommentStart {
     // --
@@ -149,23 +170,12 @@ impl From<LineCommentStart> for &'static str {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentBlock {
-    kind: CommentKind,
-    brace: CommentBraceKind,
-    content: Vec<CommentLineContent>,
-    span: Span,
+    pub kind: CommentKind,
+    pub brace: CommentBraceKind,
+    pub content: Vec<CommentLineContent>,
+    pub span: Span,
 }
 impl CommentBlock {
-    fn trim(s: &str, kind: CommentKind, brace: CommentBraceKind) -> &str {
-        let comment_bracket_len = brace.len();
-        let start = comment_bracket_len
-            + match kind {
-                CommentKind::Documentation => 2,
-                CommentKind::NonDocumentation => 0,
-            };
-        let end = s.len() - comment_bracket_len;
-        &s[start..end]
-    }
-
     pub fn make(
         kind: CommentKind,
         brace: CommentBraceKind,
@@ -173,8 +183,7 @@ impl CommentBlock {
         start_pos: Position,
         end_pos: Position,
     ) -> Self {
-        let cut_text: &str = CommentBlock::trim(full_text, kind, brace);
-        let content = CommentLineContent::decompose(cut_text);
+        let content = CommentLineContent::decompose(full_text);
         CommentBlock {
             kind,
             brace,
@@ -226,6 +235,41 @@ impl CommentsInfo {
             after: None,
         }
     }
+
+    pub fn extend<T>(&mut self, remmain: T) -> ()
+    where
+        T: Iterator<Item = Comment>,
+    {
+        self.before.extend(remmain)
+    }
+
+    pub fn push(&mut self, new: Comment) -> () {
+        self.before.push(new)
+    }
+
+    pub fn move_after_to_before(self) -> Self {
+        let CommentsInfo { mut before, after } = self;
+        match after {
+            Some(c) => {
+                before.push(c);
+                CommentsInfo {
+                    before,
+                    after: None,
+                }
+            }
+            None => CommentsInfo { before, after },
+        }
+    }
+    //TODO: this is wrong, check the docummentation on grammar about
+    //the expected behaviour
+    pub fn absorb_info(&mut self, other: CommentsInfo) -> () {
+        let CommentsInfo { before, after } = other;
+        self.extend(before.into_iter());
+        match after {
+            Some(c) => self.push(c),
+            None => (),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -250,12 +294,30 @@ impl TokenInfo {
             },
         }
     }
+
+    pub fn consume_info(&mut self, other: Self) -> () {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
 pub struct Token<T> {
     pub value: T,
     pub info: TokenInfo,
+}
+
+impl<T> Token<T> {
+    pub fn map<Out>(self, f: fn(T) -> Out) -> Token<Out> {
+        Token {
+            value: f(self.value),
+            info: self.info,
+        }
+    }
+
+    pub fn consume_token<U>(&mut self, other: Token<U>) -> U {
+        self.info.consume_info(other.info);
+        other.value
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -273,7 +335,7 @@ pub enum NamedVariable {
     },
     PrefixedOperator {
         prefix: ModuleLogicPath,
-        name: Identifier,
+        operator: OperatorName,
     },
 }
 

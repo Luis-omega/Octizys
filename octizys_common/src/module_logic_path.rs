@@ -10,6 +10,8 @@ const MODULE_LOGIC_PATH_SEPARATOR: &str = "::";
 #[derive(Debug)]
 pub enum ModuleLogicPathError {
     NotIdentifier,
+    //To be used by the TryFrom, not by the make smart constructor
+    EmptyString,
 }
 
 impl Pretty for ModuleLogicPathError {
@@ -18,6 +20,9 @@ impl Pretty for ModuleLogicPathError {
             Self::NotIdentifier => {
                 "The passed string contains a non valid Identifier component"
                     .into()
+            }
+            Self::EmptyString => {
+                "Attempt to build from a empty vector or string".into()
             }
         }
     }
@@ -41,6 +46,18 @@ impl ModuleLogicPath {
             .map_err(|_x| ModuleLogicPathError::NotIdentifier)?;
         Ok(ModuleLogicPath(v))
     }
+
+    pub fn split_head(self) -> (Option<ModuleLogicPath>, Identifier) {
+        //the split used in the make constructor guaranties that we
+        //always have a element in the internal vector
+        let mut v = self.0;
+        let last = v.pop().unwrap();
+        if v.len() == 0 {
+            (None, last)
+        } else {
+            (Some(ModuleLogicPath(v)), last)
+        }
+    }
 }
 
 impl Newtype<ModuleLogicPath, Vec<Identifier>> for ModuleLogicPath {
@@ -59,14 +76,19 @@ impl Into<String> for ModuleLogicPath {
     }
 }
 
-impl Into<ModuleLogicPath> for Vec<Identifier> {
-    fn into(self) -> ModuleLogicPath {
-        ModuleLogicPath(self)
+impl TryFrom<Vec<Identifier>> for ModuleLogicPath {
+    type Error = ModuleLogicPathError;
+    fn try_from(value: Vec<Identifier>) -> Result<Self, Self::Error> {
+        if value.len() == 0 {
+            Err(ModuleLogicPathError::EmptyString)
+        } else {
+            Ok(ModuleLogicPath(value))
+        }
     }
 }
 
-impl Into<Vec<Identifier>> for ModuleLogicPath {
-    fn into(self) -> Vec<Identifier> {
-        self.0
+impl From<ModuleLogicPath> for Vec<Identifier> {
+    fn from(value: ModuleLogicPath) -> Self {
+        value.0
     }
 }
