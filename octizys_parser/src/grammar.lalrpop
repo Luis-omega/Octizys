@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,OperatorName};
+use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,OperatorName,NamedVariable};
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::identifier::Identifier;
 use crate::lexer;
@@ -96,10 +96,11 @@ operator_name : Token<OperatorName> = OperatorName =>? lexer::operator_token_to_
 //We may consider the other approach if we get a conflict in lalrpop.
 imported_variable : Token<NamedVariable> =
   module_path => {
-  let (maybe_remain,head) = <>.split_head();
-  // The regex in the lexer is `(identifier ::)+ identifier`
-  let remain = maybe_remain.unwrap();
-  NamedVariable::PrefixedVariable{prefix:remain,name:head}
+  todo!()
+  //let (maybe_remain,head) = <>.split_head();
+  //// The regex in the lexer is `(identifier ::)+ identifier`
+  //let remain = maybe_remain.unwrap();
+  //NamedVariable::PrefixedVariable{prefix:remain,name:head}
   };
 
 //The comments right before or after the last :: are moved to be before the
@@ -126,27 +127,29 @@ imported_variable : Token<NamedVariable> =
 // in the CST
 // Note that the lexer prevents comments before or after the others ::
 imported_operator : Token<NamedVariable> =
-  <prefix:module_path> <sep:ModuleSeparator> <operator:operator>
+  <prefix:module_path> <sep:":"> <operator:operator_name>
   =>
   {
   //TODO finish this.
-  let Token{value:prefix_path, info: TokenInfo{prefix_span,token_info}} = prefix;
-  let info = prefix_info.move_after_to_before();
-  let CommentsInfo()
-  info.extend(sep.info.before);
-  info.push(sep.info.after);
-  cst::Token{ value:NamedVariable::PrefixedOperator{prefix,operator,separator:sep.info} , info:}
-  }
+  //let Token{value:prefix_path, info: TokenInfo{prefix_span,token_info}} = prefix;
+  //let info = prefix_info.move_after_to_before();
+  //let CommentsInfo()
+  //info.extend(sep.info.before);
+  //info.push(sep.info.after);
+  //cst::Token{ value:NamedVariable::PrefixedOperator{prefix,operator,separator:sep.info} , info:}
+  todo!()
+  };
 
 local_variable : Token<NamedVariable> =
-  identifier => id
+  identifier => todo!()
+  ;
 
 
 
 import_item : ImportItem ={
   identifier => ImportItem::Variable(<>),
-  operator => ImportItem::Operator(<>),
-  <t:Type> <o:operator> => ImportItem::TypeOperator(t.into(),o)
+  operator_name => ImportItem::Operator(<>),
+  <t:Type> <o:operator_name> => ImportItem::TypeOperator(t.into(),o)
 };
 
 
