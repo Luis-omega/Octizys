@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,OperatorName,NamedVariable};
+use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,OperatorName,NamedVariable,Type,TypeApplication};
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::identifier::Identifier;
 use crate::lexer;
@@ -41,8 +41,8 @@ extern {
       ,Alias => lexer::Token::Alias(TokenInfo)
       ,As => lexer::Token::As(TokenInfo)
       ,Unqualified => lexer::Token::Unqualified(TokenInfo)
-      ,Forall => lexer::Token::Forall(TokenInfo)
-      ,Type => lexer::Token::Type(TokenInfo)
+      ,"forall" => lexer::Token::Forall(TokenInfo)
+      ,"type" => lexer::Token::Type(TokenInfo)
       ,Bool => lexer::Token::Bool(TokenInfo)
       ,True => lexer::Token::True(TokenInfo)
       ,False => lexer::Token::False(TokenInfo)
@@ -149,7 +149,7 @@ local_variable : Token<NamedVariable> =
 import_item : ImportItem ={
   identifier => ImportItem::Variable(<>),
   operator_name => ImportItem::Operator(<>),
-  <t:Type> <o:operator_name> => ImportItem::TypeOperator(t.into(),o)
+  <t:"type"> <o:operator_name> => ImportItem::TypeOperator(t.into(),o)
 };
 
 
@@ -160,15 +160,6 @@ import_item : ImportItem ={
 
 import_list : TrailingList<ImportItem> =
   trailing_list<import_item,","> => <>;
-  //sepBy1<import_item,Comma> => some;
-  //{
-  //import_list Comma import_item => some,
-  //import_item => some
-  //};
-
-//pub import_declaration : Import =
-//  <i:Import> <u:Unqualified?> <p:ModuleLogicPath> between<LParen,<l:import_list>,RParen> <a:(As ModuleLogicPath)?>
-//  => some;
 
 import_as : (TokenInfo,Token<ModuleLogicPath>) =
   <a:As> <p:module_path>
@@ -183,21 +174,59 @@ pub import_declaration : Import =
     unqualified:unqualified.map(|x| x.into())
     ,module_path,import_list,qualified_path};
 
-/*
-type_basic : Type = {
-  U8 => some,
-  U16 => some,
-  U32 => some,
-  U64 => some,
-  I8 => some,
-  I16 => some,
-  I32 => some,
-  I64 => some,
-  F32 => some,
-  F64 => some,
-  Bool => some,
+
+type_base : Type = {
+  U8 => todo!(),
+  U16 => todo!(),
+  U32 => todo!(),
+  U64 => todo!(),
+  I8 => todo!(),
+  I16 => todo!(),
+  I32 => todo!(),
+  I64 => todo!(),
+  F32 => todo!(),
+  F64 => todo!(),
+  Bool =>todo!(),
 };
-*/
 
+type_variable : Type = {
+  local_variable => todo!(),
+  imported_variable =>todo!(),
+}
 
+type_tuple : Type = {
+  between<"(",trailing_list<type_expression,",">,")"> => todo!(),
+}
 
+type_record_item :Type = {
+  //TODO: add support for keyword scape
+  local_variable ":" type_expression => todo!(),
+}
+
+type_record : Type = {
+  between<"{",trailing_list<type_record_item,",">,"}"> => todo!(),
+}
+
+type_atom : Type = {
+  type_base => todo!(),
+  type_variable => todo!(),
+  between<"(",type_expression,")"> => todo!(),
+}
+
+type_application : TypeApplication = {
+   type_atom type_atom+ => todo!(),
+   type_atom => todo!(),
+}
+
+type_arrow : Type = {
+  type_application ("->" type_application)+ => todo!(),
+  type_application => todo!()
+}
+
+type_scheme : Type = {
+  "forall" local_variable+ "." type_arrow => todo!(),
+}
+
+type_expression : Type = {
+  type_scheme => todo!(),
+}

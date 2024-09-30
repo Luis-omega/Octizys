@@ -401,6 +401,18 @@ pub struct Import {
 }
 
 #[derive(Debug)]
+pub enum TypeApplication {
+    Variant1,
+    Variant2,
+}
+
+#[derive(Debug)]
+pub enum Type {
+    Variant1,
+    Variant2,
+}
+
+#[derive(Debug)]
 pub enum PatternMatch {
     Variable(Token<Identifier>),
     AnonHole(Token<()>),
