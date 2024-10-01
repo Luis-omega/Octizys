@@ -18,7 +18,10 @@ extern {
     type Error = lexer::LexerError;
 
     enum lexer::Token {
-      "," => lexer::Token::Comma(TokenInfo)
+      "?" => lexer::Token::Interrogation(TokenInfo)
+      ,"!" => lexer::Token::Exclamation(TokenInfo)
+      ,"#" => lexer::Token::Exclamation(TokenInfo)
+      ,"," => lexer::Token::Comma(TokenInfo)
       ,":" => lexer::Token::Colon(TokenInfo)
       ,";" => lexer::Token::StatementEnd(TokenInfo)
       ,"." => lexer::Token::Dot(TokenInfo)
@@ -45,6 +48,8 @@ extern {
       ,"!=" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"<=" => lexer::Token::ModuleSeparator(TokenInfo)
       ,">=" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"<" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,">" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"&&" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"||" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"&" => lexer::Token::ModuleSeparator(TokenInfo)
@@ -72,7 +77,7 @@ extern {
       ,"newinstance" => lexer::Token::Newtype(TokenInfo)
       ,"class" => lexer::Token::Newtype(TokenInfo)
       ,"instance" => lexer::Token::Newtype(TokenInfo)
-      ,"pub" => lexer::Token::Newtype(TokenInfo)
+      ,"public" => lexer::Token::Newtype(TokenInfo)
       ,"alias" => lexer::Token::Alias(TokenInfo)
       ,"as" => lexer::Token::As(TokenInfo)
       ,"unqualified" => lexer::Token::Unqualified(TokenInfo)
@@ -88,6 +93,7 @@ extern {
       ,I64 => lexer::Token::I64(TokenInfo)
       ,F32 => lexer::Token::F32(TokenInfo)
       ,F64 => lexer::Token::F64(TokenInfo)
+      ,LastComments=> lexer::Token::LastComments(TokenInfo,Comment)
       ,StringLiteral => lexer::Token::StringLiteral(TokenInfo,String)
       ,CharacterLiteral => lexer::Token::CharacterLiteral(TokenInfo,String)
       ,UintLiteral => lexer::Token::UintLiteral(TokenInfo,String)
@@ -99,7 +105,6 @@ extern {
       ,NamedHole=> lexer::Token::NamedHole(TokenInfo,String)
       ,OperatorName=> lexer::Token::OperatorName(TokenInfo,String)
       ,ModuleLogicPath=> lexer::Token::ModuleLogicPath(TokenInfo,String)
-      ,LastComments=> lexer::Token::LastComments(TokenInfo,Comment)
     }
 }
 
@@ -415,7 +420,7 @@ expression_selector : Expression = {
 
 expression_argument : Expression = {
   "@" expression_atom => todo!(),
-  expression_selector =>todo!(),
+  expression_selector "?"? =>todo!(),
   expression_atom => todo!(),
 }
 
@@ -428,14 +433,16 @@ expression_infix_application : Expression = {
   expression_application (InfixIdentifier expression_application)? => todo!(),
 }
 
-expression_negation : Expression = {
+expression_unary_operator : Expression = {
   "-" expression_infix_application => todo!(),
+  "!" expression_infix_application => todo!(),
+  "#" expression_infix_application => todo!(),
 }
 
 expression_composition : Expression = {
-  (expression_negation "|>")+ expression_negation => todo!(),
-  (expression_negation "<|")+ expression_negation => todo!(),
-  expression_negation => todo!(),
+  (expression_unary_operator "|>")+ expression_unary_operator => todo!(),
+  (expression_unary_operator "<|")+ expression_unary_operator => todo!(),
+  expression_unary_operator => todo!(),
 }
 
 expression_exponentiation : Expression = {
@@ -550,20 +557,20 @@ pub  expression : Expression = {
 
 
 pub data_type : Data = {
-  "pub"? "data" local_variable local_variable* "=" separated_list<(local_variable type_expression),"|">
-  "pub"? "data" local_variable local_variable* "="
+  "public"? "data" local_variable local_variable* "=" separated_list<(local_variable type_expression),"|">
+  "public"? "data" local_variable local_variable* "="
 }
 
 pub alias : Alias = {
-  "pub"? "alias" local_variable local_variable* "=" type_expression
+  "public"? "alias" local_variable local_variable* "=" type_expression
 }
 
 pub newtype : NewType = {
-  "pub"? "newtype" local_variable local_variable* "=" local_variable type_expression
+  "public"? "newtype" local_variable local_variable* "=" local_variable type_expression
 }
 
 pub new_instance : NewInstance = {
-  "pub"? "newinstance" local_variable local_variable* "=" local_variable type_expression
+  "public"? "newinstance" local_variable local_variable* "=" local_variable type_expression
 }
 
 
@@ -573,15 +580,15 @@ pub new_instance : NewInstance = {
 //TODO: Support for predefined values?
 //TODO: Class Constrains?
 pub class : Class = {
-  "pub"? "class" local_variable local_variable* between<"{",trailing_list<function_declaration,",">,"}">
+  "public"? "class" local_variable local_variable* between<"{",trailing_list<function_declaration,",">,"}">
 }
 
 
 //TODO: Add support to declare the explicit type of the function
 pub instance : Instance = {
-  "pub"? "instance" local_variable local_variable local_variable between<"{",trailing_list<function_definition,",">,"}">
-  "pub"? "instance" operator_name local_variable local_variable between<"{",trailing_list<function_definition,",">,"}">
-  "pub"? "instance" operator_name local_variable between<"{",trailing_list<function_definition,",">,"}">
+  "public"? "instance" local_variable local_variable local_variable between<"{",trailing_list<function_definition,",">,"}">
+  "public"? "instance" operator_name local_variable local_variable between<"{",trailing_list<function_definition,",">,"}">
+  "public"? "instance" operator_name local_variable between<"{",trailing_list<function_definition,",">,"}">
 }
 
 // --------------------- Functions  ---------------------
