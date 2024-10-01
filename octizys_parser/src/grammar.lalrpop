@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,OperatorName,NamedVariable,Type,TypeApplication};
+use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,OperatorName,NamedVariable,Type,TypeApplication,PatternMatch};
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::identifier::Identifier;
 use crate::lexer;
@@ -23,6 +23,32 @@ extern {
       ,";" => lexer::Token::StatementEnd(TokenInfo)
       ,"." => lexer::Token::Dot(TokenInfo)
       ,"::" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"-" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"|>" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"<|" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"+" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"^" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"*" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"/" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"%" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"<<" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,">>" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"<$>" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"$>" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"<$" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"<*>" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"*>" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"<*" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"==" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"!=" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"<=" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,">=" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"&&" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"||" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"&" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"$" => lexer::Token::ApplicationOperator(TokenInfo)
+      ,"=" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"@" => lexer::Token::ApplicationOperator(TokenInfo)
       ,"|" => lexer::Token::CaseSeparator(TokenInfo)
       ,"(" => lexer::Token::LParen(TokenInfo)
       ,")" => lexer::Token::RParen(TokenInfo)
@@ -34,6 +60,7 @@ extern {
       ,"<-" => lexer::Token::LeftArrow(TokenInfo)
       ,"->" => lexer::Token::Interrogation(TokenInfo)
       ,"<-" => lexer::Token::Exclamation(TokenInfo)
+      ,"unit" => lexer::Token::UnitTerm(TokenInfo)
       ,Import => lexer::Token::Import(TokenInfo)
       ,Export => lexer::Token::Export(TokenInfo)
       ,Data => lexer::Token::Data(TokenInfo)
@@ -58,15 +85,20 @@ extern {
       ,F32 => lexer::Token::F32(TokenInfo)
       ,F64 => lexer::Token::F64(TokenInfo)
       ,StringLiteral => lexer::Token::StringLiteral(TokenInfo,String)
+      ,CharacterLiteral => lexer::Token::CharacterLiteral(TokenInfo,String)
       ,UintLiteral => lexer::Token::UintLiteral(TokenInfo,String)
       ,UFloatLiteral=> lexer::Token::UFloatLiteral(TokenInfo,String)
       ,Identifier=> lexer::Token::Identifier(TokenInfo,String)
+      ,InfixIdentifier=> lexer::Token::InfixIdentifier(TokenInfo,String)
+      ,Selector=> lexer::Token::Selector(TokenInfo,String)
+      ,"_"=> lexer::Token::AnonHole(TokenInfo,String)
+      ,NamedHole=> lexer::Token::NamedHole(TokenInfo,String)
       ,OperatorName=> lexer::Token::OperatorName(TokenInfo,String)
       ,ModuleLogicPath=> lexer::Token::ModuleLogicPath(TokenInfo,String)
     }
 }
 
-//Macros
+// --------------------- Macros ---------------------
 
 separated_list<T,sep>: TrailingList<T> ={
   <t:T> <mut acc: (sep T)*>=> (t,acc,None).into()
@@ -81,9 +113,23 @@ between<left,T,right> : Between<T> =
   <l:left> <t:T> <r:right>
   => Between{left:l.into(),right:r.into(),value:t};
 
-//Terminal translation
+tuple<T> : Between<TrailingLis<T>> = {
+  between<"(",terminated_list<T,",">,")"> => todo!(),
+};
+
+record<record_item, sep> : Between<TrailingList<record_item>> = {
+  between<"{",trailing_list<record_item,sep>,"}"> => todo!(),
+};
+
+// --------------------- Terminal translation ---------------------
 
 pub string = StringLiteral;
+
+character = CharacterLiteral;
+
+uint : T = {
+  UintLiteral => todo!(),
+};
 
 module_path : Token<ModuleLogicPath>  =
   ModuleLogicPath =>? lexer::module_token_to_token(<>);
@@ -153,9 +199,9 @@ import_item : ImportItem ={
 };
 
 
-//Imports
+// --------------------- Imports ---------------------
 
-//TODO: Add constructors
+//TODO: Add importation of constructors
 
 
 import_list : TrailingList<ImportItem> =
@@ -175,6 +221,14 @@ pub import_declaration : Import =
     ,module_path,import_list,qualified_path};
 
 
+//TODO: add kinds,
+// we eventually would add type functions
+// and for them enforce a termination checker
+// Kinds would be useful for that.
+// Additionally consider if we would add effects!
+
+//Types
+
 type_base : Type = {
   U8 => todo!(),
   U16 => todo!(),
@@ -192,41 +246,259 @@ type_base : Type = {
 type_variable : Type = {
   local_variable => todo!(),
   imported_variable =>todo!(),
-}
+};
 
 type_tuple : Type = {
-  between<"(",trailing_list<type_expression,",">,")"> => todo!(),
+  tuple<type_expression> => todo!(),
 }
 
-type_record_item :Type = {
-  //TODO: add support for keyword scape
-  local_variable ":" type_expression => todo!(),
-}
+//TODO: add support for keyword scape
 
+
+type_record_item : Type = {
+  local_variable ":" expression,
+};
+
+//TODO: add support for row polymorphism (we need kinds)
+// we may need a different rule than the macro `record`
 type_record : Type = {
-  between<"{",trailing_list<type_record_item,",">,"}"> => todo!(),
-}
+  record<type_record_item, ",">
+};
 
 type_atom : Type = {
   type_base => todo!(),
   type_variable => todo!(),
+  type_tuple => todo!(),
+  type_record => todo!(),
   between<"(",type_expression,")"> => todo!(),
-}
+};
 
 type_application : TypeApplication = {
    type_atom type_atom+ => todo!(),
    type_atom => todo!(),
-}
+};
 
 type_arrow : Type = {
   type_application ("->" type_application)+ => todo!(),
   type_application => todo!()
-}
+};
 
 type_scheme : Type = {
   "forall" local_variable+ "." type_arrow => todo!(),
+};
+
+//TODO : add type operators
+pub type_expression : Type = {
+  type_scheme => todo!(),
+};
+
+
+
+// --------------------- PatternMatch  ---------------------
+
+pattern_variable : Token<NamedVariable> = {
+  local_variable => todo!(),
+  imported_variable => todo!(),
+};
+
+//TODO: add support for negative integers?
+pattern_literal : PatternMatch  = {
+  string => todo!(),
+  character => todo!(),
+  uint => todo!(),
+  "unit" => todo!(),
+};
+
+pattern_hole : PatternMatch = {
+  "_" => todo!(),
+};
+
+pattern_tuple :PatternMatch = {
+  tuple<pattern> => todo!(),
+};
+
+pattern_record_item : (Token<NamedVariable>,Token_algo,Option<PatternMatch>) = {
+  local_variable ("=" pattern )?  => todo!(),
 }
 
-type_expression : Type = {
-  type_scheme => todo!(),
+pattern_record :PatternMatch = {
+  local_variable  between<"{", trailing_list<pattern_record_item,",">,"}"> => todo!(),
+  imported_variable between<"{", trailing_list<pattern_record_item,",">,"}"> => todo!(),
+};
+
+
+pattern_atom : PatternMatch = {
+  pattern_literal => todo!(),
+  pattern_variable => todo!(),
+  pattern_hole => todo!(),
+  pattern_tuple => todo!(),
+  pattern_record => todo!(),
+  between<"(",pattern,")"> => todo!(),
+};
+
+pattern_bind : PatternMatch = {
+  local_variable "@" pattern_atom => todo!(),
+  pattern_atom =>todo!(),
 }
+
+pattern_application :PatternMatch = {
+  pattern_variable pattern_bind+ => todo!(),
+  pattern_bind => todo!()
+};
+
+pub pattern : PatternMatch = {
+  pattern_application => todo!(),
+};
+
+
+// --------------------- Expression ---------------------
+
+expression_literal : Expression ={
+  "unit" => todo!(),
+};
+
+expression_variable : Expression = {
+  local_variable => todo!(),
+  imported_variable => todo!(),
+};
+
+expression_named_hole : Expression = {
+  NamedHole => todo!(),
+};
+
+expression_tuple : Expression = {
+  tuple<expression> => todo!(),
+};
+
+expression_record_item : Expression = {
+  local_variable "=" expression,
+};
+
+expression_record : Expression = {
+  local_variable  between<"{", trailing_list<expression_record_item,",">,"}"> => todo!(),
+}
+
+expression_atom : Expression = {
+  expression_literal => todo!(),
+  expression_variable => todo!(),
+  expression_named_hole => todo!(),
+  expression_tuple => todo!(),
+  expression_record => todo!(),
+  between<"(",expression,")"> => todo!(),
+};
+
+expression_selector : Expression = {
+  expression_atom Selector+ => todo!(),
+}
+
+expression_argument : Expression = {
+  "@" expression_atom => todo!(),
+  expression_selector =>todo!(),
+  expression_atom => todo!(),
+}
+
+expression_application : Expression = {
+  expression_selector expression_argument* => todo!()
+  expression_atom expression_argument* => todo!()
+}
+
+expression_infix_application : Expression = {
+  expression_application (InfixIdentifier expression_application)? => todo!(),
+}
+
+expression_negation : Expression = {
+  "-" expression_infix_application => todo!(),
+}
+
+expression_composition : Expression = {
+  (expression_negation "|>")+ expression_negation => todo!(),
+  (expression_negation "<|")+ expression_negation => todo!(),
+  expression_negation => todo!(),
+}
+
+expression_exponentiation : Expression = {
+  expression_composition ("^" expression_composition)? => todo!(),
+}
+
+
+multiplicative_operators  : Token = {
+  "*" => todo!(),
+  "/" => todo!(),
+  "%" => todo!(),
+}
+
+expression_multiplicative : Expression = {
+  expression_exponentiation
+  multiplicative_operators
+  expression_exponentiation
+  => todo!(),
+}
+
+additive_operators : Token = {
+  "+" => todo!(),
+  "-" => todo!(),
+}
+
+expression_additive : Expression = {
+  (expression_multiplicative additive_operators)* expression_multiplicative => todo!(),
+}
+
+expression_shift : Expression = {
+  expression_additive "<<" expression_additive => todo!(),
+  expression_additive ">>" expression_additive=>todo!(),
+  expression_additive => todo!(),
+};
+
+expression_annotation : Expression = {
+  expression_shift ":" type_expression => todo!(),
+  expression_shift => todo!(),
+}
+
+
+functor_applicative_operators : Token<OperatorName> = {
+  "<$>" => todo!(),
+  "$>" => todo!(),
+  "<$" => todo!(),
+  "<*>" => todo!(),
+  "<*" => todo!(),
+  "*>" => todo!(),
+}
+
+expression_functor_applicative : Expression = {
+  (expression_annotation functor_applicative_operators)* expression_annotation => todo!(),
+}
+
+comparison_operators : Token<OperatorName> = {
+  "=="=>todo!()
+  "!="=>todo!()
+  "<="=>todo!()
+  ">="=>todo!()
+}
+
+expression_comparison : Expression ={
+  expression_functor_applicative
+  comparison_operators
+  expression_functor_applicative
+  =>todo!(),
+}
+
+expression_and : Expression ={
+  expression_comparison ("&&" expression_comparison)* =>todo!(),
+}
+
+expression_or : Expression = {
+  expression_and ("||" expression_and)* =>todo!(),
+}
+
+expression_reverse_application : Expression = {
+  (expression_composition "&")* expression_composition => todo!(),
+}
+
+expression_dollar : Expression = {
+  expression_reverse_application ("$" expression_reverse_application)* => todo!()
+}
+
+pub  expression : Expression = {
+  expression_dollar
+};
+
