@@ -33,9 +33,11 @@ extern {
       ,"%" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"<<" => lexer::Token::ModuleSeparator(TokenInfo)
       ,">>" => lexer::Token::ModuleSeparator(TokenInfo)
+      //TODO: Add "<&>" = \ x y -> y $ x
       ,"<$>" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"$>" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"<$" => lexer::Token::ModuleSeparator(TokenInfo)
+      //TODO: add <|> and <?>
       ,"<*>" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"*>" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"<*" => lexer::Token::ModuleSeparator(TokenInfo)
@@ -49,7 +51,7 @@ extern {
       ,"$" => lexer::Token::ApplicationOperator(TokenInfo)
       ,"=" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"@" => lexer::Token::ApplicationOperator(TokenInfo)
-      ,"|" => lexer::Token::CaseSeparator(TokenInfo)
+      ,"|" => lexer::Token::Pipe(TokenInfo)
       ,"(" => lexer::Token::LParen(TokenInfo)
       ,")" => lexer::Token::RParen(TokenInfo)
       ,"{" => lexer::Token::LBrace(TokenInfo)
@@ -58,22 +60,24 @@ extern {
       ,"]" => lexer::Token::RBracket(TokenInfo)
       ,"->" => lexer::Token::RightArrow(TokenInfo)
       ,"<-" => lexer::Token::LeftArrow(TokenInfo)
-      ,"->" => lexer::Token::Interrogation(TokenInfo)
-      ,"<-" => lexer::Token::Exclamation(TokenInfo)
-      ,"unit" => lexer::Token::UnitTerm(TokenInfo)
-      ,Import => lexer::Token::Import(TokenInfo)
-      ,Export => lexer::Token::Export(TokenInfo)
-      ,Data => lexer::Token::Data(TokenInfo)
-      ,Newtype => lexer::Token::Newtype(TokenInfo)
-      ,Alias => lexer::Token::Alias(TokenInfo)
-      ,As => lexer::Token::As(TokenInfo)
-      ,Unqualified => lexer::Token::Unqualified(TokenInfo)
+      ,"\\" => lexer::Token::LambdaStart(TokenInfo)
+      ,"let" => lexer::Token::Let(TokenInfo)
+      ,"in" => lexer::Token::In(TokenInfo)
+      ,"case" => lexer::Token::Case(TokenInfo)
+      ,"of" => lexer::Token::Of(TokenInfo)
+      ,"import" => lexer::Token::Import(TokenInfo)
+      ,"export" => lexer::Token::Export(TokenInfo)
+      ,"data" => lexer::Token::Data(TokenInfo)
+      ,"newtype" => lexer::Token::Newtype(TokenInfo)
+      ,"newinstance" => lexer::Token::Newtype(TokenInfo)
+      ,"class" => lexer::Token::Newtype(TokenInfo)
+      ,"instance" => lexer::Token::Newtype(TokenInfo)
+      ,"pub" => lexer::Token::Newtype(TokenInfo)
+      ,"alias" => lexer::Token::Alias(TokenInfo)
+      ,"as" => lexer::Token::As(TokenInfo)
+      ,"unqualified" => lexer::Token::Unqualified(TokenInfo)
       ,"forall" => lexer::Token::Forall(TokenInfo)
       ,"type" => lexer::Token::Type(TokenInfo)
-      ,Bool => lexer::Token::Bool(TokenInfo)
-      ,True => lexer::Token::True(TokenInfo)
-      ,False => lexer::Token::False(TokenInfo)
-      ,Unit => lexer::Token::Unit(TokenInfo)
       ,U8 => lexer::Token::U8(TokenInfo)
       ,U16 => lexer::Token::U16(TokenInfo)
       ,U32 => lexer::Token::U32(TokenInfo)
@@ -95,6 +99,7 @@ extern {
       ,NamedHole=> lexer::Token::NamedHole(TokenInfo,String)
       ,OperatorName=> lexer::Token::OperatorName(TokenInfo,String)
       ,ModuleLogicPath=> lexer::Token::ModuleLogicPath(TokenInfo,String)
+      ,LastComments=> lexer::Token::LastComments(TokenInfo,Comment)
     }
 }
 
@@ -208,11 +213,11 @@ import_list : TrailingList<ImportItem> =
   trailing_list<import_item,","> => <>;
 
 import_as : (TokenInfo,Token<ModuleLogicPath>) =
-  <a:As> <p:module_path>
+  <a:"as"> <p:module_path>
   => (a.into(),p);
 
 pub import_declaration : Import =
-  <import:Import> <unqualified:Unqualified?> <module_path:module_path>
+  <import:"import"> <unqualified:"unqualified"?> <module_path:module_path>
   <import_list:between<"(",<l:import_list>,")">?>
   <qualified_path:import_as?>
   => Import{
@@ -240,7 +245,6 @@ type_base : Type = {
   I64 => todo!(),
   F32 => todo!(),
   F64 => todo!(),
-  Bool =>todo!(),
 };
 
 type_variable : Type = {
@@ -306,7 +310,6 @@ pattern_literal : PatternMatch  = {
   string => todo!(),
   character => todo!(),
   uint => todo!(),
-  "unit" => todo!(),
 };
 
 pattern_hole : PatternMatch = {
@@ -354,7 +357,10 @@ pub pattern : PatternMatch = {
 // --------------------- Expression ---------------------
 
 expression_literal : Expression ={
-  "unit" => todo!(),
+  string => todo!(),
+  CharacterLiteral =>todo!(),
+  UintLiteral =>todo!(),
+  UFloatLiteral => todo!(),
 };
 
 expression_variable : Expression = {
@@ -378,12 +384,28 @@ expression_record : Expression = {
   local_variable  between<"{", trailing_list<expression_record_item,",">,"}"> => todo!(),
 }
 
+case_item : Expression = {
+  pattern "->" expression
+}
+
+//The off is needed for this:
+// case some_func {a:1 , b:2} { something ...}
+// the lr can't choose between
+// case (some_func {a:1 , b:2}) { something ...}
+// and
+// (case some_func {a:1 , b:2}) { something ...}
+expression_case : Expression = {
+  "case" expression "of" between<"{",trailing_list<case_item,",">,"}"> => todo!(),
+}
+
+
 expression_atom : Expression = {
   expression_literal => todo!(),
   expression_variable => todo!(),
   expression_named_hole => todo!(),
   expression_tuple => todo!(),
   expression_record => todo!(),
+  expression_case => todo!(),
   between<"(",expression,")"> => todo!(),
 };
 
@@ -498,7 +520,94 @@ expression_dollar : Expression = {
   expression_reverse_application ("$" expression_reverse_application)* => todo!()
 }
 
+// was using pattern_atom+ or separating the patterns using something like ","
+// I like this more.
+expression_lambda : Expression = {
+  "\\" pattern_atom+ "->" expression_dollar => todo!()
+  expression_dollar => todo!(),
+}
+
+let_binding : Expression = {
+  pattern (":" type_expression)? "=" expression => todo!(),
+}
+
+let_bindings : Expression = {
+  trailing_list<let_binding,","> =>todo!(),
+}
+
+expression_let : Expression = {
+  "let" let_bindings "in" expression => todo!(),
+  expression_lambda => todo!()
+}
+
 pub  expression : Expression = {
-  expression_dollar
+  expression_let
 };
 
+
+
+// --------------------- Data  ---------------------
+
+
+pub data_type : Data = {
+  "pub"? "data" local_variable local_variable* "=" separated_list<(local_variable type_expression),"|">
+  "pub"? "data" local_variable local_variable* "="
+}
+
+pub alias : Alias = {
+  "pub"? "alias" local_variable local_variable* "=" type_expression
+}
+
+pub newtype : NewType = {
+  "pub"? "newtype" local_variable local_variable* "=" local_variable type_expression
+}
+
+pub new_instance : NewInstance = {
+  "pub"? "newinstance" local_variable local_variable* "=" local_variable type_expression
+}
+
+
+// --------------------- Class  ---------------------
+
+//TODO: do classes need pub control?
+//TODO: Support for predefined values?
+//TODO: Class Constrains?
+pub class : Class = {
+  "pub"? "class" local_variable local_variable* between<"{",trailing_list<function_declaration,",">,"}">
+}
+
+
+//TODO: Add support to declare the explicit type of the function
+pub instance : Instance = {
+  "pub"? "instance" local_variable local_variable local_variable between<"{",trailing_list<function_definition,",">,"}">
+  "pub"? "instance" operator_name local_variable local_variable between<"{",trailing_list<function_definition,",">,"}">
+  "pub"? "instance" operator_name local_variable between<"{",trailing_list<function_definition,",">,"}">
+}
+
+// --------------------- Functions  ---------------------
+
+pub function_declaration : FunctionDeclaration = {
+  local_variable ":" type_expression
+}
+
+
+//TODO: replace local_variable* with pattern_atom*
+// ie, support for patterns
+pub function_definition : FunctionDefinition = {
+  local_variable local_variable* "=" expression
+}
+
+
+
+pub top_non_import_item : TopItem = {
+  data_type,
+  alias,
+  newtype,
+  new_instance,
+}
+
+pub top : Cst = {
+  terminated_list<import_declaration,";">?
+  terminated_list<top_non_import_item,";">?
+  LastComments?
+}
