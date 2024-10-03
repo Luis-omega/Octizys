@@ -3,7 +3,7 @@ use octizys_common::error::Error;
 use octizys_cst::cst;
 use std::path::PathBuf;
 
-lalrpop_mod!(grammar);
+//lalrpop_mod!(grammar);
 
 #[derive(Debug)]
 pub enum ParsedFile {}

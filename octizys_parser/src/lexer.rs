@@ -22,6 +22,7 @@ pub enum LexerErrorType {
     InvaliedSequenceOfCharacters(String),
     CantConvertIdentifierTextToIdentifier(String, TokenInfo),
     CantConvertToModuleLogicPath(String, TokenInfo),
+    CantParseOperator(String, TokenInfo),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -32,12 +33,43 @@ pub struct LexerError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
+    Interrogation(TokenInfo),
+    Exclamation(TokenInfo),
+    Hash(TokenInfo),
     Comma(TokenInfo),
     Colon(TokenInfo),
     StatementEnd(TokenInfo),
     Dot(TokenInfo),
     ModuleSeparator(TokenInfo),
-    CaseSeparator(TokenInfo),
+    Minus(TokenInfo),
+    CompositionRight(TokenInfo),
+    CompositionLeft(TokenInfo),
+    Plus(TokenInfo),
+    Power(TokenInfo),
+    Star(TokenInfo),
+    Div(TokenInfo),
+    Module(TokenInfo),
+    ShiftLeft(TokenInfo),
+    ShiftRigth(TokenInfo),
+    Map(TokenInfo),
+    MapConstRigth(TokenInfo),
+    MapConstLeft(TokenInfo),
+    Appliative(TokenInfo),
+    ApplicativeRight(TokenInfo),
+    ApplicativeLeft(TokenInfo),
+    Equality(TokenInfo),
+    NotEqual(TokenInfo),
+    LessOrEqual(TokenInfo),
+    MoreOrEqual(TokenInfo),
+    LessThan(TokenInfo),
+    MoreThan(TokenInfo),
+    And(TokenInfo),
+    Or(TokenInfo),
+    ReverseAppliation(TokenInfo),
+    DollarApplication(TokenInfo),
+    Asignation(TokenInfo),
+    At(TokenInfo),
+    Pipe(TokenInfo),
     LParen(TokenInfo),
     RParen(TokenInfo),
     LBracket(TokenInfo),
@@ -46,21 +78,24 @@ pub enum Token {
     RBrace(TokenInfo),
     RightArrow(TokenInfo),
     LeftArrow(TokenInfo),
-    Interrogation(TokenInfo),
-    Exclamation(TokenInfo),
+    LambdaStart(TokenInfo),
+    Let(TokenInfo),
+    In(TokenInfo),
+    Case(TokenInfo),
+    Of(TokenInfo),
     Import(TokenInfo),
     Export(TokenInfo),
     Data(TokenInfo),
     Newtype(TokenInfo),
+    NewInstance(TokenInfo),
+    Class(TokenInfo),
+    Instance(TokenInfo),
+    Public(TokenInfo),
     Alias(TokenInfo),
     As(TokenInfo),
     Unqualified(TokenInfo),
     Forall(TokenInfo),
     Type(TokenInfo),
-    Bool(TokenInfo),
-    True(TokenInfo),
-    False(TokenInfo),
-    Unit(TokenInfo),
     U8(TokenInfo),
     U16(TokenInfo),
     U32(TokenInfo),
@@ -76,62 +111,107 @@ pub enum Token {
     UintLiteral(TokenInfo, String),
     UFloatLiteral(TokenInfo, String),
     Identifier(TokenInfo, Identifier),
-    OperatorName(TokenInfo, OperatorName),
+    InfixIdentifier(TokenInfo, String),
+    Selector(TokenInfo, String),
+    AnonHole(TokenInfo, String),
+    NamedHole(TokenInfo, String),
     ModuleLogicPath(TokenInfo, ModuleLogicPath),
 }
 
 impl From<Token> for TokenInfo {
     fn from(value: Token) -> TokenInfo {
         match value {
-            Token::Comma(info) => info,
-            Token::Colon(info) => info,
-            Token::StatementEnd(info) => info,
-            Token::Dot(info) => info,
-            Token::ModuleSeparator(info) => info,
-            Token::CaseSeparator(info) => info,
-            Token::LParen(info) => info,
-            Token::RParen(info) => info,
-            Token::LBracket(info) => info,
-            Token::RBracket(info) => info,
-            Token::LBrace(info) => info,
-            Token::RBrace(info) => info,
-            Token::RightArrow(info) => info,
-            Token::LeftArrow(info) => info,
-            Token::Interrogation(info) => info,
-            Token::Exclamation(info) => info,
-            Token::Import(info) => info,
-            Token::Export(info) => info,
-            Token::Data(info) => info,
-            Token::Newtype(info) => info,
-            Token::Alias(info) => info,
-            Token::As(info) => info,
-            Token::Unqualified(info) => info,
-            Token::Forall(info) => info,
-            Token::Type(info) => info,
-            Token::Bool(info) => info,
-            Token::True(info) => info,
-            Token::False(info) => info,
-            Token::Unit(info) => info,
-            Token::U8(info) => info,
-            Token::U16(info) => info,
-            Token::U32(info) => info,
-            Token::U64(info) => info,
-            Token::I8(info) => info,
-            Token::I16(info) => info,
-            Token::I32(info) => info,
-            Token::I64(info) => info,
-            Token::F32(info) => info,
-            Token::F64(info) => info,
-            //TODO: if there are comments, use the span of the last one
-            Token::LastComments(comments) => TokenInfo {
-                comments: CommentsInfo::empty(),
-                span: (usize::MAX, usize::MAX).into(),
-            },
+            Token::Interrogation(info) => (info),
+            Token::Exclamation(info) => (info),
+            Token::Hash(info) => (info),
+            Token::Comma(info) => (info),
+            Token::Colon(info) => (info),
+            Token::StatementEnd(info) => (info),
+            Token::Dot(info) => (info),
+            Token::ModuleSeparator(info) => (info),
+            Token::Minus(info) => (info),
+            Token::CompositionRight(info) => (info),
+            Token::CompositionLeft(info) => (info),
+            Token::Plus(info) => (info),
+            Token::Power(info) => (info),
+            Token::Star(info) => (info),
+            Token::Div(info) => (info),
+            Token::Module(info) => (info),
+            Token::ShiftLeft(info) => (info),
+            Token::ShiftRigth(info) => (info),
+            Token::Map(info) => (info),
+            Token::MapConstRigth(info) => (info),
+            Token::MapConstLeft(info) => (info),
+            Token::Appliative(info) => (info),
+            Token::ApplicativeRight(info) => (info),
+            Token::ApplicativeLeft(info) => (info),
+            Token::Equality(info) => (info),
+            Token::NotEqual(info) => (info),
+            Token::LessOrEqual(info) => (info),
+            Token::MoreOrEqual(info) => (info),
+            Token::LessThan(info) => (info),
+            Token::MoreThan(info) => (info),
+            Token::And(info) => (info),
+            Token::Or(info) => (info),
+            Token::ReverseAppliation(info) => (info),
+            Token::DollarApplication(info) => (info),
+            Token::Asignation(info) => (info),
+            Token::At(info) => (info),
+            Token::Pipe(info) => (info),
+            Token::LParen(info) => (info),
+            Token::RParen(info) => (info),
+            Token::LBracket(info) => (info),
+            Token::RBracket(info) => (info),
+            Token::LBrace(info) => (info),
+            Token::RBrace(info) => (info),
+            Token::RightArrow(info) => (info),
+            Token::LeftArrow(info) => (info),
+            Token::LambdaStart(info) => (info),
+            Token::Let(info) => (info),
+            Token::In(info) => (info),
+            Token::Case(info) => (info),
+            Token::Of(info) => (info),
+            Token::Import(info) => (info),
+            Token::Export(info) => (info),
+            Token::Data(info) => (info),
+            Token::Newtype(info) => (info),
+            Token::NewInstance(info) => (info),
+            Token::Class(info) => (info),
+            Token::Instance(info) => (info),
+            Token::Public(info) => (info),
+            Token::Alias(info) => (info),
+            Token::As(info) => (info),
+            Token::Unqualified(info) => (info),
+            Token::Forall(info) => (info),
+            Token::Type(info) => (info),
+            Token::U8(info) => (info),
+            Token::U16(info) => (info),
+            Token::U32(info) => (info),
+            Token::U64(info) => (info),
+            Token::I8(info) => (info),
+            Token::I16(info) => (info),
+            Token::I32(info) => (info),
+            Token::I64(info) => (info),
+            Token::F32(info) => (info),
+            Token::F64(info) => (info),
+            Token::LastComments(comments) => {
+                let span = match comments.get(0) {
+                    Some(s) => s.clone().get_span(),
+                    None => (usize::MAX, usize::MAX).into(),
+                };
+                TokenInfo {
+                    comments: CommentsInfo::empty(),
+                    span,
+                }
+            }
             Token::StringLiteral(info, _) => info,
             Token::UintLiteral(info, _) => info,
             Token::UFloatLiteral(info, _) => info,
             Token::Identifier(info, _) => info,
-            Token::OperatorName(info, _) => info,
+            Token::InfixIdentifier(info, _) => info,
+            Token::Selector(info, _) => info,
+            Token::AnonHole(info, _) => info,
+            Token::NamedHole(info, _) => info,
             Token::ModuleLogicPath(info, _) => info,
         }
     }
@@ -153,23 +233,25 @@ macro_rules! make_lexer_token_to_token {
 
 make_lexer_token_to_token!(module, ModuleLogicPath);
 make_lexer_token_to_token!(identifier, Identifier);
-make_lexer_token_to_token!(operator, OperatorName);
 
 fn match_keyword(s: &str, info: TokenInfo) -> Option<Token> {
     return match s {
+        "let" => Some(Token::Let(info)),
+        "in" => Some(Token::In(info)),
+        "case" => Some(Token::Case(info)),
+        "of" => Some(Token::Of(info)),
         "import" => Some(Token::Import(info)),
         "export" => Some(Token::Export(info)),
         "data" => Some(Token::Data(info)),
         "newtype" => Some(Token::Newtype(info)),
+        "newinstance" => Some(Token::NewInstance(info)),
+        "class" => Some(Token::Class(info)),
+        "instance" => Some(Token::Instance(info)),
         "alias" => Some(Token::Alias(info)),
         "as" => Some(Token::As(info)),
         "unqualified" => Some(Token::Unqualified(info)),
         "forall" => Some(Token::Forall(info)),
         "type" => Some(Token::Type(info)),
-        "Bool" => Some(Token::Bool(info)),
-        "true" => Some(Token::True(info)),
-        "false" => Some(Token::False(info)),
-        "Unit" => Some(Token::Unit(info)),
         "U8" => Some(Token::U8(info)),
         "U16" => Some(Token::U16(info)),
         "U32" => Some(Token::U32(info)),
@@ -180,6 +262,58 @@ fn match_keyword(s: &str, info: TokenInfo) -> Option<Token> {
         "I64" => Some(Token::I64(info)),
         "F32" => Some(Token::F32(info)),
         "F64" => Some(Token::F64(info)),
+        _ => None,
+    };
+}
+
+fn match_operator(s: &str, info: TokenInfo) -> Option<Token> {
+    return match s {
+        "?" => Some(Token::Interrogation(info)),
+        "!" => Some(Token::Exclamation(info)),
+        "#" => Some(Token::Hash(info)),
+        "," => Some(Token::Comma(info)),
+        ":" => Some(Token::Colon(info)),
+        ";" => Some(Token::StatementEnd(info)),
+        "." => Some(Token::Dot(info)),
+        "::" => Some(Token::ModuleSeparator(info)),
+        "-" => Some(Token::Minus(info)),
+        "|>" => Some(Token::CompositionRight(info)),
+        "<|" => Some(Token::CompositionLeft(info)),
+        "+" => Some(Token::Plus(info)),
+        "^" => Some(Token::Power(info)),
+        "*" => Some(Token::Star(info)),
+        "/" => Some(Token::Div(info)),
+        "%" => Some(Token::Module(info)),
+        "<<" => Some(Token::ShiftLeft(info)),
+        ">>" => Some(Token::ShiftRigth(info)),
+        "<$>" => Some(Token::Map(info)),
+        "$>" => Some(Token::MapConstRigth(info)),
+        "<$" => Some(Token::MapConstLeft(info)),
+        "<*>" => Some(Token::Appliative(info)),
+        "*>" => Some(Token::ApplicativeRight(info)),
+        "<*" => Some(Token::ApplicativeLeft(info)),
+        "==" => Some(Token::NotEqual(info)),
+        "!=" => Some(Token::NotEqual(info)),
+        "<=" => Some(Token::LessOrEqual(info)),
+        "=>" => Some(Token::MoreOrEqual(info)),
+        "<" => Some(Token::LessThan(info)),
+        ">" => Some(Token::MoreThan(info)),
+        "&&" => Some(Token::And(info)),
+        "||" => Some(Token::Or(info)),
+        "&" => Some(Token::ReverseAppliation(info)),
+        "$" => Some(Token::DollarApplication(info)),
+        "=" => Some(Token::Asignation(info)),
+        "@" => Some(Token::At(info)),
+        "|" => Some(Token::Pipe(info)),
+        "(" => Some(Token::LParen(info)),
+        ")" => Some(Token::RParen(info)),
+        "{" => Some(Token::LBrace(info)),
+        "}" => Some(Token::RBrace(info)),
+        "[" => Some(Token::LBracket(info)),
+        "]" => Some(Token::RBracket(info)),
+        "->" => Some(Token::LeftArrow(info)),
+        "<-" => Some(Token::RightArrow(info)),
+        "\\" => Some(Token::LambdaStart(info)),
         _ => None,
     };
 }
@@ -228,26 +362,83 @@ static COMMENT_BLOCKD3: LazyLock<Regex> =
 //  uses  all binary ops as left associative, we only need to take care
 //  of the precedences.
 static OPERATOR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(-|\+|\*|/|=|<|>|~|#|!|\?|&|\^|:|%|,|\\)+").unwrap()
+    Regex::new(
+        r"^(x?:)
+        \?
+        |\#
+        |,
+        |::
+        |;
+        |\.
+        |:
+        |\|>
+        |<\|
+        |\+
+        |\^
+        |/
+        |%
+        |<<
+        |>>
+        |<$
+        |$>
+        |<$
+        |<\*
+        |\*>
+        |<\*
+        |\*
+        |==
+        |!=
+        |<=
+        |>=
+        |<
+        |>
+        |!
+        |&&
+        |\|\|
+        |&
+        |\$
+        |=
+        |@
+        |\|
+        |\(
+        |\)
+        |\{
+        |\}
+        |\[
+        |\]
+        |->
+        |<-
+        |-
+        |\\
+        ",
+    )
+    .unwrap()
 });
 static MULTILINE_STRING: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"^""".*""""#).unwrap());
 static LINE_STRING: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"^"([^"\n]|((\\\\)*\\\"))*""#).unwrap());
+static UINT_STRING: &'static str = r"^0[0_]*|[1-9][0-9_]+";
 static UINT: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^0[0_]*|[1-9][0-9_]+").unwrap());
+    LazyLock::new(|| Regex::new(UINT_STRING).unwrap());
 static FLOAT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(0[0_]*|[1-9][0-9_]+)\.(0[0_]*|[1-9][0-9_]+)((e|E)(0[0_]*|[1-9][0-9_]+))?").unwrap()
+    Regex::new(&format!("^{UINT_STRING}\\.UINT_STRING((e|E)UINT_STRING)?"))
+        .unwrap()
 });
 // For docummentation on this, see the octizys_commmon::identifier::IDENTIFER_LAZY_REGEX
 static IDENTIFIER_STRING: &'static str = r"_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*";
 static IDENTIFER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(&format!("^{:}", IDENTIFIER_STRING)).unwrap());
+static INFIX_IDENTIFIER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!("^`{:}`", IDENTIFIER_STRING)).unwrap()
+});
+static SELECTOR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!("^\\.{re}", re = IDENTIFIER_STRING)).unwrap()
+});
+static HOLE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&format!("^_{re}", re = UINT_STRING)).unwrap());
 static MODULE_LOGIC_PATH: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!("^(({re}::)+{re})", re = IDENTIFIER_STRING)).unwrap()
-});
-static ACCESSOR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(&format!("^\\.{re}", re = IDENTIFIER_STRING)).unwrap()
 });
 
 #[derive(Debug)]
@@ -541,26 +732,63 @@ impl<'input> Lexer<'input> {
         before: Vec<Comment>,
     ) -> Option<Result<Token, LexerError>> {
         self.lex_with_value(&OPERATOR, before, |text, info| match text {
+            "?" => Ok(Token::Interrogation(info)),
+            "!" => Ok(Token::Exclamation(info)),
+            "#" => Ok(Token::Hash(info)),
             "," => Ok(Token::Comma(info)),
             ":" => Ok(Token::Colon(info)),
             ";" => Ok(Token::StatementEnd(info)),
             "." => Ok(Token::Dot(info)),
             "::" => Ok(Token::ModuleSeparator(info)),
-            "|" => Ok(Token::CaseSeparator(info)),
+            "-" => Ok(Token::Minus(info)),
+            "|>" => Ok(Token::CompositionLeft(info)),
+            "<|" => Ok(Token::CompositionRight(info)),
+            "+" => Ok(Token::Plus(info)),
+            "^" => Ok(Token::Power(info)),
+            "*" => Ok(Token::Star(info)),
+            "/" => Ok(Token::Div(info)),
+            "%" => Ok(Token::Module(info)),
+            "<<" => Ok(Token::ShiftLeft(info)),
+            ">>" => Ok(Token::ShiftRigth(info)),
+            //TODO: Add "<&>" = \ x y -> y $ x
+            "<$>" => Ok(Token::Map(info)),
+            "$>" => Ok(Token::MapConstRigth(info)),
+            "<$" => Ok(Token::MapConstLeft(info)),
+            //TODO: add <|> and <?>
+            "<*>" => Ok(Token::Appliative(info)),
+            "*>" => Ok(Token::ApplicativeRight(info)),
+            "<*" => Ok(Token::ApplicativeRight(info)),
+            "==" => Ok(Token::Equality(info)),
+            "!=" => Ok(Token::NotEqual(info)),
+            "<=" => Ok(Token::LessOrEqual(info)),
+            ">=" => Ok(Token::MoreOrEqual(info)),
+            "<" => Ok(Token::LessThan(info)),
+            ">" => Ok(Token::MoreThan(info)),
+            "&&" => Ok(Token::And(info)),
+            "||" => Ok(Token::Or(info)),
+            "&" => Ok(Token::ReverseAppliation(info)),
+            "$" => Ok(Token::DollarApplication(info)),
+            "=" => Ok(Token::Asignation(info)),
+            "@" => Ok(Token::At(info)),
+            "|" => Ok(Token::Pipe(info)),
+            "(" => Ok(Token::LParen(info)),
+            ")" => Ok(Token::RParen(info)),
+            "{" => Ok(Token::LBrace(info)),
+            "}" => Ok(Token::RBrace(info)),
+            "[" => Ok(Token::LBracket(info)),
+            "]" => Ok(Token::RBracket(info)),
             "->" => Ok(Token::RightArrow(info)),
             "<-" => Ok(Token::LeftArrow(info)),
-            "?" => Ok(Token::Interrogation(info)),
-            "!" => Ok(Token::Exclamation(info)),
+            "\\" => Ok(Token::LambdaStart(info)),
             _ => {
-                Ok(Token::OperatorName(info, OperatorName(String::from(text))))
-                //if Regex::new("--+").unwrap().is_match(text) {
-                //    Ok(todo!())
-                //} else {
-                //    Ok(Token::OperatorName(
-                //        info,
-                //        OperatorName(String::from(text)),
-                //    ))
-                //}
+                let position = info.span.start;
+                Err(LexerError {
+                    error_type: LexerErrorType::CantParseOperator(
+                        text.into(),
+                        info,
+                    ),
+                    position,
+                })
             }
         })
     }
@@ -705,10 +933,6 @@ mod lexer_tests {
     make_keyword_test_macro!("unqualified", "unqualified", Unqualified);
     make_keyword_test_macro!("forall", "forall", Forall);
     make_keyword_test_macro!("type", "type", Type);
-    make_keyword_test_macro!("bool", "Bool", Bool);
-    make_keyword_test_macro!("true", "true", True);
-    make_keyword_test_macro!("false", "false", False);
-    make_keyword_test_macro!("unit", "Unit", Unit);
     make_keyword_test_macro!("u8", "U8", U8);
     make_keyword_test_macro!("u16", "U16", U16);
     make_keyword_test_macro!("u32", "U32", U32);

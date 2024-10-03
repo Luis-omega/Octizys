@@ -210,6 +210,15 @@ pub enum Comment {
     Block(CommentBlock),
 }
 
+impl Comment {
+    pub fn get_span(self) -> Span {
+        match self {
+            Self::Line(CommentLine { span, .. }) => span,
+            Self::Block(CommentBlock { span, .. }) => span,
+        }
+    }
+}
+
 impl From<CommentLine> for Comment {
     fn from(value: CommentLine) -> Self {
         Comment::Line(value)
