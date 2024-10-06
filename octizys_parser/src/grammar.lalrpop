@@ -240,7 +240,7 @@ imported_operator : Token<NamedVariable> =
   };
 
 local_variable : Token<Identifier> =
-  identifier => todo!()
+  identifier => <>
   ;
 
 
@@ -284,16 +284,46 @@ pub import_declaration : Import =
 
 type_base : Token<TypeBase> = {
   //TODO: Delayed until enabled in the lexer
-  U8 => todo!(),
-  U16 => todo!(),
-  U32 => todo!(),
-  U64 => todo!(),
-  I8 => todo!(),
-  I16 => todo!(),
-  I32 => todo!(),
-  I64 => todo!(),
-  F32 => todo!(),
-  F64 => todo!(),
+  U8 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::U8,info}
+    },
+  U16 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::U16,info}
+    },
+  U32 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::U32,info}
+    },
+  U64 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::U64,info}
+    },
+  I8 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::I8,info}
+    },
+  I16 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::I16,info}
+    },
+  I32 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::I32,info}
+    },
+  I64 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::I64,info}
+    },
+  F32 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::F32,info}
+    },
+  F64 => {
+    let info :TokenInfo = <>.into();
+    cst::Token{value:TypeBase::F64,info}
+    },
 };
 
 type_variable : Type = {
