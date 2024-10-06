@@ -8,8 +8,8 @@ use std::{collections::VecDeque, rc::Rc};
 
 use octizys_cst::cst::{
     self, Comment, CommentBlock, CommentBraceKind, CommentKind, CommentLine,
-    CommentLineContent, CommentsInfo, LineCommentStart, OperatorName, Position,
-    Span, TokenInfo,
+    CommentLineContent, CommentsInfo, LineCommentStart, Position, Span,
+    TokenInfo,
 };
 
 use paste::paste;
@@ -106,8 +106,9 @@ pub enum Token {
     I64(TokenInfo),
     F32(TokenInfo),
     F64(TokenInfo),
-    LastComments(Vec<Comment>),
+    LastComments(Vec<Comment>, TokenInfo),
     StringLiteral(TokenInfo, String),
+    CharacterLiteral(TokenInfo, char),
     UintLiteral(TokenInfo, String),
     UFloatLiteral(TokenInfo, String),
     Identifier(TokenInfo, Identifier),
@@ -194,17 +195,18 @@ impl From<Token> for TokenInfo {
             Token::I64(info) => (info),
             Token::F32(info) => (info),
             Token::F64(info) => (info),
-            Token::LastComments(comments) => {
-                let span = match comments.get(0) {
-                    Some(s) => s.clone().get_span(),
-                    None => (usize::MAX, usize::MAX).into(),
-                };
-                TokenInfo {
-                    comments: CommentsInfo::empty(),
-                    span,
-                }
-            }
+            Token::LastComments(_, info) => info, //{
+            //let span = match comments.get(0) {
+            //    Some(s) => s.clone().get_span(),
+            //    None => (usize::MAX, usize::MAX).into(),
+            //};
+            //TokenInfo {
+            //    comments: CommentsInfo::empty(),
+            //    span,
+            //}
+            //}
             Token::StringLiteral(info, _) => info,
+            Token::CharacterLiteral(info, _) => info,
             Token::UintLiteral(info, _) => info,
             Token::UFloatLiteral(info, _) => info,
             Token::Identifier(info, _) => info,
@@ -834,13 +836,20 @@ impl<'input> Iterator for Lexer<'input> {
                 Some(Err(error_token))
             }
             Err(comments) => {
-                let token = Token::LastComments(comments);
-                let s = TokenInfo::from(token.clone()).span;
+                let span = match comments.get(0) {
+                    Some(s) => s.clone().get_span(),
+                    None => (usize::MAX, usize::MAX).into(),
+                };
+                let info = TokenInfo {
+                    comments: CommentsInfo::empty(),
+                    span,
+                };
+                let token = Token::LastComments(comments, info);
                 //TODO: this is a hack to make lexer to stop if we couldn't identify a token
-                //To fix it, we need to get a notion of "we tried everithing and we didn't find
+                //To fix it, we need to get a notion of "we tried everything and we didn't find
                 //anything and we still have input" and check for it
                 self.found_error = true;
-                return Some(Ok((s.start, token, s.end)));
+                return Some(Ok((span.start, token, span.end)));
             }
         }
     }
@@ -1031,7 +1040,7 @@ mod lexer_tests {
         };
         let result: Vec<Result<Token, LexerError>> =
             lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
-        let token = Token::LastComments(vec![block.into()]);
+        let token = Token::LastComments(vec![block.into()], todo!());
         let expected = vec![Ok(token)];
         println!("result:   {:?}", result);
         println!("expected: {:?}", expected);

@@ -1,5 +1,6 @@
 use std::str::FromStr;
-use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,OperatorName,NamedVariable,Type,TypeApplication,PatternMatch};
+use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,NamedVariable,Type,TypeRecordItem,PatternMatch,ImportedVariable,TypeBase,OperatorName};
+use octizys_cst::cst;
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::identifier::Identifier;
 use crate::lexer;
@@ -43,7 +44,7 @@ extern {
       //TODO: add <|> and <?>
       ,"<*>" => lexer::Token::Appliative(TokenInfo)
       ,"*>" => lexer::Token::ApplicativeRight(TokenInfo)
-      ,"<*" => lexer::Token::ApplicativeRight(TokenInfo)
+      ,"<*" => lexer::Token::ApplicativeLeft(TokenInfo)
       ,"==" => lexer::Token::Equality(TokenInfo)
       ,"!=" => lexer::Token::NotEqual(TokenInfo)
       ,"<=" => lexer::Token::LessOrEqual(TokenInfo)
@@ -103,7 +104,6 @@ extern {
       ,Selector=> lexer::Token::Selector(TokenInfo,String)
       ,"_"=> lexer::Token::AnonHole(TokenInfo,String)
       ,NamedHole=> lexer::Token::NamedHole(TokenInfo,String)
-      ,OperatorName=> lexer::Token::OperatorName(TokenInfo,String)
       ,ModuleLogicPath=> lexer::Token::ModuleLogicPath(TokenInfo,String)
     }
 }
@@ -123,7 +123,7 @@ between<left,T,right> : Between<T> =
   <l:left> <t:T> <r:right>
   => Between{left:l.into(),right:r.into(),value:t};
 
-tuple<T> : Between<TrailingLis<T>> = {
+tuple<T> : Between<TrailingList<T>> = {
   between<"(",terminated_list<T,",">,")"> => todo!(),
 };
 
@@ -137,20 +137,63 @@ pub string = StringLiteral;
 
 character = CharacterLiteral;
 
-uint : T = {
-  UintLiteral => todo!(),
-};
+//uint : T = {
+//  UintLiteral => todo!(),
+//};
 
 module_path : Token<ModuleLogicPath>  =
   ModuleLogicPath =>? lexer::module_token_to_token(<>);
 
 identifier : Token<Identifier> = Identifier =>? lexer::identifier_token_to_token(<>);
-operator_name : Token<OperatorName> = OperatorName =>? lexer::operator_token_to_token(<>);
+operator_name : Token<OperatorName> = {
+      "?" => cst::Token{value: OperatorName::Interrogation,info:<>.into()}
+      ,"!" => cst::Token{value: OperatorName::Exclamation,info:<>.into()}
+      ,"#" => cst::Token{value: OperatorName::Hash,info:<>.into()}
+      ,"," => cst::Token{value: OperatorName::Comma,info:<>.into()}
+      ,":" => cst::Token{value: OperatorName::Colon,info:<>.into()}
+      ,";" => cst::Token{value: OperatorName::StatementEnd,info:<>.into()}
+      ,"." => cst::Token{value: OperatorName::Dot,info:<>.into()}
+      ,"::" => cst::Token{value: OperatorName::ModuleSeparator,info:<>.into()}
+      ,"-" => cst::Token{value: OperatorName::Minus,info:<>.into()}
+      ,"|>" => cst::Token{value: OperatorName::CompositionLeft,info:<>.into()}
+      ,"<|" => cst::Token{value: OperatorName::CompositionRight,info:<>.into()}
+      ,"+" => cst::Token{value: OperatorName::Plus,info:<>.into()}
+      ,"^" => cst::Token{value: OperatorName::Power,info:<>.into()}
+      ,"*" => cst::Token{value: OperatorName::Star,info:<>.into()}
+      ,"/" => cst::Token{value: OperatorName::Div,info:<>.into()}
+      ,"%" => cst::Token{value: OperatorName::Module,info:<>.into()}
+      ,"<<" => cst::Token{value: OperatorName::ShiftLeft,info:<>.into()}
+      ,">>" => cst::Token{value: OperatorName::ShiftRigth,info:<>.into()}
+      //TODO: Add "<&>" = \ x y -> y $ x
+      ,"<$>" => cst::Token{value: OperatorName::Map,info:<>.into()}
+      ,"$>" => cst::Token{value: OperatorName::MapConstRigth,info:<>.into()}
+      ,"<$" => cst::Token{value: OperatorName::MapConstLeft,info:<>.into()}
+      //TODO: add <|> and <?>
+      ,"<*>" => cst::Token{value: OperatorName::Appliative,info:<>.into()}
+      ,"*>" => cst::Token{value: OperatorName::ApplicativeRight,info:<>.into()}
+      ,"<*" => cst::Token{value: OperatorName::ApplicativeLeft,info:<>.into()}
+      ,"==" => cst::Token{value: OperatorName::Equality,info:<>.into()}
+      ,"!=" => cst::Token{value: OperatorName::NotEqual,info:<>.into()}
+      ,"<=" => cst::Token{value: OperatorName::LessOrEqual,info:<>.into()}
+      ,">=" => cst::Token{value: OperatorName::MoreOrEqual,info:<>.into()}
+      ,"<" => cst::Token{value: OperatorName::LessThan,info:<>.into()}
+      ,">" => cst::Token{value: OperatorName::MoreThan,info:<>.into()}
+      ,"&&" => cst::Token{value: OperatorName::And,info:<>.into()}
+      ,"||" => cst::Token{value: OperatorName::Or,info:<>.into()}
+      ,"&" => cst::Token{value: OperatorName::ReverseAppliation,info:<>.into()}
+      ,"$" => cst::Token{value: OperatorName::DollarApplication,info:<>.into()}
+      ,"=" => cst::Token{value: OperatorName::Asignation,info:<>.into()}
+      ,"@" => cst::Token{value: OperatorName::At,info:<>.into()}
+      ,"|" => cst::Token{value: OperatorName::Pipe,info:<>.into()}
+      ,"->" => cst::Token{value: OperatorName::RightArrow,info:<>.into()}
+      ,"<-" => cst::Token{value: OperatorName::LeftArrow,info:<>.into()}
+      ,"\\" => cst::Token{value: OperatorName::LambdaStart,info:<>.into()}
+};
 
 //We can hack the lexer to do the split of the path from the
 //head, but we choose to do this instead.
 //We may consider the other approach if we get a conflict in lalrpop.
-imported_variable : Token<NamedVariable> =
+imported_variable : Token<ImportedVariable> =
   module_path => {
   todo!()
   //let (maybe_remain,head) = <>.split_head();
@@ -196,7 +239,7 @@ imported_operator : Token<NamedVariable> =
   todo!()
   };
 
-local_variable : Token<NamedVariable> =
+local_variable : Token<Identifier> =
   identifier => todo!()
   ;
 
@@ -239,7 +282,8 @@ pub import_declaration : Import =
 
 //Types
 
-type_base : Type = {
+type_base : Token<TypeBase> = {
+  //TODO: Delayed until enabled in the lexer
   U8 => todo!(),
   U16 => todo!(),
   U32 => todo!(),
@@ -253,8 +297,8 @@ type_base : Type = {
 };
 
 type_variable : Type = {
-  local_variable => todo!(),
-  imported_variable =>todo!(),
+  local_variable => Type::LocalVariable(<>),
+  imported_variable =>Type::ImportedVariable(<>),
 };
 
 type_tuple : Type = {
@@ -262,27 +306,34 @@ type_tuple : Type = {
 }
 
 //TODO: add support for keyword scape
-
-
-type_record_item : Type = {
-  local_variable ":" expression,
+type_record_item : TypeRecordItem = {
+  <variable:local_variable> <separator:":"> <expression:type_expression>
+  => TypeRecordItem{
+    variable,separator:separator.into(),expression:Box::new(expression)
+  },
 };
 
 //TODO: add support for row polymorphism (we need kinds)
 // we may need a different rule than the macro `record`
-type_record : Type = {
+type_record : Between<TrailingList<TypeRecordItem>> = {
   record<type_record_item, ",">
 };
 
 type_atom : Type = {
-  type_base => todo!(),
-  type_variable => todo!(),
-  type_tuple => todo!(),
-  type_record => todo!(),
-  between<"(",type_expression,")"> => todo!(),
+  type_base => Type::Base(<>),
+  type_variable => <>,
+  type_tuple => <>,
+  type_record => Type::Record(<>),
+  <l:"("> <t:type_expression> <r:")"> => Type::Parens(
+    Between{
+    left : l.into(),
+    right : r.into(),
+    value: Box::new(t)
+    }
+  ),
 };
 
-type_application : TypeApplication = {
+type_application : Type = {
    type_atom type_atom+ => todo!(),
    type_atom => todo!(),
 };
@@ -302,7 +353,7 @@ pub type_expression : Type = {
 };
 
 
-
+/*
 // --------------------- PatternMatch  ---------------------
 
 pattern_variable : Token<NamedVariable> = {
@@ -618,3 +669,4 @@ pub top : Cst = {
   terminated_list<top_non_import_item,";">?
   LastComments?
 }
+*/

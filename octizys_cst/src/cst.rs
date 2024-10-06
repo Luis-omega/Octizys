@@ -330,9 +330,56 @@ impl<T> Token<T> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-//TODO: Smart constructor, it only allows combinations
-//of +-*?<>=/@~#"
-pub struct OperatorName(pub String);
+pub enum OperatorName {
+    Interrogation,
+    Exclamation,
+    Hash,
+    Comma,
+    Colon,
+    StatementEnd,
+    Dot,
+    ModuleSeparator,
+    Minus,
+    CompositionLeft,
+    CompositionRight,
+    Plus,
+    Power,
+    Star,
+    Div,
+    Module,
+    ShiftLeft,
+    ShiftRigth, //TODO: Add "<&>" = \ x y -> y $ x
+    Map,
+    MapConstRigth,
+    MapConstLeft, //TODO: add <|> and <?>
+    Appliative,
+    ApplicativeRight,
+    ApplicativeLeft,
+    Equality,
+    NotEqual,
+    LessOrEqual,
+    MoreOrEqual,
+    LessThan,
+    MoreThan,
+    And,
+    Or,
+    ReverseAppliation,
+    DollarApplication,
+    Asignation,
+    At,
+    Pipe,
+    RightArrow,
+    LeftArrow,
+    LambdaStart,
+}
+
+type LocalVariable = Token<Identifier>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportedVariable {
+    prefix: ModuleLogicPath,
+    name: Identifier,
+}
 
 #[derive(Debug)]
 pub enum NamedVariable {
@@ -410,15 +457,49 @@ pub struct Import {
 }
 
 #[derive(Debug)]
-pub enum TypeApplication {
-    Variant1,
-    Variant2,
+pub enum TypeBase {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
+}
+
+#[derive(Debug)]
+pub struct TypeRecordItem {
+    pub variable: Token<Identifier>,
+    pub separator: TokenInfo,
+    // This is needed as TrailingList stores a T
+    // otherwise we can drop the Box, maybe put
+    // the box in the TrailingList?
+    pub expression: Box<Type>,
 }
 
 #[derive(Debug)]
 pub enum Type {
-    Variant1,
-    Variant2,
+    Base(Token<TypeBase>),
+    LocalVariable(Token<Identifier>),
+    ImportedVariable(Token<ImportedVariable>),
+    Tuple(Between<Box<Type>>),
+    Record(Between<TrailingList<TypeRecordItem>>),
+    Parens(Between<Box<Type>>),
+    Application {
+        start: Box<Type>,
+        second: Box<Type>,
+        remain: Vec<Type>,
+    },
+    Scheme {
+        forall: TokenInfo,
+        first_variable: Token<Identifier>,
+        remain_variables: Vec<Token<Identifier>>,
+        dot: TokenInfo,
+        expression: Box<Type>,
+    },
 }
 
 #[derive(Debug)]
