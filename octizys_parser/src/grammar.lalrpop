@@ -124,12 +124,14 @@ between<left,T,right> : Between<T> =
   => Between{left:l.into(),right:r.into(),value:t};
 
 tuple<T> : Between<TrailingList<T>> = {
-  between<"(",terminated_list<T,",">,")"> => todo!(),
+  between<"(",terminated_list<T,",">,")"> => <>,
 };
 
 record<record_item, sep> : Between<TrailingList<record_item>> = {
-  between<"{",trailing_list<record_item,sep>,"}"> => todo!(),
+  between<"{",trailing_list<record_item,sep>,"}"> => <>,
 };
+
+boxed<T> : Box<T> = T => Box::new(<>);
 
 // --------------------- Terminal translation ---------------------
 
@@ -332,7 +334,7 @@ type_variable : Type = {
 };
 
 type_tuple : Type = {
-  tuple<type_expression> => todo!(),
+  tuple<boxed<type_expression>> => Type::Tuple(<>),
 }
 
 //TODO: add support for keyword scape
@@ -364,22 +366,49 @@ type_atom : Type = {
 };
 
 type_application : Type = {
-   type_atom type_atom+ => todo!(),
-   type_atom => todo!(),
+   <start:type_atom>
+   <second:type_atom>
+   <remain:type_atom*> => {
+    Type::Application{
+      start: Box::new(start) ,
+      second: Box::new(second),
+      remain
+    }
+   },
+   type_atom => <>,
 };
 
 type_arrow : Type = {
-  type_application ("->" type_application)+ => todo!(),
-  type_application => todo!()
+  <first:type_application> <remain:("->" type_application)+>
+    =>
+    Type::Arrow{
+      first:Box::new(first),
+      remain:remain.into_iter().map(|(x,y)| (x.into(),y)  ).collect()
+    },
+  type_application => <>
 };
 
 type_scheme : Type = {
-  "forall" local_variable+ "." type_arrow => todo!(),
+  <forall:"forall">
+    <first_variable:local_variable>
+    <remain_variables:local_variable*>
+    <dot:".">
+    <expression:type_arrow> => {
+      Type::Scheme{
+        forall: forall.into(),
+        first_variable,
+        remain_variables,
+        dot: dot.into(),
+        expression:Box::new(expression)
+      }
+
+    },
+  type_arrow => <>
 };
 
 //TODO : add type operators
 pub type_expression : Type = {
-  type_scheme => todo!(),
+  type_scheme => <>,
 };
 
 

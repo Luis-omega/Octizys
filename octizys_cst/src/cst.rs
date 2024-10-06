@@ -485,13 +485,17 @@ pub enum Type {
     Base(Token<TypeBase>),
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
-    Tuple(Between<Box<Type>>),
+    Tuple(Between<TrailingList<Box<Type>>>),
     Record(Between<TrailingList<TypeRecordItem>>),
     Parens(Between<Box<Type>>),
     Application {
         start: Box<Type>,
         second: Box<Type>,
         remain: Vec<Type>,
+    },
+    Arrow {
+        first: Box<Type>,
+        remain: Vec<(TokenInfo, Type)>,
     },
     Scheme {
         forall: TokenInfo,
