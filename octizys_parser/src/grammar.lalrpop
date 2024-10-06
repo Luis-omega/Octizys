@@ -135,13 +135,9 @@ boxed<T> : Box<T> = T => Box::new(<>);
 
 // --------------------- Terminal translation ---------------------
 
-pub string = StringLiteral;
+pub string :Token<String> = StringLiteral =>? lexer::string_token_to_token(<>);
 
-character = CharacterLiteral;
-
-//uint : T = {
-//  UintLiteral => todo!(),
-//};
+character : Token<char> = CharacterLiteral =>? lexer::char_token_to_token(<>);
 
 module_path : Token<ModuleLogicPath>  =
   ModuleLogicPath =>? lexer::module_token_to_token(<>);
@@ -412,31 +408,35 @@ pub type_expression : Type = {
 };
 
 
-/*
+
 // --------------------- PatternMatch  ---------------------
 
-pattern_variable : Token<NamedVariable> = {
-  local_variable => todo!(),
-  imported_variable => todo!(),
+pattern_variable : PatternMatch = {
+  local_variable => PatternMatch::LocalVariable(<>),
+  imported_variable => PatternMatch::ImportedVariable(<>),
 };
 
 //TODO: add support for negative integers?
 pattern_literal : PatternMatch  = {
-  string => todo!(),
-  character => todo!(),
-  uint => todo!(),
+  string => PatternMatch::String(<>),
+  character => PatternMatch::Char(<>),
 };
 
 pattern_hole : PatternMatch = {
-  "_" => todo!(),
+  "_" => PatternMatch::AnonHole(<>.into()),
 };
 
 pattern_tuple :PatternMatch = {
-  tuple<pattern> => todo!(),
+  tuple<boxed<pattern>> => PatternMatch::Tuple(<>),
 };
 
-pattern_record_item : (Token<NamedVariable>,Token_algo,Option<PatternMatch>) = {
-  local_variable ("=" pattern )?  => todo!(),
+pattern_record_item : (Token<Identifier>,Option<(TokenInfo,PatternMatch)>) = {
+  <l:local_variable> <r:("=" pattern )?>  =>
+  match r {
+    Some((equal,p)) => (l,Some((equal.into(),p))),
+    None => (l,None)
+  }
+  ,
 }
 
 pattern_record :PatternMatch = {
@@ -469,6 +469,7 @@ pub pattern : PatternMatch = {
 };
 
 
+/*
 // --------------------- Expression ---------------------
 
 expression_literal : Expression ={

@@ -508,9 +508,13 @@ pub enum Type {
 
 #[derive(Debug)]
 pub enum PatternMatch {
-    Variable(Token<Identifier>),
-    AnonHole(Token<()>),
+    LocalVariable(Token<Identifier>),
+    ImportedVariable(Token<ImportedVariable>),
+    String(Token<String>),
+    Char(Token<char>),
+    AnonHole(TokenInfo),
     NamedHole(Token<Identifier>),
+    Tuple(Between<TrailingList<Box<PatternMatch>>>),
     Application(Token<Identifier>, Vec<PatternMatch>),
     Parens(Between<Box<PatternMatch>>),
 }

@@ -220,11 +220,11 @@ impl From<Token> for TokenInfo {
 }
 
 macro_rules! make_lexer_token_to_token {
-    ($name:tt, $output:tt) => {
+    ($name:tt, $output_constructor:tt, $output_type:tt) => {
         paste!{
-            pub fn [< $name _token_to_token >](t:Token)->Result<cst::Token<$output>,ParseError<usize,Token,LexerError>>{
+            pub fn [< $name _token_to_token >](t:Token)->Result<cst::Token<$output_type>,ParseError<usize,Token,LexerError>>{
                 match t {
-                    Token::$output(info,value) => Ok(cst::Token{value,info}),
+                    Token::$output_constructor(info,value) => Ok(cst::Token{value,info}),
                     _ => Err(ParseError::User{error: LexerError{error_type:LexerErrorType::CantTranslateToToken(t.clone()),position:{let t2 : TokenInfo =t.into(); t2.span.start}} })
                 }
             }
@@ -233,8 +233,10 @@ macro_rules! make_lexer_token_to_token {
     };
 }
 
-make_lexer_token_to_token!(module, ModuleLogicPath);
-make_lexer_token_to_token!(identifier, Identifier);
+make_lexer_token_to_token!(module, ModuleLogicPath, ModuleLogicPath);
+make_lexer_token_to_token!(identifier, Identifier, Identifier);
+make_lexer_token_to_token!(string, StringLiteral, String);
+make_lexer_token_to_token!(char, CharacterLiteral, char);
 
 fn match_keyword(s: &str, info: TokenInfo) -> Option<Token> {
     return match s {
