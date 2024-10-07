@@ -507,15 +507,39 @@ pub enum Type {
 }
 
 #[derive(Debug)]
+pub enum PatternMatchRecordItem {
+    OnlyVariable {
+        variable: Token<Identifier>,
+    },
+    WithPattern {
+        variable: Token<Identifier>,
+        separator: TokenInfo,
+        pattern: Box<PatternMatch>,
+    },
+}
+
+#[derive(Debug)]
+pub struct PatternMatchBind {
+    pub variable: Token<Identifier>,
+    pub at: TokenInfo,
+    pub pattern: Box<PatternMatch>,
+}
+
+#[derive(Debug)]
 pub enum PatternMatch {
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
     String(Token<String>),
     Char(Token<char>),
     AnonHole(TokenInfo),
-    NamedHole(Token<Identifier>),
     Tuple(Between<TrailingList<Box<PatternMatch>>>),
-    Application(Token<Identifier>, Vec<PatternMatch>),
+    Record(Between<TrailingList<PatternMatchRecordItem>>),
+    Bind(PatternMatchBind),
+    Application {
+        start: Box<PatternMatch>,
+        second: Box<PatternMatch>,
+        remain: Vec<PatternMatch>,
+    },
     Parens(Between<Box<PatternMatch>>),
 }
 

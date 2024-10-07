@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,NamedVariable,Type,TypeRecordItem,PatternMatch,ImportedVariable,TypeBase,OperatorName};
+use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,NamedVariable,Type,TypeRecordItem,PatternMatch,ImportedVariable,TypeBase,OperatorName,PatternMatchRecordItem, PatternMatchBind};
 use octizys_cst::cst;
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::identifier::Identifier;
@@ -430,42 +430,61 @@ pattern_tuple :PatternMatch = {
   tuple<boxed<pattern>> => PatternMatch::Tuple(<>),
 };
 
-pattern_record_item : (Token<Identifier>,Option<(TokenInfo,PatternMatch)>) = {
+pattern_record_item : PatternMatchRecordItem = {
   <l:local_variable> <r:("=" pattern )?>  =>
   match r {
-    Some((equal,p)) => (l,Some((equal.into(),p))),
-    None => (l,None)
+    Some((equal,p))
+      => PatternMatchRecordItem::WithPattern{
+        variable:l,
+        separator:equal.into(),
+        pattern:Box::new(p)
+        },
+    None => PatternMatchRecordItem::OnlyVariable{variable:l}
   }
   ,
 }
 
+//TODO:Add and `...` pattern for `the remaining of the record`.
 pattern_record :PatternMatch = {
-  local_variable  between<"{", trailing_list<pattern_record_item,",">,"}"> => todo!(),
-  imported_variable between<"{", trailing_list<pattern_record_item,",">,"}"> => todo!(),
+  between<"{", trailing_list<pattern_record_item,",">,"}">
+    => PatternMatch::Record(<>) ,
 };
 
 
 pattern_atom : PatternMatch = {
-  pattern_literal => todo!(),
-  pattern_variable => todo!(),
-  pattern_hole => todo!(),
-  pattern_tuple => todo!(),
-  pattern_record => todo!(),
-  between<"(",pattern,")"> => todo!(),
+  pattern_literal => <>,
+  pattern_variable => <>,
+  pattern_hole => <>,
+  pattern_tuple => <>,
+  pattern_record => <>,
+  between<"(",boxed<pattern>,")">
+  => PatternMatch::Parens(<>) ,
 };
 
 pattern_bind : PatternMatch = {
-  local_variable "@" pattern_atom => todo!(),
-  pattern_atom =>todo!(),
+  <variable:local_variable> <at:"@"> <pattern:pattern_atom>
+    => PatternMatch::Bind(
+      PatternMatchBind{
+        variable,
+        at:at.into(),
+        pattern:Box::new(pattern)
+      }
+    ) ,
+  pattern_atom =><>,
 }
 
 pattern_application :PatternMatch = {
-  pattern_variable pattern_bind+ => todo!(),
-  pattern_bind => todo!()
+  <s:pattern_variable> <s2:pattern_bind> <r:pattern_bind*>
+    => PatternMatch::Application{
+      start: Box::new(s),
+      second: Box::new(s2),
+      remain: r
+    },
+  pattern_bind => <>
 };
 
 pub pattern : PatternMatch = {
-  pattern_application => todo!(),
+  pattern_application => <>,
 };
 
 
