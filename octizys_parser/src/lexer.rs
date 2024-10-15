@@ -113,9 +113,9 @@ pub enum Token {
     UFloatLiteral(TokenInfo, String),
     Identifier(TokenInfo, Identifier),
     InfixIdentifier(TokenInfo, String),
-    Selector(TokenInfo, String),
+    Selector(TokenInfo, Identifier),
     AnonHole(TokenInfo, String),
-    NamedHole(TokenInfo, String),
+    NamedHole(TokenInfo, u64),
     ModuleLogicPath(TokenInfo, ModuleLogicPath),
 }
 
@@ -237,6 +237,10 @@ make_lexer_token_to_token!(module, ModuleLogicPath, ModuleLogicPath);
 make_lexer_token_to_token!(identifier, Identifier, Identifier);
 make_lexer_token_to_token!(string, StringLiteral, String);
 make_lexer_token_to_token!(char, CharacterLiteral, char);
+make_lexer_token_to_token!(uint, UintLiteral, String);
+make_lexer_token_to_token!(ufloat, UFloatLiteral, String);
+make_lexer_token_to_token!(selector, Selector, Identifier);
+make_lexer_token_to_token!(named_hole, NamedHole, u64);
 
 fn match_keyword(s: &str, info: TokenInfo) -> Option<Token> {
     return match s {

@@ -545,69 +545,121 @@ pub enum PatternMatch {
 
 #[derive(Debug)]
 pub struct LetBinding {
-    pattern: PatternMatch,
-    equal: TokenInfo,
-    value: Expression,
-    semicolon: TokenInfo,
+    pub pattern: PatternMatch,
+    pub equal: TokenInfo,
+    pub value: Expression,
+    pub semicolon: TokenInfo,
 }
 
 #[derive(Debug)]
 pub struct Let {
-    let_: TokenInfo,
-    bindings: Vec<LetBinding>,
-    in_: TokenInfo,
-    expression: Box<Expression>,
+    pub let_: TokenInfo,
+    pub bindings: Vec<LetBinding>,
+    pub in_: TokenInfo,
+    pub expression: Box<Expression>,
 }
 
-//TODO: Whats a good closer for a case expression?
-//Current options are :
-//Use brackets
-//Use `with` and `end`
-//Allow both previous
-//Use a punctuation symbol
-//(but then we are forced to do :  let x = match _  |  => _ MatchEnd LetEnd )
-//In the other side a nested match can mix the `|` (making the grammar ambiguous)
 #[derive(Debug)]
-pub struct OneCase {
-    pattern: PatternMatch,
-    arrow: TokenInfo,
-    expression: Expression,
-    end: TokenInfo,
+pub struct CaseItem {
+    pub pattern: PatternMatch,
+    pub arrow: TokenInfo,
+    pub expression: Box<Expression>,
 }
 
 #[derive(Debug)]
 pub struct Case {
-    case: TokenInfo,
-    expression: Box<Expression>,
-    of: TokenInfo,
-    cases: Between<Vec<OneCase>>,
+    pub case: TokenInfo,
+    pub expression: Box<Expression>,
+    pub of: TokenInfo,
+    pub cases: Between<TrailingList<CaseItem>>,
 }
 
 #[derive(Debug)]
 pub struct BinaryOperator {
-    left: Box<Expression>,
-    right: Box<Expression>,
-    name: Token<OperatorName>,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+    pub name: Token<OperatorName>,
 }
 
 #[derive(Debug)]
-struct LambdaExpression {
-    variable: Token<Identifier>,
-    expression: Box<Expression>,
+pub struct LambdaExpression {
+    pub variable: Token<Identifier>,
+    pub expression: Box<Expression>,
 }
 
 #[derive(Debug)]
-struct ApplicationExpression {
-    start: Box<Expression>,
-    remain: Vec<Expression>,
+pub struct ApplicationExpression {
+    pub start: Box<Expression>,
+    pub remain: Vec<Expression>,
+}
+
+#[derive(Debug)]
+pub enum ExpressionRecordItem {
+    SingleVariable {
+        variable: Token<Identifier>,
+    },
+    Assignation {
+        variable: Token<Identifier>,
+        equal: TokenInfo,
+        expression: Box<Expression>,
+    },
+}
+
+#[derive(Debug)]
+pub struct ExpressionSelector {
+    pub expression: Box<Expression>,
+    pub accessor: Token<Identifier>,
 }
 
 #[derive(Debug)]
 pub enum Expression {
-    Variable(Token<NamedVariable>),
-    Let(Let),
+    String(Token<String>),
+    Character(Token<char>),
+    //TODO: make the lexer return the right type instead of string?
+    //The main problem is with floats and uints, they must be in
+    //the range or we should issue a warning or error about
+    //maximum literal
+    Uint(Token<String>),
+    UFloat(Token<String>),
+    LocalVariable(Token<Identifier>),
+    ImportedVariable(Token<ImportedVariable>),
+    NamedHole(Token<u64>),
+    Tuple(Between<TrailingList<Box<Expression>>>),
+    Record(Between<TrailingList<ExpressionRecordItem>>),
     Case(Case),
+    Parens(Between<Box<Expression>>),
+    Selector(ExpressionSelector),
+    Interrogation {
+        expression: Box<Expression>,
+        symbol: TokenInfo,
+    },
+    TypeArgument {
+        at: TokenInfo,
+        _type: Type,
+    },
+
+    Let(Let),
     BinaryOperator(BinaryOperator),
     Lambda(LambdaExpression),
     Application(ApplicationExpression),
+}
+
+impl Expression {
+    pub fn selector_from_args(
+        e: Box<Self>,
+        s: Token<Identifier>,
+        symbol: Option<TokenInfo>,
+    ) -> Self {
+        let selector = Expression::Selector(ExpressionSelector {
+            expression: e,
+            accessor: s,
+        });
+        match symbol {
+            Some(info) => Expression::Interrogation {
+                expression: Box::new(selector),
+                symbol: info,
+            },
+            None => selector,
+        }
+    }
 }
