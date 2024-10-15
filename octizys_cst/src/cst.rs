@@ -3,33 +3,10 @@ use std::{collections::HashSet, ops::Add, rc::Rc};
 use octizys_common::{
     identifier::Identifier, module_logic_path::ModuleLogicPath,
 };
-use octizys_pretty::types::NoLineBreaksString;
-
-#[derive(Debug)]
-pub struct StringArena {
-    arena: HashSet<Rc<str>>,
-}
-
-impl StringArena {
-    pub fn new() -> Self {
-        StringArena {
-            arena: HashSet::new(),
-        }
-    }
-
-    pub fn insert(self: &mut Self, value: &str) -> Rc<str> {
-        let rc: Rc<str> = Rc::from(value);
-        //TODO: use get_or_insert when it became stable
-        match self.arena.get(&rc) {
-            Some(old_rc) => old_rc.clone(),
-            None => {
-                let new_rc = rc.clone();
-                self.arena.insert(rc);
-                new_rc
-            }
-        }
-    }
-}
+use octizys_pretty::{
+    combinators::text,
+    types::{Document, NoLineBreaksString},
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Position {
@@ -85,6 +62,10 @@ impl CommentLineContent {
             .into_iter()
             .map(|x| CommentLineContent { content: x })
             .collect()
+    }
+
+    pub fn to_document(&self, config: u8) -> Document {
+        return text(self.content.clone());
     }
 }
 
@@ -193,6 +174,15 @@ impl CommentBlock {
                 end: end_pos,
             },
         }
+    }
+
+    pub fn to_document(&self, configuration: u8) -> Document {
+        let line_start = match self.brace {
+            CommentBraceKind::Brace0=> match self.kind {
+               CommentKind::Documentation=>"{- |" 
+               CommentKind::Documentation=>"{-  ",
+            } 
+        }; 
     }
 }
 
