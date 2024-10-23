@@ -140,6 +140,7 @@ fn fits(remain_width: Option<usize>, param: &mut Vec<FitsParam>) -> bool {
                     ),
                     Mode::Break => true,
                 },
+                Document::HardBreak(_) => true,
                 Document::Group(remain) => {
                     param.push(FitsParam {
                         ident,
@@ -228,6 +229,17 @@ fn document_to_simple_document_aux(
                     )
                 }
             },
+            Document::HardBreak(s) => {
+                let remain = document_to_simple_document_aux(
+                    width,
+                    usize::from(ident),
+                    param,
+                );
+                SimpleDocument::Line(
+                    ident,
+                    Box::from(SimpleDocument::Text(s, Box::from(remain))),
+                )
+            }
             Document::Group(remain) => {
                 let mut copy = param.clone();
                 let remain_copy = remain.clone();

@@ -3,6 +3,7 @@ use std::rc::Rc;
 use crate::error::{error_from_pretty, Error};
 use crate::identifier::{Identifier, IdentifierError};
 use crate::newtype::Newtype;
+use octizys_pretty::combinators::{concat_sep_by, from_str};
 use octizys_pretty::types::{Document, Pretty};
 
 const MODULE_LOGIC_PATH_SEPARATOR: &str = "::";
@@ -57,6 +58,15 @@ impl ModuleLogicPath {
         } else {
             (Some(ModuleLogicPath(v)), last)
         }
+    }
+}
+
+impl Pretty for ModuleLogicPath {
+    fn to_document(&self) -> Document {
+        concat_sep_by(
+            self.0.iter().map(|x| x.to_document()).collect(),
+            from_str("::"),
+        )
     }
 }
 

@@ -55,6 +55,7 @@ pub enum Document {
     Nest(u16, Box<Document>),
     Break(NoLineBreaksString),
     Group(Box<Document>),
+    HardBreak(NoLineBreaksString),
 }
 
 #[derive(Debug, PartialEq, Eq)]

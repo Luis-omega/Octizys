@@ -18,6 +18,13 @@ pub fn concat_vec(docs: Vec<Document>) -> Document {
     doc
 }
 
+/// concatenate a series of document using a separator.
+/// the separator is always appended to the final item
+/// (trailing separator)
+pub fn concat_sep_by(docs: Vec<Document>, sep: Document) -> Document {
+    concat_vec(docs.into_iter().map(|d| concat(d, sep.clone())).collect())
+}
+
 pub fn text(s: NoLineBreaksString) -> Document {
     Text(s)
 }
@@ -29,6 +36,10 @@ pub fn nest(ident: u16, d: Document) -> Document {
 //Rust has break keyword
 pub fn break_(s: NoLineBreaksString) -> Document {
     Break(s)
+}
+
+pub fn hard_break(s: NoLineBreaksString) -> Document {
+    HardBreak(s)
 }
 
 pub fn group(d: Document) -> Document {

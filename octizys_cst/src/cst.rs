@@ -4,9 +4,13 @@ use octizys_common::{
     identifier::Identifier, module_logic_path::ModuleLogicPath,
 };
 use octizys_pretty::{
-    combinators::text,
+    combinators::{concat, concat_vec, hard_break, text},
     types::{Document, NoLineBreaksString},
 };
+
+pub trait PrettyCST {
+    fn to_document(self, configuration: u8) -> Document;
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Position {
@@ -63,8 +67,10 @@ impl CommentLineContent {
             .map(|x| CommentLineContent { content: x })
             .collect()
     }
+}
 
-    pub fn to_document(&self, config: u8) -> Document {
+impl PrettyCST for CommentLineContent {
+    fn to_document(self, _configuration: u8) -> Document {
         return text(self.content.clone());
     }
 }
@@ -175,14 +181,38 @@ impl CommentBlock {
             },
         }
     }
+}
 
-    pub fn to_document(&self, configuration: u8) -> Document {
-        let line_start = match self.brace {
-            CommentBraceKind::Brace0=> match self.kind {
-               CommentKind::Documentation=>"{- |" 
-               CommentKind::Documentation=>"{-  ",
-            } 
-        }; 
+impl PrettyCST for CommentBlock {
+    fn to_document(self, configuration: u8) -> Document {
+        let (block_start, block_end) = match self.brace {
+            CommentBraceKind::Brace0 => match self.kind {
+                CommentKind::Documentation => ("{- |", "-}"),
+                CommentKind::NonDocumentation => ("{-", "-}"),
+            },
+            CommentBraceKind::Brace1 => match self.kind {
+                CommentKind::Documentation => ("{-- |", "--}"),
+                CommentKind::NonDocumentation => ("{--", "--}"),
+            },
+            CommentBraceKind::Brace2 => match self.kind {
+                CommentKind::Documentation => ("{--- |", "---}"),
+                CommentKind::NonDocumentation => ("{---", "---}"),
+            },
+            CommentBraceKind::Brace3 => match self.kind {
+                CommentKind::Documentation => ("{---- |", "----}"),
+                CommentKind::NonDocumentation => ("{----", "----}"),
+            },
+        };
+        let mut content: Vec<_> = self
+            .content
+            .into_iter()
+            .map(|x| hard_break(x.content))
+            .collect();
+        let start = hard_break(NoLineBreaksString::make(block_start).unwrap());
+        let end = hard_break(NoLineBreaksString::make(block_end).unwrap());
+        content.push(end);
+        let most_of_out = concat_vec(content);
+        concat(start, most_of_out)
     }
 }
 
@@ -192,6 +222,23 @@ pub struct CommentLine {
     pub start: LineCommentStart,
     pub content: CommentLineContent,
     pub span: Span,
+}
+
+impl PrettyCST for CommentLine {
+    fn to_document(self, configuration: u8) -> Document {
+        let line_start = match self.start {
+            LineCommentStart::DoubleHypen => match self.kind {
+                CommentKind::Documentation => "-- |",
+                CommentKind::NonDocumentation => "--",
+            },
+            LineCommentStart::DoubleSlash => match self.kind {
+                CommentKind::Documentation => "// |",
+                CommentKind::NonDocumentation => "//",
+            },
+        };
+        let start = text(NoLineBreaksString::make(line_start).unwrap());
+        concat(start, self.content.to_document(configuration))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -205,6 +252,15 @@ impl Comment {
         match self {
             Self::Line(CommentLine { span, .. }) => span,
             Self::Block(CommentBlock { span, .. }) => span,
+        }
+    }
+}
+
+impl PrettyCST for Comment {
+    fn to_document(self, configuration: u8) -> Document {
+        match self {
+            Comment::Line(l) => l.to_document(configuration),
+            Comment::Block(l) => l.to_document(configuration),
         }
     }
 }
@@ -369,6 +425,12 @@ type LocalVariable = Token<Identifier>;
 pub struct ImportedVariable {
     prefix: ModuleLogicPath,
     name: Identifier,
+}
+
+impl PrettyCST for ImportedVariable {
+    fn to_document(self, configuration: u8) -> Document {
+        concat(self.prefix.to_document(), text(self.name.0))
+    }
 }
 
 #[derive(Debug)]
