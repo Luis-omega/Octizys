@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 octizys_core={path="../octizys_core"}
-
+octizys_common={path="../octizys_common"}

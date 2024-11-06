@@ -10,6 +10,12 @@ use std::sync::LazyLock;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Identifier(NoLineBreaksString);
 
+impl Into<NoLineBreaksString> for Identifier {
+    fn into(self) -> NoLineBreaksString {
+        self.0
+    }
+}
+
 impl Into<Rc<str>> for Identifier {
     fn into(self) -> Rc<str> {
         self.0.into()

@@ -15,6 +15,8 @@ pub enum BasicExpression {
     I8(i8),
     Float(f32),
     Double(f64),
+    String(String),
+    Char(char),
 }
 
 #[derive(Debug)]

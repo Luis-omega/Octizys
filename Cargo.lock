@@ -363,6 +363,7 @@ version = "0.1.0"
 name = "octizys_sast"
 version = "0.1.0"
 dependencies = [
+ "octizys_common",
  "octizys_core",
 ]
 

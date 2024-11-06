@@ -1,11 +1,7 @@
-use crate::common;
-use crate::common::{Name, PathPrefix};
+use octizys_common::{identifier::Identifier, span::Span};
 
 #[derive(Debug)]
 pub enum BasicType {
-    //TODO: We don't need bool here, we can apply if in any type
-    //that uses two constructors only...
-    Bool,
     U64,
     I64,
     U32,
@@ -16,30 +12,26 @@ pub enum BasicType {
     I8,
     Float,
     Double,
+    String,
+    Char,
 }
 
 #[derive(Debug)]
-pub struct BasicTypeInfo<Info> {
-    info: Info,
-    _type: BasicType,
+pub struct Function {
+    span: Span,
+    arguments: Vec<Type>,
+    output: Box<Type>,
 }
 
 #[derive(Debug)]
-pub struct Function<'prefix, Info> {
-    info: Info,
-    arguments: Vec<Type<'prefix, Info>>,
-    output: Box<Type<'prefix, Info>>,
+pub struct Forall {
+    span: Span,
+    arguments: Vec<Identifier>,
+    output: Box<Type>,
 }
 
 #[derive(Debug)]
-pub struct Forall<'prefix, Info> {
-    info: Info,
-    arguments: Vec<Name<Info>>,
-    output: Box<Type<'prefix, Info>>,
-}
-
-#[derive(Debug)]
-pub struct Constructor<'prefix, Info> {
+pub struct Constructor {
     info: Info,
     prefix: Option<&'prefix PathPrefix>,
     name: Name<Info>,
@@ -81,8 +73,8 @@ pub struct Record<'prefix, Info> {
 }
 
 #[derive(Debug)]
-pub enum Type<'prefix, Info> {
-    BasicType(BasicTypeInfo<Info>),
+pub enum Type {
+    BasicType { _type: BasicType, span: Span },
     Variable(Name<Info>),
     Function(Function<'prefix, Info>),
     Forall(Forall<'prefix, Info>),
