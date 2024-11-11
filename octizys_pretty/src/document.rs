@@ -3,7 +3,7 @@
 /// we use internalization of strings.
 use string_interner::{DefaultStringInterner, DefaultSymbol};
 
-type Interner = DefaultStringInterner;
+pub type Interner = DefaultStringInterner;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 ///This type is hidden as we must ensure the invariant of no "\n" in the texts
@@ -217,7 +217,6 @@ impl<'doc> DocumentIterator<'doc> {
                     }
                 },
             };
-            println!("flat state: {:?}",current);
             match current.doc {
                 DocumentInternal::Empty => continue,
                 DocumentInternal::SoftBreak => match current.mode {
@@ -264,11 +263,6 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.stack.pop()?;
-        println!(
-            "global_state, consumed = {:?}, width = {:?}",
-            self.consumed_width, self.line_width
-        );
-        println!("processing : {:?}", current);
         match current.doc {
             DocumentInternal::Empty => Some(String::new()),
             DocumentInternal::SoftBreak => match current.mode {
@@ -358,7 +352,6 @@ mod render_tests {
                 ]),
             ),
         ]));
-        println!("{:?}", document);
         make_test("hello\n   world", document, 2)
     }
 
