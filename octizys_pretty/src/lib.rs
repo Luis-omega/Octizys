@@ -1,4 +1,2 @@
-pub mod combinators;
-pub mod configuration;
-pub mod pretty;
-pub mod types;
+pub mod document;
+pub mod simple_document;
