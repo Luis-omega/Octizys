@@ -1,30 +1,26 @@
-use crate::error::{error_from_pretty, Error};
-use crate::newtype::Newtype;
-use octizys_pretty::combinators::text;
-use octizys_pretty::types::{Document, NoLineBreaksString, Pretty};
+use crate::error::{error_from_document, Error};
+use octizys_pretty::combinators::{concat, text};
+use octizys_pretty::document::{self, Document, Interner};
 
 use regex::Regex;
-use std::rc::Rc;
 use std::sync::LazyLock;
+use string_interner::DefaultSymbol;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Identifier(NoLineBreaksString);
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct Identifier {
+    symbol: DefaultSymbol,
+    len: usize,
+}
 
-impl Into<NoLineBreaksString> for Identifier {
-    fn into(self) -> NoLineBreaksString {
-        self.0
+impl Into<DefaultSymbol> for Identifier {
+    fn into(self) -> DefaultSymbol {
+        self.symbol
     }
 }
 
-impl Into<Rc<str>> for Identifier {
-    fn into(self) -> Rc<str> {
-        self.0.into()
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum IdentifierError {
-    ContainsInvalidCodePoint,
+    ContainsInvalidCodePoint(String),
     EmptyIdentifier,
 }
 
@@ -46,67 +42,70 @@ pub static IDENTIFER_LAZY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 impl<'a> Identifier {
-    pub fn make(s: &str) -> Result<Identifier, IdentifierError> {
-        let splitted = NoLineBreaksString::decompose(s);
-        if splitted.len() == 1 {
-            let zero_element = splitted[0].clone();
-            let zero_string = zero_element.clone().extract();
-            if IDENTIFER_LAZY_REGEX.is_match(&zero_string.clone()) {
-                Ok(Identifier(zero_element))
-            } else {
-                return Err(IdentifierError::ContainsInvalidCodePoint);
-            }
+    pub fn make(
+        s: &str,
+        interner: &mut Interner,
+    ) -> Result<Identifier, IdentifierError> {
+        if s.is_empty() {
+            return Err(IdentifierError::EmptyIdentifier);
+        }
+        if IDENTIFER_LAZY_REGEX.is_match(&s) {
+            let symbol = interner.get_or_intern(s);
+            let len = document::aproximate_string_width(s);
+            Ok(Identifier { symbol, len })
         } else {
-            if splitted.len() > 0 {
-                return Err(IdentifierError::ContainsInvalidCodePoint);
-            }
-            {
-                return Err(IdentifierError::EmptyIdentifier);
-            }
+            return Err(IdentifierError::ContainsInvalidCodePoint(
+                String::from(s),
+            ));
         }
     }
 }
 
-impl<'a> Newtype<Identifier, NoLineBreaksString> for Identifier {
-    fn extract(self) -> NoLineBreaksString {
-        self.0
+impl Into<Document> for Identifier {
+    fn into(self) -> Document {
+        Document::from_symbol_and_len(self.symbol, self.len)
     }
 }
 
-impl Pretty for Identifier {
-    fn to_document(&self) -> Document {
-        text(self.0.clone())
+impl Into<Document> for &Identifier {
+    fn into(self) -> Document {
+        (*self).into()
     }
 }
 
-impl Pretty for IdentifierError {
-    fn to_document(&self) -> Document {
+impl Into<Document> for IdentifierError {
+    fn into(self) -> Document {
         match self {
-            Self::ContainsInvalidCodePoint => {
-                "The passed string is not a valid identifier, it contains invalid characters".into()
+            Self::ContainsInvalidCodePoint(s)=> {
+                concat(
+                    vec![
+                    text("The passed string is not a valid identifier, it contains invalid characters: ")
+                    , text(&s)]
+                )
             }
             Self::EmptyIdentifier => {
-                "The passed string is not a valid identifier, it is seen as a empty string".into()
+                text("The passed string is not a valid identifier, it is seen as a empty string")
             }
         }
     }
 }
 
-impl Pretty for &IdentifierError {
-    fn to_document(&self) -> Document {
-        (*self).to_document()
+impl Into<Document> for &IdentifierError {
+    fn into(self) -> Document {
+        self.clone().into()
     }
 }
 
 impl Into<Error> for IdentifierError {
     fn into(self) -> Error {
-        error_from_pretty(&self)
+        error_from_document(&self)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::identifier::Identifier;
+    use octizys_pretty::document::Interner;
     use paste::paste;
 
     macro_rules! make_negative_test {
@@ -115,7 +114,8 @@ mod tests {
                 #[test]
                 fn [<test_ $name _isnt_identifier>]() {
                     let s = $s;
-                    let result = Identifier::make(s);
+                    let mut interner = Interner::new();
+                    let result = Identifier::make(s,&mut interner);
                     assert!(result.is_err(), "s = {}, result = {:?}", s, result);
                 }
             }
@@ -151,12 +151,13 @@ mod tests {
                 #[test]
                 fn [<test_ $name _is_identifier>]() {
                     let s = $s;
-                    let result = Identifier::make(s);
+                    let mut interner = Interner::new();
+                    let result = Identifier::make(s,&mut interner);
                     match result {
                         Err(_)=>
                             assert!(false, "s = {}, result = {:?}", s, result),
                         Ok(value)=>
-                            assert!(*value.0.clone().extract() == *s, "s = {}, value = {:?}", s, value),
+                            assert!(interner.resolve(value.symbol) == Some(s), "s = {}, value = {:?}", s, value),
                     }
                 }
             }

@@ -1,10 +1,7 @@
-use std::rc::Rc;
-
-use crate::error::{error_from_pretty, Error};
+use crate::error::{error_from_document, Error};
 use crate::identifier::{Identifier, IdentifierError};
-use crate::newtype::Newtype;
-use octizys_pretty::combinators::{concat_sep_by, from_str};
-use octizys_pretty::types::{Document, Pretty};
+use octizys_pretty::combinators;
+use octizys_pretty::document::{Document, Interner};
 
 const MODULE_LOGIC_PATH_SEPARATOR: &str = "::";
 
@@ -15,8 +12,8 @@ pub enum ModuleLogicPathError {
     EmptyString,
 }
 
-impl Pretty for ModuleLogicPathError {
-    fn to_document(&self) -> Document {
+impl Into<Document> for ModuleLogicPathError {
+    fn into(self) -> Document {
         match self {
             Self::NotIdentifier => {
                 "The passed string contains a non valid Identifier component"
@@ -31,7 +28,7 @@ impl Pretty for ModuleLogicPathError {
 
 impl Into<Error> for ModuleLogicPathError {
     fn into(self) -> Error {
-        error_from_pretty(&self)
+        error_from_document(self)
     }
 }
 
@@ -39,10 +36,13 @@ impl Into<Error> for ModuleLogicPathError {
 pub struct ModuleLogicPath(Vec<Identifier>);
 
 impl ModuleLogicPath {
-    pub fn make(s: &str) -> Result<ModuleLogicPath, ModuleLogicPathError> {
+    pub fn make(
+        s: &str,
+        interner: &mut Interner,
+    ) -> Result<ModuleLogicPath, ModuleLogicPathError> {
         let v: Vec<Identifier> = s
             .split(MODULE_LOGIC_PATH_SEPARATOR)
-            .map(|x| Identifier::make(x))
+            .map(|x| Identifier::make(x, interner))
             .collect::<Result<Vec<Identifier>, IdentifierError>>()
             .map_err(|_x| ModuleLogicPathError::NotIdentifier)?;
         Ok(ModuleLogicPath(v))
@@ -61,28 +61,15 @@ impl ModuleLogicPath {
     }
 }
 
-impl Pretty for ModuleLogicPath {
-    fn to_document(&self) -> Document {
-        concat_sep_by(
-            self.0.iter().map(|x| x.to_document()).collect(),
-            from_str("::"),
-        )
+impl Into<Document> for ModuleLogicPath {
+    fn into(self) -> Document {
+        self.to_document()
     }
 }
 
-impl Newtype<ModuleLogicPath, Vec<Identifier>> for ModuleLogicPath {
-    fn extract(self) -> Vec<Identifier> {
-        self.0
-    }
-}
-
-impl Into<String> for ModuleLogicPath {
-    fn into(self) -> String {
-        self.extract()
-            .into_iter()
-            .map(|x| x.extract().extract())
-            .collect::<Vec<Rc<str>>>()
-            .join(MODULE_LOGIC_PATH_SEPARATOR)
+impl ModuleLogicPath {
+    pub fn to_document(&self) -> Document {
+        combinators::intersperse(self.0.iter(), MODULE_LOGIC_PATH_SEPARATOR)
     }
 }
 
