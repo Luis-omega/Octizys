@@ -1,6 +1,12 @@
 use std::str::FromStr;
-use octizys_cst::cst::{Between,Token,TrailingList,TokenInfo,CommentKind,LineCommentStart,Comment,ImportItem,Import,NamedVariable,Type,TypeRecordItem,PatternMatch,ImportedVariable,TypeBase,OperatorName,PatternMatchRecordItem, PatternMatchBind,Expression,CaseItem,Case,ExpressionSelector,ExpressionRecordItem};
-use octizys_cst::cst;
+use octizys_cst::{
+  base::{Between,Token,TrailingList,TokenInfo,ImportedVariable,OperatorName,TrailingListItem},
+  comments::{CommentKind,LineCommentStart,Comment},
+  imports::{Import},
+  types::{Type,TypeRecordItem,TypeBase},
+  patterns::{PatternMatch,PatternMatchRecordItem, PatternMatchBind},
+  expressions::{Expression,CaseItem,Case,ExpressionSelector,ExpressionRecordItem}};
+use octizys_cst::base;
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::identifier::Identifier;
 use crate::lexer;
@@ -94,6 +100,8 @@ extern {
       ,I64 => lexer::Token::I64(TokenInfo)
       ,F32 => lexer::Token::F32(TokenInfo)
       ,F64 => lexer::Token::F64(TokenInfo)
+      ,CharType => lexer::Token::CharType(TokenInfo)
+      ,StringType => lexer::Token::StringType(TokenInfo)
       ,LastComments=> lexer::Token::LastComments(TokenInfo,Comment)
       ,StringLiteral => lexer::Token::StringLiteral(TokenInfo,String)
       ,CharacterLiteral => lexer::Token::CharacterLiteral(TokenInfo,String)
@@ -148,48 +156,48 @@ module_path : Token<ModuleLogicPath>  =
 
 identifier : Token<Identifier> = Identifier =>? lexer::identifier_token_to_token(<>);
 operator_name : Token<OperatorName> = {
-      "?" => cst::Token{value: OperatorName::Interrogation,info:<>.into()}
-      ,"!" => cst::Token{value: OperatorName::Exclamation,info:<>.into()}
-      ,"#" => cst::Token{value: OperatorName::Hash,info:<>.into()}
-      ,"," => cst::Token{value: OperatorName::Comma,info:<>.into()}
-      ,":" => cst::Token{value: OperatorName::Colon,info:<>.into()}
-      ,";" => cst::Token{value: OperatorName::StatementEnd,info:<>.into()}
-      ,"." => cst::Token{value: OperatorName::Dot,info:<>.into()}
-      ,"::" => cst::Token{value: OperatorName::ModuleSeparator,info:<>.into()}
-      ,"-" => cst::Token{value: OperatorName::Minus,info:<>.into()}
-      ,"|>" => cst::Token{value: OperatorName::CompositionLeft,info:<>.into()}
-      ,"<|" => cst::Token{value: OperatorName::CompositionRight,info:<>.into()}
-      ,"+" => cst::Token{value: OperatorName::Plus,info:<>.into()}
-      ,"^" => cst::Token{value: OperatorName::Power,info:<>.into()}
-      ,"*" => cst::Token{value: OperatorName::Star,info:<>.into()}
-      ,"/" => cst::Token{value: OperatorName::Div,info:<>.into()}
-      ,"%" => cst::Token{value: OperatorName::Module,info:<>.into()}
-      ,"<<" => cst::Token{value: OperatorName::ShiftLeft,info:<>.into()}
-      ,">>" => cst::Token{value: OperatorName::ShiftRigth,info:<>.into()}
+      "?" => base::Token{value: OperatorName::Interrogation,info:<>.into()}
+      ,"!" => base::Token{value: OperatorName::Exclamation,info:<>.into()}
+      ,"#" => base::Token{value: OperatorName::Hash,info:<>.into()}
+      ,"," => base::Token{value: OperatorName::Comma,info:<>.into()}
+      ,":" => base::Token{value: OperatorName::Colon,info:<>.into()}
+      ,";" => base::Token{value: OperatorName::StatementEnd,info:<>.into()}
+      ,"." => base::Token{value: OperatorName::Dot,info:<>.into()}
+      ,"::" => base::Token{value: OperatorName::ModuleSeparator,info:<>.into()}
+      ,"-" => base::Token{value: OperatorName::Minus,info:<>.into()}
+      ,"|>" => base::Token{value: OperatorName::CompositionLeft,info:<>.into()}
+      ,"<|" => base::Token{value: OperatorName::CompositionRight,info:<>.into()}
+      ,"+" => base::Token{value: OperatorName::Plus,info:<>.into()}
+      ,"^" => base::Token{value: OperatorName::Power,info:<>.into()}
+      ,"*" => base::Token{value: OperatorName::Star,info:<>.into()}
+      ,"/" => base::Token{value: OperatorName::Div,info:<>.into()}
+      ,"%" => base::Token{value: OperatorName::Module,info:<>.into()}
+      ,"<<" => base::Token{value: OperatorName::ShiftLeft,info:<>.into()}
+      ,">>" => base::Token{value: OperatorName::ShiftRigth,info:<>.into()}
       //TODO: Add "<&>" = \ x y -> y $ x
-      ,"<$>" => cst::Token{value: OperatorName::Map,info:<>.into()}
-      ,"$>" => cst::Token{value: OperatorName::MapConstRigth,info:<>.into()}
-      ,"<$" => cst::Token{value: OperatorName::MapConstLeft,info:<>.into()}
+      ,"<$>" => base::Token{value: OperatorName::Map,info:<>.into()}
+      ,"$>" => base::Token{value: OperatorName::MapConstRigth,info:<>.into()}
+      ,"<$" => base::Token{value: OperatorName::MapConstLeft,info:<>.into()}
       //TODO: add <|> and <?>
-      ,"<*>" => cst::Token{value: OperatorName::Appliative,info:<>.into()}
-      ,"*>" => cst::Token{value: OperatorName::ApplicativeRight,info:<>.into()}
-      ,"<*" => cst::Token{value: OperatorName::ApplicativeLeft,info:<>.into()}
-      ,"==" => cst::Token{value: OperatorName::Equality,info:<>.into()}
-      ,"!=" => cst::Token{value: OperatorName::NotEqual,info:<>.into()}
-      ,"<=" => cst::Token{value: OperatorName::LessOrEqual,info:<>.into()}
-      ,">=" => cst::Token{value: OperatorName::MoreOrEqual,info:<>.into()}
-      ,"<" => cst::Token{value: OperatorName::LessThan,info:<>.into()}
-      ,">" => cst::Token{value: OperatorName::MoreThan,info:<>.into()}
-      ,"&&" => cst::Token{value: OperatorName::And,info:<>.into()}
-      ,"||" => cst::Token{value: OperatorName::Or,info:<>.into()}
-      ,"&" => cst::Token{value: OperatorName::ReverseAppliation,info:<>.into()}
-      ,"$" => cst::Token{value: OperatorName::DollarApplication,info:<>.into()}
-      ,"=" => cst::Token{value: OperatorName::Asignation,info:<>.into()}
-      ,"@" => cst::Token{value: OperatorName::At,info:<>.into()}
-      ,"|" => cst::Token{value: OperatorName::Pipe,info:<>.into()}
-      ,"->" => cst::Token{value: OperatorName::RightArrow,info:<>.into()}
-      ,"<-" => cst::Token{value: OperatorName::LeftArrow,info:<>.into()}
-      ,"\\" => cst::Token{value: OperatorName::LambdaStart,info:<>.into()}
+      ,"<*>" => base::Token{value: OperatorName::Appliative,info:<>.into()}
+      ,"*>" => base::Token{value: OperatorName::ApplicativeRight,info:<>.into()}
+      ,"<*" => base::Token{value: OperatorName::ApplicativeLeft,info:<>.into()}
+      ,"==" => base::Token{value: OperatorName::Equality,info:<>.into()}
+      ,"!=" => base::Token{value: OperatorName::NotEqual,info:<>.into()}
+      ,"<=" => base::Token{value: OperatorName::LessOrEqual,info:<>.into()}
+      ,">=" => base::Token{value: OperatorName::MoreOrEqual,info:<>.into()}
+      ,"<" => base::Token{value: OperatorName::LessThan,info:<>.into()}
+      ,">" => base::Token{value: OperatorName::MoreThan,info:<>.into()}
+      ,"&&" => base::Token{value: OperatorName::And,info:<>.into()}
+      ,"||" => base::Token{value: OperatorName::Or,info:<>.into()}
+      ,"&" => base::Token{value: OperatorName::ReverseAppliation,info:<>.into()}
+      ,"$" => base::Token{value: OperatorName::DollarApplication,info:<>.into()}
+      ,"=" => base::Token{value: OperatorName::Asignation,info:<>.into()}
+      ,"@" => base::Token{value: OperatorName::At,info:<>.into()}
+      ,"|" => base::Token{value: OperatorName::Pipe,info:<>.into()}
+      ,"->" => base::Token{value: OperatorName::RightArrow,info:<>.into()}
+      ,"<-" => base::Token{value: OperatorName::LeftArrow,info:<>.into()}
+      ,"\\" => base::Token{value: OperatorName::LambdaStart,info:<>.into()}
 };
 
 selector : Token<Identifier> = Selector =>? lexer::selector_token_to_token(<>);
@@ -229,19 +237,6 @@ imported_variable : Token<ImportedVariable> =
 // ```
 // in the CST
 // Note that the lexer prevents comments before or after the others ::
-imported_operator : Token<NamedVariable> =
-  <prefix:module_path> <sep:":"> <operator:operator_name>
-  =>
-  {
-  //TODO finish this.
-  //let Token{value:prefix_path, info: TokenInfo{prefix_span,token_info}} = prefix;
-  //let info = prefix_info.move_after_to_before();
-  //let CommentsInfo()
-  //info.extend(sep.info.before);
-  //info.push(sep.info.after);
-  //cst::Token{ value:NamedVariable::PrefixedOperator{prefix,operator,separator:sep.info} , info:}
-  todo!()
-  };
 
 local_variable : Token<Identifier> =
   identifier => <>
@@ -249,10 +244,8 @@ local_variable : Token<Identifier> =
 
 
 
-import_item : ImportItem ={
-  identifier => ImportItem::Variable(<>),
-  operator_name => ImportItem::Operator(<>),
-  <t:"type"> <o:operator_name> => ImportItem::TypeOperator(t.into(),o)
+import_item : Token<Identifier> ={
+  local_variable => <>,
 };
 
 
@@ -261,7 +254,7 @@ import_item : ImportItem ={
 //TODO: Add importation of constructors
 
 
-import_list : TrailingList<ImportItem> =
+import_list : TrailingList<Token<Identifier>> =
   trailing_list<import_item,","> => <>;
 
 import_as : (TokenInfo,Token<ModuleLogicPath>) =
@@ -289,43 +282,51 @@ pub import_declaration : Import =
 type_base : Token<TypeBase> = {
   U8 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::U8,info}
+    base::Token{value:TypeBase::U8,info}
     },
   U16 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::U16,info}
+    base::Token{value:TypeBase::U16,info}
     },
   U32 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::U32,info}
+    base::Token{value:TypeBase::U32,info}
     },
   U64 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::U64,info}
+    base::Token{value:TypeBase::U64,info}
     },
   I8 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::I8,info}
+    base::Token{value:TypeBase::I8,info}
     },
   I16 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::I16,info}
+    base::Token{value:TypeBase::I16,info}
     },
   I32 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::I32,info}
+    base::Token{value:TypeBase::I32,info}
     },
   I64 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::I64,info}
+    base::Token{value:TypeBase::I64,info}
     },
   F32 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::F32,info}
+    base::Token{value:TypeBase::F32,info}
     },
   F64 => {
     let info :TokenInfo = <>.into();
-    cst::Token{value:TypeBase::F64,info}
+    base::Token{value:TypeBase::F64,info}
+    },
+  CharType => {
+    let info :TokenInfo = <>.into();
+    base::Token{value:TypeBase::Char,info}
+    },
+  StringType => {
+    let info :TokenInfo = <>.into();
+    base::Token{value:TypeBase::String,info}
     },
 };
 
@@ -384,7 +385,7 @@ type_arrow : Type = {
     =>
     Type::Arrow{
       first:Box::new(first),
-      remain:remain.into_iter().map(|(x,y)| (x.into(),y)  ).collect()
+      remain:remain.into_iter().map(|(x,y)| TrailingListItem{separator:x.into(),item:y}  ).collect()
     },
   type_application => <>
 };

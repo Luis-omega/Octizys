@@ -30,7 +30,7 @@ impl TokenInfo {
         }
     }
 
-    pub fn consume_info(&mut self, other: Self) -> () {
+    pub fn consume_info(&mut self, _other: Self) -> () {
         todo!()
     }
     pub fn to_document(
@@ -180,6 +180,22 @@ impl PrettyCST for ImportedVariable {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportedOperator {
+    path: ModuleLogicPath,
+    name: Identifier,
+}
+
+impl PrettyCST for ImportedOperator {
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+        concat(vec![
+            self.path.to_document(configuration),
+            "::".into(),
+            self.name.into(),
+        ])
+    }
+}
+
 #[derive(Debug)]
 pub struct Between<T> {
     pub left: TokenInfo,
@@ -228,12 +244,14 @@ pub struct TrailingListItem<T> {
 pub enum ItemSeparator {
     Comma,
     Pipe,
+    Arrow,
 }
 impl PrettyCST for ItemSeparator {
     fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
         match self {
             ItemSeparator::Comma => ",".into(),
             ItemSeparator::Pipe => "|".into(),
+            ItemSeparator::Arrow => "->".into(),
         }
     }
 }

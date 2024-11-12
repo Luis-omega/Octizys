@@ -1,6 +1,5 @@
 use crate::base::{
-    Between, Enclosures, ItemSeparator, OperatorName, Token, TokenInfo,
-    TrailingList,
+    Between, Enclosures, ItemSeparator, Token, TokenInfo, TrailingList,
 };
 use crate::pretty::{PrettyCST, PrettyCSTConfig};
 use octizys_common::{
@@ -10,34 +9,12 @@ use octizys_pretty::combinators::*;
 use octizys_pretty::document::Document;
 
 #[derive(Debug)]
-pub enum ImportItem {
-    Variable(Token<Identifier>),
-    Operator(Token<OperatorName>),
-    TypeOperator(TokenInfo, Token<OperatorName>),
-}
-
-impl PrettyCST for ImportItem {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
-        match self {
-            Self::Variable(t) => {
-                t.info.to_document(configuration, t.value.into())
-            }
-            Self::Operator(t) => t.to_document(configuration),
-            Self::TypeOperator(ti, t) => concat(vec![
-                ti.to_document(configuration, "type ".into()),
-                t.to_document(configuration),
-            ]),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct Import {
     // import unqualified S.O.M.E.Path(a,b,c) as N.A.Me
     pub import: TokenInfo,
     pub unqualified: Option<TokenInfo>,
     pub module_path: Token<ModuleLogicPath>,
-    pub import_list: Option<Between<TrailingList<ImportItem>>>,
+    pub import_list: Option<Between<TrailingList<Token<Identifier>>>>,
     // "as name"
     pub qualified_path: Option<(TokenInfo, Token<ModuleLogicPath>)>,
 }

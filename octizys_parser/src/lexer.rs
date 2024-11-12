@@ -1,15 +1,18 @@
 use lalrpop_util::ParseError;
 use octizys_common::identifier::Identifier;
 use octizys_common::module_logic_path::ModuleLogicPath;
+use octizys_common::{DefaultSymbol, Interner};
 use regex::Regex;
 use std::str::CharIndices;
 use std::sync::LazyLock;
 use std::{collections::VecDeque, rc::Rc};
 
-use octizys_cst::cst::{
-    self, Comment, CommentBlock, CommentBraceKind, CommentKind, CommentLine,
-    CommentLineContent, CommentsInfo, LineCommentStart, Position, Span,
-    TokenInfo,
+use octizys_common::span::{Position, Span};
+use octizys_cst::base;
+use octizys_cst::base::TokenInfo;
+use octizys_cst::comments::{
+    Comment, CommentBlock, CommentBraceKind, CommentKind, CommentLine,
+    CommentLineContent, CommentsInfo, LineCommentStart,
 };
 
 use paste::paste;
@@ -106,6 +109,8 @@ pub enum Token {
     I64(TokenInfo),
     F32(TokenInfo),
     F64(TokenInfo),
+    CharType(TokenInfo),
+    StringType(TokenInfo),
     LastComments(Vec<Comment>, TokenInfo),
     StringLiteral(TokenInfo, String),
     CharacterLiteral(TokenInfo, char),
@@ -195,6 +200,8 @@ impl From<Token> for TokenInfo {
             Token::I64(info) => (info),
             Token::F32(info) => (info),
             Token::F64(info) => (info),
+            Token::CharType(info) => (info),
+            Token::StringType(info) => (info),
             Token::LastComments(_, info) => info, //{
             //let span = match comments.get(0) {
             //    Some(s) => s.clone().get_span(),
@@ -222,9 +229,9 @@ impl From<Token> for TokenInfo {
 macro_rules! make_lexer_token_to_token {
     ($name:tt, $output_constructor:tt, $output_type:tt) => {
         paste!{
-            pub fn [< $name _token_to_token >](t:Token)->Result<cst::Token<$output_type>,ParseError<usize,Token,LexerError>>{
+            pub fn [< $name _token_to_token >](t:Token)->Result<base::Token<$output_type>,ParseError<usize,Token,LexerError>>{
                 match t {
-                    Token::$output_constructor(info,value) => Ok(cst::Token{value,info}),
+                    Token::$output_constructor(info,value) => Ok(base::Token{value,info}),
                     _ => Err(ParseError::User{error: LexerError{error_type:LexerErrorType::CantTranslateToToken(t.clone()),position:{let t2 : TokenInfo =t.into(); t2.span.start}} })
                 }
             }
@@ -270,6 +277,8 @@ fn match_keyword(s: &str, info: TokenInfo) -> Option<Token> {
         "I64" => Some(Token::I64(info)),
         "F32" => Some(Token::F32(info)),
         "F64" => Some(Token::F64(info)),
+        "Char" => Some(Token::CharType(info)),
+        "String" => Some(Token::StringType(info)),
         _ => None,
     };
 }
@@ -454,14 +463,16 @@ pub struct Lexer<'input> {
     src: &'input str,
     offset: usize,
     found_error: bool,
+    interner: &'input mut Interner,
 }
 
 impl<'input> Lexer<'input> {
-    pub fn new(src: &'input str) -> Self {
+    pub fn new(src: &'input str, interner: &'input mut Interner) -> Self {
         Lexer {
             src,
             offset: 0,
             found_error: false,
+            interner,
         }
     }
 
@@ -626,8 +637,8 @@ impl<'input> Lexer<'input> {
     pub fn any_comment(&mut self) -> Option<Comment> {
         let comment = self
             .single_line_comment()
-            .map(Comment::from)
-            .or_else(|| self.comment_block().map(Comment::from));
+            .map(|x| x.into())
+            .or_else(|| self.comment_block().map(|x| x.into()));
         self.all_spaces();
         comment
     }
@@ -649,20 +660,37 @@ impl<'input> Lexer<'input> {
         self.simple_spaces();
         let comment = self.single_line_comment();
         self.all_spaces();
-        comment.map(Comment::from)
+        comment.map(|x| x.into())
     }
 
     pub fn lex_with_value(
         &mut self,
         re: &LazyLock<Regex>,
         before: Vec<Comment>,
-        make_token: fn(&str, TokenInfo) -> Result<Token, LexerError>,
+        mut make_token: impl FnOnce(&str, TokenInfo) -> Result<Token, LexerError>,
     ) -> Option<Result<Token, LexerError>> {
         let (span, text) = self.satisfy(re)?;
         let after = self.after_comments();
-        let comments = cst::CommentsInfo { before, after };
+        let comments = CommentsInfo { before, after };
         let info = TokenInfo { comments, span };
         Some(make_token(text, info))
+    }
+
+    pub fn lex_with_value_interner(
+        &mut self,
+        re: &LazyLock<Regex>,
+        before: Vec<Comment>,
+        mut make_token: impl FnOnce(
+            &str,
+            TokenInfo,
+            &mut Interner,
+        ) -> Result<Token, LexerError>,
+    ) -> Option<Result<Token, LexerError>> {
+        let (span, text) = self.satisfy(re)?;
+        let after = self.after_comments();
+        let comments = CommentsInfo { before, after };
+        let info = TokenInfo { comments, span };
+        Some(make_token(text, info, &mut self.interner))
     }
 
     pub fn identifier_or_keyword(
@@ -673,11 +701,11 @@ impl<'input> Lexer<'input> {
         //let after = self.after_comments();
         //let comments = cst::CommentsInfo { before, after };
         //let info = TokenInfo { comments, span };
-        self.lex_with_value(&IDENTIFER, before, |text, info| {
+        self.lex_with_value_interner(&IDENTIFER, before, |text, info, interner| {
             match match_keyword(text, info.clone()){
                 Some(x) => Ok(x),
                 None =>{
-                    match Identifier::make(text) {
+                    match Identifier::make(text,interner) {
                         Ok(identifier) => Ok(Token::Identifier(info, identifier)),
                         Err(_) => {let position = info.span.start; Err(LexerError {
                             error_type:
@@ -717,8 +745,10 @@ impl<'input> Lexer<'input> {
         &mut self,
         before: Vec<Comment>,
     ) -> Option<Result<Token, LexerError>> {
-        self.lex_with_value(&MODULE_LOGIC_PATH, before, |text, info| {
-            match ModuleLogicPath::make(text) {
+        self.lex_with_value_interner(
+            &MODULE_LOGIC_PATH,
+            before,
+            |text, info, interner| match ModuleLogicPath::make(text, interner) {
                 Ok(path) => Ok(Token::ModuleLogicPath(info, path)),
                 Err(_) => {
                     let position = info.span.start;
@@ -731,8 +761,8 @@ impl<'input> Lexer<'input> {
                         position,
                     })
                 }
-            }
-        })
+            },
+        )
     }
 
     pub fn lex_symbol_or_operator(
@@ -864,8 +894,6 @@ impl<'input> Iterator for Lexer<'input> {
 #[cfg(test)]
 mod lexer_tests {
 
-    use octizys_pretty::types::NoLineBreaksString;
-
     use crate::lexer::*;
 
     //fn generic_test_by_spaces(s: &'static str) {
@@ -879,7 +907,8 @@ mod lexer_tests {
     #[test]
     fn empty_string() {
         let input = "";
-        let lex = Lexer::new(&input);
+        let mut interner = Interner::new();
+        let lex = Lexer::new(&input, &mut interner);
         let result: Vec<Result<Token, LexerError>> =
             lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
         assert!(result == vec![])
@@ -888,10 +917,11 @@ mod lexer_tests {
     #[test]
     fn identifier() {
         let s = "helloWorld";
-        let lex = Lexer::new(s);
+        let mut interner = Interner::new();
+        let mut lex = Lexer::new(s, &mut interner);
         let result: Vec<Result<Token, LexerError>> =
             lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
-        let identifier = Identifier::make(s).unwrap();
+        let identifier = Identifier::make(s, &mut interner).unwrap();
         let info = TokenInfo {
             comments: CommentsInfo {
                 before: vec![],
@@ -911,7 +941,8 @@ mod lexer_tests {
         constructor: fn(TokenInfo) -> Token,
     ) {
         println!("beginging: ");
-        let lex = Lexer::new(key);
+        let mut interner = Interner::new();
+        let lex = Lexer::new(key, &mut interner);
         let result: Vec<Result<Token, LexerError>> =
             lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
         let info = TokenInfo {
@@ -964,17 +995,16 @@ mod lexer_tests {
         kind: CommentKind,
         start: LineCommentStart,
     ) {
+        let mut interner = Interner::new();
         let start_str: &'static str = start.into();
         let trailing_string: String = vec![start_str, kind.into()].join("");
         let start_gap = trailing_string.len();
         let raw_string: String =
             trailing_string.clone() + content_string + "\n";
-        let lex = Lexer::new(&raw_string);
+        let lex = Lexer::new(&raw_string, &mut interner);
         let result: Vec<Result<Token, LexerError>> =
             lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
-        let content = CommentLineContent {
-            content: NoLineBreaksString::make(content_string).unwrap(),
-        };
+        let content = CommentLineContent::make(content_string).unwrap();
         let comment_line = CommentLine {
             kind,
             start,
@@ -982,7 +1012,11 @@ mod lexer_tests {
             // -1 here as the len give us a bigger index
             span: (0, raw_string.len() - 1).into(),
         };
-        let token = Token::LastComments(vec![comment_line.into()]);
+        let info = TokenInfo {
+            comments: CommentsInfo::empty(),
+            span: comment_line.span,
+        };
+        let token = Token::LastComments(vec![comment_line.into()], info);
         let expected = vec![Ok(token)];
         println!("result:   {:?}", result);
         println!("expected: {:?}", expected);
@@ -1030,6 +1064,7 @@ mod lexer_tests {
         kind: CommentKind,
         brace: CommentBraceKind,
     ) {
+        let mut interner = Interner::new();
         let kind_as_str: &str = kind.into();
         println!("kind: {:?} {:?}", kind, kind_as_str);
         let (start_str, end_str): (&'static str, &'static str) = brace.into();
@@ -1037,7 +1072,7 @@ mod lexer_tests {
         let start_gap = trailing_string.len();
         let content = CommentLineContent::decompose(content_string);
         let lexer_string = [&trailing_string, content_string, end_str].join("");
-        let lex = Lexer::new(&lexer_string);
+        let lex = Lexer::new(&lexer_string, &mut interner);
         let block = CommentBlock {
             kind,
             brace,

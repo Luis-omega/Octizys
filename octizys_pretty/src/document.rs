@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 /// Adapted from the paper Strictly Pretty, Christian Lindig.
 /// Is specialized to handle the source files, that's why
 /// we use internalization of strings.
@@ -67,7 +69,7 @@ impl<'doc> FitsParam<'doc> {
 }
 
 //TODO: change this to a better approximate using graphemes
-fn aproximate_string_width(s: &str) -> usize {
+pub fn aproximate_string_width(s: &str) -> usize {
     s.chars().count()
 }
 
@@ -115,6 +117,10 @@ impl Document {
         }
     }
 
+    pub fn from_symbol_and_len(s: DefaultSymbol, len: usize) -> Self {
+        Document(DocumentInternal::InternalizedText(s, len))
+    }
+
     /// This function decomposes the given str by "\n" and returns a equivalent document
     /// This preserves line breaks and spaces as is
     /// This doesn't perform internalization of the text
@@ -154,6 +160,19 @@ impl Document {
 
     pub fn render_to_string(self, width: usize, interner: &Interner) -> String {
         self.into_iter(width, interner).collect()
+    }
+}
+
+impl Into<Document> for &str {
+    fn into(self) -> Document {
+        Document::text(self)
+    }
+}
+
+impl Add for Document {
+    type Output = Document;
+    fn add(self, rhs: Self) -> Self::Output {
+        Document::concat(vec![self, rhs])
     }
 }
 

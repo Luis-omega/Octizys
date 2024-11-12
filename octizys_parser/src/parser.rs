@@ -1,6 +1,5 @@
 use lalrpop_util::lalrpop_mod;
 use octizys_common::error::Error;
-use octizys_cst::cst;
 use std::path::PathBuf;
 
 lalrpop_mod!(grammar);

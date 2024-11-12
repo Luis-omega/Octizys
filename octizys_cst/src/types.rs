@@ -1,6 +1,6 @@
 use crate::base::{
     Between, Enclosures, ImportedVariable, ItemSeparator, Token, TokenInfo,
-    TrailingList,
+    TrailingList, TrailingListItem,
 };
 use crate::pretty::{PrettyCST, PrettyCSTConfig};
 use octizys_common::identifier::Identifier;
@@ -88,7 +88,7 @@ pub enum Type {
     },
     Arrow {
         first: Box<Type>,
-        remain: Vec<Token<Type>>,
+        remain: Vec<TrailingListItem<Type>>,
     },
     Scheme {
         forall: TokenInfo,
@@ -215,10 +215,7 @@ impl PrettyCST for Type {
             )),
             Type::Arrow { first, remain } => {
                 let remain_doc = remain.into_iter().map(|arg| {
-                    arg.info.to_document(
-                        configuration,
-                        arg.value.to_document_arrow_arguments(configuration),
-                    )
+                    arg.to_document(configuration, ItemSeparator::Arrow)
                 });
                 first.to_document_arrow_arguments(configuration)
                     + concat_iter(remain_doc)

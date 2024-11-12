@@ -14,6 +14,7 @@ octizys_pretty = {path = "../octizys_pretty"}
 lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
 paste = "1.0.15"
 regex = "1.10.6"
+string-interner = "0.17.0"
 
 
 [build-dependencies]
