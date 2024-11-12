@@ -1,47 +1,100 @@
-use std::rc::Rc;
-
 use octizys_common::{
     identifier::Identifier,
     module_logic_path::ModuleLogicPath,
     span::{Position, Span},
 };
 use octizys_pretty::{
-    combinators::{concat, concat_vec, hard_break, text},
-    types::{Document, NoLineBreaksString, Pretty},
+    combinators::{
+        self, concat, empty, group, hard_break, intersperse, nest, soft_break,
+        text,
+    },
+    document::Document,
 };
 
+#[derive(Debug, Copy, Clone)]
+pub struct PrettyCSTConfig {
+    //TODO: add option to sort imports alphabetically  (Ord<String>)
+    // An even better options may be to sort first by package and then sort
+    // alphabetically
+    pub line_width: u16,
+    pub indentation_deep: u16,
+    pub leading_commas: bool,
+    pub add_trailing_separator: bool,
+    pub move_documentantion_before_object: bool,
+    pub indent_comment_blocks: bool,
+    pub separe_comments_by: u8,
+    pub compact_comments: bool,
+}
+
+impl PrettyCSTConfig {
+    pub fn new() -> PrettyCSTConfig {
+        PrettyCSTConfig {
+            line_width: 80,
+            indentation_deep: 2,
+            leading_commas: true,
+            add_trailing_separator: true,
+            move_documentantion_before_object: true,
+            indent_comment_blocks: true,
+            separe_comments_by: 1,
+            compact_comments: true,
+        }
+    }
+}
+
 pub trait PrettyCST {
-    fn to_document(self, configuration: u8) -> Document;
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document;
+}
+
+impl PrettyCST for ModuleLogicPath {
+    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+        self.into()
+    }
+}
+
+impl<T> PrettyCST for Box<T>
+where
+    T: PrettyCST,
+{
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+        (*self).to_document(configuration)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentLineContent {
-    pub content: NoLineBreaksString,
+    pub content: String,
 }
 
 impl CommentLineContent {
-    pub fn make(value: Rc<str>) -> Result<Self, String> {
-        let content = NoLineBreaksString::make(&value)?;
+    pub fn make(value: &str) -> Result<Self, String> {
+        if value.find("\n").is_some() {
+            return Err(String::from(
+                "CommentLines souldn't containt line breaks!",
+            ));
+        }
+        let content = String::from(value);
         Ok(CommentLineContent { content })
     }
 
     pub fn decompose(value: &str) -> Vec<Self> {
-        NoLineBreaksString::decompose(value)
-            .into_iter()
-            .map(|x| CommentLineContent { content: x })
+        value
+            .split("\n")
+            .map(|x| CommentLineContent {
+                content: x.to_string(),
+            })
             .collect()
     }
 }
 
 impl PrettyCST for CommentLineContent {
-    fn to_document(self, _configuration: u8) -> Document {
-        return text(self.content.clone());
+    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+        text(&self.content)
     }
 }
 
-impl From<CommentLineContent> for Rc<str> {
-    fn from(value: CommentLineContent) -> Self {
-        value.content.into()
+impl Into<Document> for CommentLineContent {
+    fn into(self) -> Document {
+        text(&self.content)
     }
 }
 
@@ -148,7 +201,7 @@ impl CommentBlock {
 }
 
 impl PrettyCST for CommentBlock {
-    fn to_document(self, configuration: u8) -> Document {
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
         let (block_start, block_end) = match self.brace {
             CommentBraceKind::Brace0 => match self.kind {
                 CommentKind::Documentation => ("{- |", "-}"),
@@ -167,16 +220,23 @@ impl PrettyCST for CommentBlock {
                 CommentKind::NonDocumentation => ("{----", "----}"),
             },
         };
-        let mut content: Vec<_> = self
-            .content
-            .into_iter()
-            .map(|x| hard_break(x.content))
-            .collect();
-        let start = hard_break(NoLineBreaksString::make(block_start).unwrap());
-        let end = hard_break(NoLineBreaksString::make(block_end).unwrap());
-        content.push(end);
-        let most_of_out = concat_vec(content);
-        concat(start, most_of_out)
+        let content_raw = intersperse(self.content, hard_break());
+
+        let content = if configuration.indent_comment_blocks {
+            group(nest(
+                configuration.indentation_deep,
+                concat(vec![hard_break(), content_raw]),
+            )) + hard_break()
+        } else {
+            content_raw
+        };
+
+        concat(vec![
+            block_start.into(),
+            content,
+            block_end.into(),
+            hard_break(),
+        ])
     }
 }
 
@@ -189,7 +249,7 @@ pub struct CommentLine {
 }
 
 impl PrettyCST for CommentLine {
-    fn to_document(self, configuration: u8) -> Document {
+    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
         let line_start = match self.start {
             LineCommentStart::DoubleHypen => match self.kind {
                 CommentKind::Documentation => "-- |",
@@ -200,8 +260,7 @@ impl PrettyCST for CommentLine {
                 CommentKind::NonDocumentation => "//",
             },
         };
-        let start = text(NoLineBreaksString::make(line_start).unwrap());
-        concat(start, self.content.to_document(configuration))
+        concat(vec![line_start.into(), self.content.into(), hard_break()])
     }
 }
 
@@ -221,7 +280,7 @@ impl Comment {
 }
 
 impl PrettyCST for Comment {
-    fn to_document(self, configuration: u8) -> Document {
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
         match self {
             Comment::Line(l) => l.to_document(configuration),
             Comment::Block(l) => l.to_document(configuration),
@@ -229,15 +288,15 @@ impl PrettyCST for Comment {
     }
 }
 
-impl From<CommentLine> for Comment {
-    fn from(value: CommentLine) -> Self {
-        Comment::Line(value)
+impl Into<Comment> for CommentLine {
+    fn into(self) -> Comment {
+        Comment::Line(self)
     }
 }
 
-impl From<CommentBlock> for Comment {
-    fn from(value: CommentBlock) -> Self {
-        Comment::Block(value)
+impl Into<Comment> for CommentBlock {
+    fn into(self) -> Comment {
+        Comment::Block(self)
     }
 }
 
@@ -266,17 +325,14 @@ impl CommentsInfo {
         self.before.push(new)
     }
 
-    pub fn move_after_to_before(self) -> Self {
-        let CommentsInfo { mut before, after } = self;
-        match after {
+    pub fn move_after_to_before(mut self) -> Self {
+        match self.after {
             Some(c) => {
-                before.push(c);
-                CommentsInfo {
-                    before,
-                    after: None,
-                }
+                self.before.push(c);
+                self.after = None;
+                return self;
             }
-            None => CommentsInfo { before, after },
+            None => return self,
         }
     }
     //TODO: this is wrong, check the docummentation on grammar about
@@ -288,6 +344,38 @@ impl CommentsInfo {
             Some(c) => self.push(c),
             None => (),
         }
+    }
+
+    /// Take a CommentsInfo and transform all the contiguous occurrences
+    /// of comments of the same type in a single block
+    /// Example: Multiple documentation lines became a  documentation block
+    /// Example: Multiple NonDocumentation lines became a block
+    pub fn compact_comments(mut self) -> Self {
+        todo!()
+    }
+
+    pub fn to_document(
+        mut self,
+        configuration: PrettyCSTConfig,
+        doc: Document,
+    ) -> Document {
+        if configuration.move_documentantion_before_object {
+            self = self.move_after_to_before();
+        }
+        if configuration.compact_comments {
+            self = self.compact_comments();
+        }
+        let separe_by = usize::from(configuration.separe_comments_by);
+        concat(vec![
+            intersperse(
+                self.before
+                    .into_iter()
+                    .map(|x| x.to_document(configuration)),
+                combinators::repeat(hard_break(), separe_by),
+            ),
+            doc,
+            self.after.map_or(empty(), |x| x.to_document(configuration)),
+        ])
     }
 }
 
@@ -317,6 +405,13 @@ impl TokenInfo {
     pub fn consume_info(&mut self, other: Self) -> () {
         todo!()
     }
+    pub fn to_document(
+        self,
+        configuration: PrettyCSTConfig,
+        value: Document,
+    ) -> Document {
+        self.comments.to_document(configuration, value)
+    }
 }
 
 #[derive(Debug)]
@@ -336,6 +431,16 @@ impl<T> Token<T> {
     pub fn consume_token<U>(&mut self, other: Token<U>) -> U {
         self.info.consume_info(other.info);
         other.value
+    }
+}
+
+impl<T> PrettyCST for Token<T>
+where
+    T: PrettyCST,
+{
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+        self.info
+            .to_document(configuration, self.value.to_document(configuration))
     }
 }
 
@@ -383,32 +488,70 @@ pub enum OperatorName {
     LambdaStart,
 }
 
+impl PrettyCST for OperatorName {
+    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+        let x = match self {
+            OperatorName::Interrogation => "?",
+            OperatorName::Exclamation => "!",
+            OperatorName::Hash => "#",
+            OperatorName::Comma => ",",
+            OperatorName::Colon => ":",
+            OperatorName::StatementEnd => ";",
+            OperatorName::Dot => ".",
+            OperatorName::ModuleSeparator => "::",
+            OperatorName::Minus => "-",
+            OperatorName::CompositionLeft => "<|",
+            OperatorName::CompositionRight => "|>",
+            OperatorName::Plus => "+",
+            OperatorName::Power => "^",
+            OperatorName::Star => "*",
+            OperatorName::Div => "/",
+            OperatorName::Module => "%",
+            OperatorName::ShiftLeft => "<<",
+            OperatorName::ShiftRigth => ">>", //TODO: Add "<&>" = \ x y -> y $ x
+            OperatorName::Map => "<$>",
+            OperatorName::MapConstRigth => "$>",
+            OperatorName::MapConstLeft => "<$", //TODO: add <|> and <?>
+            OperatorName::Appliative => "<*>",
+            OperatorName::ApplicativeRight => "*>",
+            OperatorName::ApplicativeLeft => "<*",
+            OperatorName::Equality => "==",
+            OperatorName::NotEqual => "!=",
+            OperatorName::LessOrEqual => "<=",
+            OperatorName::MoreOrEqual => "=>",
+            OperatorName::LessThan => "<",
+            OperatorName::MoreThan => ">",
+            OperatorName::And => "&&",
+            OperatorName::Or => "||",
+            OperatorName::ReverseAppliation => "&",
+            OperatorName::DollarApplication => "$",
+            OperatorName::Asignation => "=",
+            OperatorName::At => "&",
+            OperatorName::Pipe => "|",
+            OperatorName::RightArrow => "<-",
+            OperatorName::LeftArrow => "->",
+            OperatorName::LambdaStart => "\\",
+        };
+        x.into()
+    }
+}
+
 type LocalVariable = Token<Identifier>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImportedVariable {
-    prefix: ModuleLogicPath,
+    path: ModuleLogicPath,
     name: Identifier,
 }
 
 impl PrettyCST for ImportedVariable {
-    fn to_document(self, configuration: u8) -> Document {
-        concat(Pretty::to_document(&self.prefix), text(self.name.into()))
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+        concat(vec![
+            self.path.to_document(configuration),
+            "::".into(),
+            self.name.into(),
+        ])
     }
-}
-
-#[derive(Debug)]
-pub enum NamedVariable {
-    SingleVariable(Identifier),
-    SingleOperator(OperatorName),
-    PrefixedVariable {
-        prefix: ModuleLogicPath,
-        name: Identifier,
-    },
-    PrefixedOperator {
-        prefix: ModuleLogicPath,
-        operator: OperatorName,
-    },
 }
 
 #[derive(Debug)]
@@ -418,10 +561,74 @@ pub struct Between<T> {
     pub value: T,
 }
 
+pub enum Enclosures {
+    Parens,
+    Brackets,
+    Braces,
+}
+
+impl<T> Between<T> {
+    pub fn to_document(
+        self,
+        configuration: PrettyCSTConfig,
+        enclosure: Enclosures,
+        to_document: impl FnOnce(T, PrettyCSTConfig) -> Document,
+    ) -> Document {
+        let (start, end): (Document, Document) = match enclosure {
+            Enclosures::Parens => ("(".into(), ")".into()),
+            Enclosures::Braces => ("{".into(), "}".into()),
+            Enclosures::Brackets => ("[".into(), "]".into()),
+        };
+
+        concat(vec![
+            self.left.to_document(configuration, start),
+            group(nest(
+                configuration.indentation_deep,
+                to_document(self.value, configuration),
+            )),
+            self.right.to_document(configuration, end),
+        ])
+    }
+}
+
+/// The separator came before the item in the stream
 #[derive(Debug)]
 pub struct TrailingListItem<T> {
     pub separator: TokenInfo,
     pub item: T,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ItemSeparator {
+    Comma,
+    Pipe,
+}
+impl PrettyCST for ItemSeparator {
+    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+        match self {
+            ItemSeparator::Comma => ",".into(),
+            ItemSeparator::Pipe => "|".into(),
+        }
+    }
+}
+
+impl<T> TrailingListItem<T>
+where
+    T: PrettyCST,
+{
+    pub fn to_document(
+        self,
+        configuration: PrettyCSTConfig,
+        separator: ItemSeparator,
+    ) -> Document {
+        concat(vec![
+            self.separator.to_document(
+                configuration,
+                separator.to_document(configuration),
+            ),
+            self.item.to_document(configuration),
+        ])
+    }
 }
 
 #[derive(Debug)]
@@ -429,6 +636,41 @@ pub struct TrailingList<T> {
     pub first: T,
     pub items: Vec<TrailingListItem<T>>,
     pub trailing_sep: Option<TokenInfo>,
+}
+
+impl<T> TrailingList<T>
+where
+    T: PrettyCST,
+{
+    pub fn to_document(
+        self,
+        configuration: PrettyCSTConfig,
+        separator: ItemSeparator,
+    ) -> Document {
+        let trailing = match self.trailing_sep {
+            Some(separator_info) => separator_info.to_document(
+                configuration,
+                separator.to_document(configuration),
+            ),
+            None => {
+                if configuration.add_trailing_separator {
+                    separator.to_document(configuration)
+                } else {
+                    combinators::empty()
+                }
+            }
+        };
+        concat(vec![
+            self.first.to_document(configuration),
+            concat(
+                self.items
+                    .into_iter()
+                    .map(|x| x.to_document(configuration, separator))
+                    .collect(),
+            ),
+            trailing,
+        ])
+    }
 }
 
 impl<T, ToInfo> Into<TrailingList<T>> for (T, Vec<(ToInfo, T)>, Option<ToInfo>)
@@ -461,6 +703,21 @@ pub enum ImportItem {
     TypeOperator(TokenInfo, Token<OperatorName>),
 }
 
+impl PrettyCST for ImportItem {
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+        match self {
+            Self::Variable(t) => {
+                t.info.to_document(configuration, t.value.into())
+            }
+            Self::Operator(t) => t.to_document(configuration),
+            Self::TypeOperator(ti, t) => concat(vec![
+                ti.to_document(configuration, "type ".into()),
+                t.to_document(configuration),
+            ]),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Import {
     // import unqualified S.O.M.E.Path(a,b,c) as N.A.Me
@@ -470,6 +727,34 @@ pub struct Import {
     pub import_list: Option<Between<TrailingList<ImportItem>>>,
     // "as name"
     pub qualified_path: Option<(TokenInfo, Token<ModuleLogicPath>)>,
+}
+
+impl PrettyCST for Import {
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+        let import = self.import.to_document(configuration, "import ".into());
+        let unqualified: Document = self.unqualified.map_or(empty(), |x| {
+            x.to_document(configuration, "unqualified ".into())
+        });
+        let path = self.module_path.to_document(configuration);
+        let imports = match self.import_list {
+            Some(x) => {
+                x.to_document(configuration, Enclosures::Parens, |l, c| {
+                    l.to_document(c, ItemSeparator::Comma)
+                })
+            }
+            None => "()".into(),
+        };
+        let _as = match self.qualified_path {
+            Some((ti, tm)) => concat(vec![
+                ti.to_document(configuration, "as ".into()),
+                tm.to_document(configuration),
+            ]),
+            None => empty(),
+        };
+        // TODO: add soft_break between items (but be careful that two optional items don't overlap
+        // their soft_breaks if they don't exists!
+        concat(vec![import, unqualified, path, imports, _as])
+    }
 }
 
 #[derive(Debug)]
@@ -484,6 +769,27 @@ pub enum TypeBase {
     I64,
     F32,
     F64,
+    Char,
+    String,
+}
+
+impl PrettyCST for TypeBase {
+    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+        match self {
+            TypeBase::U8 => "U8".into(),
+            TypeBase::U16 => "U16".into(),
+            TypeBase::U32 => "U32".into(),
+            TypeBase::U64 => "U64".into(),
+            TypeBase::I8 => "I8".into(),
+            TypeBase::I16 => "I16".into(),
+            TypeBase::I32 => "I32".into(),
+            TypeBase::I64 => "I64".into(),
+            TypeBase::F32 => "F32".into(),
+            TypeBase::F64 => "F64".into(),
+            TypeBase::Char => "Char".into(),
+            TypeBase::String => "String".into(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -494,6 +800,27 @@ pub struct TypeRecordItem {
     // otherwise we can drop the Box, maybe put
     // the box in the TrailingList?
     pub expression: Box<Type>,
+}
+
+impl PrettyCST for TypeRecordItem {
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+        concat(vec![
+            self.variable
+                .info
+                .to_document(configuration, self.variable.value.into()),
+            self.separator.to_document(configuration, ":".into()),
+            self.expression.to_document(configuration),
+        ])
+    }
+}
+
+fn pretty_betwee_trailing<T: PrettyCST>(
+    between: Between<TrailingList<T>>,
+    configuration: PrettyCSTConfig,
+    sep: ItemSeparator,
+    enclosure: Enclosures,
+) -> Document {
+    between.to_document(configuration, enclosure, |l, c| l.to_document(c, sep))
 }
 
 #[derive(Debug)]
@@ -520,6 +847,60 @@ pub enum Type {
         dot: TokenInfo,
         expression: Box<Type>,
     },
+}
+
+impl PrettyCST for Type {
+    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+        match self {
+            Type::Base(token) => token.to_document(configuration),
+            Type::LocalVariable(token) => {
+                token.info.to_document(configuration, token.value.into())
+            }
+            Type::ImportedVariable(token) => token.to_document(configuration),
+            Type::Tuple(between) => pretty_betwee_trailing(
+                between,
+                configuration,
+                ItemSeparator::Comma,
+                Enclosures::Parens,
+            ),
+            Type::Record(between) => pretty_betwee_trailing(
+                between,
+                configuration,
+                ItemSeparator::Comma,
+                Enclosures::Braces,
+            ),
+            Type::Parens(between) => between.to_document(
+                configuration,
+                Enclosures::Parens,
+                |t, c| t.to_document(c),
+            ),
+            Type::Application {
+                start,
+                second,
+                remain,
+            } =>
+            //TODO: Add parens here as needed
+            {
+                group(nest(
+                    configuration.indentation_deep,
+                    concat(vec![
+                        start.to_document(configuration),
+                        soft_break(),
+                        second.to_document(configuration),
+                        soft_break(),
+                        intersperse(
+                            remain
+                                .into_iter()
+                                .map(|x| x.to_document(configuration)),
+                            soft_break(),
+                        ),
+                    ]),
+                ))
+            }
+            Type::Arrow { first, remain } => empty(),
+            _ => todo!(),
+        }
+    }
 }
 
 #[derive(Debug)]
