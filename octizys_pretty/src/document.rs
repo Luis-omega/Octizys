@@ -385,10 +385,12 @@ mod render_tests {
                 Document::concat(vec![
                     Document::soft_break(),
                     Document::text("world"),
+                    Document::soft_break(),
+                    Document::text("!"),
                 ]),
             ),
         ]));
-        make_test("hello\n   world", document, 2)
+        make_test("hello\n   world\n   !", document, 2)
     }
 
     #[test]
@@ -400,9 +402,11 @@ mod render_tests {
                 Document::concat(vec![
                     Document::soft_break(),
                     Document::text("world"),
+                    Document::soft_break(),
+                    Document::text("!"),
                 ]),
             ),
         ]));
-        make_test("hello world", document, 20)
+        make_test("hello world !", document, 20)
     }
 }

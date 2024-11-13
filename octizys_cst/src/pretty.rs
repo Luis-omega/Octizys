@@ -14,20 +14,38 @@ pub struct PrettyCSTConfig {
     pub line_width: u16,
     pub indentation_deep: u16,
     pub leading_commas: bool,
+    /// trailing commas are always preserved but
+    /// if they don't exists this option as false would
+    /// prevent the formatter to put a new one.
     pub add_trailing_separator: bool,
+    /// In a block like:
+    /// ```haskell
+    /// someIdent -- | doc for this
+    /// ```
+    /// If this options is true, it is translated to
+    /// ```haskell
+    /// -- | doc for this
+    /// someIdent
+    /// ```
     pub move_documentantion_before_object: bool,
     pub indent_comment_blocks: bool,
+    /// Contiguous but different sections of comments
+    /// are going to be separated by this distance
+    /// unless the compact_comments options is enabled
     pub separe_comments_by: u8,
+    /// Would collapse multiples commentaries in a single block
+    /// and multiple documentation commentaries to a single block
     pub compact_comments: bool,
 }
 
 impl PrettyCSTConfig {
+    //TOD:Use a Default instead of this new.
     pub fn new() -> PrettyCSTConfig {
         PrettyCSTConfig {
-            line_width: 3,
+            line_width: 10,
             indentation_deep: 2,
             leading_commas: true,
-            add_trailing_separator: true,
+            add_trailing_separator: false,
             move_documentantion_before_object: true,
             indent_comment_blocks: true,
             separe_comments_by: 1,

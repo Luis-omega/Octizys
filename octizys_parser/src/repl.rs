@@ -6,6 +6,28 @@ use octizys_pretty::combinators::group;
 use std::fmt::Debug;
 use std::io::{self, Read};
 
+//TODO:
+//TEst the following :
+//```
+//import a::b (c,d,e,f,g,h,i -- some comment
+//,j) as k::l
+//```
+//I believe with the right parameters we end with
+//```
+//import
+//  a::b (c,d,e,f,g,h,i -- some comment
+//  ,j) as k::l
+//```
+//We expected:
+//```
+//import
+//  a::b (
+//  c,d,e,f,g,h,i -- some comment
+//  ,j)
+//  as k::l
+//```
+//Or something better...
+
 fn main() {
     let mut interner = Interner::new();
     let mut stdin = io::stdin();
@@ -29,7 +51,7 @@ fn main() {
                 println!(
                     "{}",
                     as_doc.render_to_string(
-                        usize::from(configuration.indentation_deep),
+                        usize::from(configuration.line_width),
                         &interner
                     )
                 )

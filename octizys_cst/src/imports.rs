@@ -44,8 +44,10 @@ impl PrettyCST for Import {
                 soft_break()
                     + concat(vec![
                         ti.to_document(configuration, "as".into()),
-                        soft_break(),
-                        tm.to_document(configuration),
+                        indent(
+                            configuration,
+                            soft_break() + tm.to_document(configuration),
+                        ),
                     ])
             }
             None => empty(),

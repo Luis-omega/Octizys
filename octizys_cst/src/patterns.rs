@@ -75,7 +75,6 @@ pub enum PatternMatch {
         remain: Vec<PatternMatch>,
     },
     Parens(Between<Box<PatternMatch>>),
-    //TODO: add records
 }
 
 impl PatternMatch {

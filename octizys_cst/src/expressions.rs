@@ -6,7 +6,7 @@ use crate::pretty::{indent, PrettyCST, PrettyCSTConfig};
 use crate::types::Type;
 use octizys_common::identifier::Identifier;
 use octizys_pretty::combinators::{
-    concat, concat_iter, hard_break, soft_break,
+    concat, concat_iter, empty_break, hard_break, soft_break,
 };
 use octizys_pretty::document::Document;
 
@@ -55,7 +55,7 @@ impl PrettyCST for Let {
                             .map(|x| x.to_document(configuration)),
                     ),
             ),
-            hard_break(),
+            soft_break(),
             self.in_.to_document(configuration, "in".into()),
             indent(
                 configuration,
@@ -73,8 +73,15 @@ pub struct CaseItem {
 }
 
 impl PrettyCST for CaseItem {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
-        todo!()
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+        concat(vec![
+            self.pattern.to_document(configuration),
+            self.arrow.to_document(configuration, " =>".into()),
+            indent(
+                configuration,
+                soft_break() + self.expression.to_document(configuration),
+            ),
+        ])
     }
 }
 
@@ -87,8 +94,17 @@ pub struct Case {
 }
 
 impl PrettyCST for Case {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
-        todo!()
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+        concat(vec![
+            self.case.to_document(configuration, "case".into()),
+            indent(
+                configuration,
+                soft_break() + self.expression.to_document(configuration),
+            ),
+            self.of.to_document(configuration, "of".into()),
+            self.cases.left.to_document(configuration, "{".into()),
+            //TODO: finish this
+        ])
     }
 }
 

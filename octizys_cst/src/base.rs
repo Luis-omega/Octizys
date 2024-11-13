@@ -4,7 +4,7 @@ use octizys_common::identifier::Identifier;
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::span::{Position, Span};
 use octizys_pretty::combinators::{
-    concat, empty, group, intersperse, nest, soft_break,
+    concat, empty, empty_break, group, intersperse, nest, soft_break,
 };
 use octizys_pretty::document::Document;
 
@@ -229,11 +229,15 @@ impl<T> Between<T> {
             Enclosures::Brackets => ("[".into(), "]".into()),
         };
 
-        concat(vec![
-            self.left.to_document(configuration, start),
-            indent(configuration, to_document(&self.value, configuration)),
-            self.right.to_document(configuration, end),
-        ])
+        self.left.to_document(configuration, start)
+            + group(concat(vec![
+                nest(
+                    configuration.indentation_deep,
+                    empty_break() + to_document(&self.value, configuration),
+                ),
+                empty_break(),
+                self.right.to_document(configuration, end),
+            ]))
     }
 }
 
@@ -304,7 +308,7 @@ where
         let separator_doc = if configuration.leading_commas {
             soft_break() + separator.to_document(configuration)
         } else {
-            separator.to_document(configuration) + soft_break()
+            separator.to_document(configuration)
         };
         let trailing = match &self.trailing_sep {
             Some(separator_info) => {
