@@ -26,6 +26,12 @@ impl From<&ModuleLogicPathError> for Document {
     }
 }
 
+impl From<Identifier> for ModuleLogicPath {
+    fn from(value: Identifier) -> Self {
+        ModuleLogicPath(vec![value])
+    }
+}
+
 impl From<&ModuleLogicPathError> for Error {
     fn from(vaue: &ModuleLogicPathError) -> Error {
         error_from_document(vaue)

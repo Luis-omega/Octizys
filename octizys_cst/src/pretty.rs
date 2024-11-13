@@ -24,7 +24,7 @@ pub struct PrettyCSTConfig {
 impl PrettyCSTConfig {
     pub fn new() -> PrettyCSTConfig {
         PrettyCSTConfig {
-            line_width: 80,
+            line_width: 3,
             indentation_deep: 2,
             leading_commas: true,
             add_trailing_separator: true,

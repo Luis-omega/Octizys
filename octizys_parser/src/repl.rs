@@ -2,6 +2,7 @@ use octizys_common::Interner;
 use octizys_cst::pretty::{PrettyCST, PrettyCSTConfig};
 use octizys_parser::grammar::import_declarationParser;
 use octizys_parser::lexer::Lexer;
+use octizys_pretty::combinators::group;
 use std::fmt::Debug;
 use std::io::{self, Read};
 
@@ -15,12 +16,15 @@ fn main() {
         input.clear();
         stdin.read_line(input);
         input.pop();
+        if input == ":q" {
+            break;
+        }
         let mut lexer = Lexer::new(input, &mut interner);
         let parsed = p.parse(lexer);
         match parsed {
             Ok(item) => {
                 println!("{:#?}", item);
-                let as_doc = item.to_document(configuration);
+                let as_doc = group(item.to_document(configuration));
                 println!("{:?}", as_doc);
                 println!(
                     "{}",
