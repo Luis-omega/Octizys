@@ -51,6 +51,13 @@ pub fn text(words: &str) -> Document {
     Document::text(words)
 }
 
+pub fn comment_line(
+    source: &str,
+    comments_accumulator: &mut Vec<String>,
+) -> Document {
+    Document::comment_line(source, comments_accumulator)
+}
+
 pub fn nest(indentation_level: u16, doc: Document) -> Document {
     Document::nest(indentation_level, doc)
 }

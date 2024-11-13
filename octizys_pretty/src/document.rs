@@ -11,20 +11,27 @@ pub type Interner = DefaultStringInterner;
 ///This type is hidden as we must ensure the invariant of no "\n" in the texts
 enum DocumentInternal {
     Empty,
-    // Flat mode : space
-    // Break mode : \n
+    /// Flat mode : space
+    /// Break mode : \n
     SoftBreak,
-    // Always translated to \n
+    /// Always translated to \n
     HardBreak,
-    // Flat mode : empty
-    // Break mode : \n
+    /// Flat mode : empty
+    /// Break mode : \n
     EmptyBreak,
-    //Union of two or more files
+    ///Union of two or more files
     Concat(Vec<DocumentInternal>),
-    // between keywords and identifiers used in a file
+    ///Keywords and identifiers used in a file
     InternalizedText(DefaultSymbol, usize),
-    // for things like comments
+    ///All the text that isn't part of the original document and we didn't
+    ///allocate in a separate structure
     PlainText(String, usize),
+    /// For comments stored in a vector as String.
+    /// This doesn't add a line beak!
+    CommentLine {
+        index: usize,
+        len: usize,
+    },
     // set the Indentation level for the document that it contains
     Nest(u16, Box<DocumentInternal>),
     // Enable the option to be in flat or break mode
@@ -154,6 +161,18 @@ impl Document {
         Document(DocumentInternal::Concat(acc))
     }
 
+    pub fn comment_line(
+        source: &str,
+        comments_accumulator: &mut Vec<String>,
+    ) -> Document {
+        let index = comments_accumulator.len();
+        comments_accumulator.push(String::from(source));
+        Document(DocumentInternal::CommentLine {
+            index,
+            len: aproximate_string_width(source),
+        })
+    }
+
     pub fn nest(indentation_level: u16, doc: Document) -> Document {
         Document(DocumentInternal::Nest(indentation_level, Box::new(doc.0)))
     }
@@ -165,13 +184,17 @@ impl Document {
     pub fn into_iter<'doc>(
         &'doc self,
         width: usize,
-        interner: &'doc Interner,
+        context: DocumentRenderContext<'doc>,
     ) -> DocumentIterator {
-        DocumentIterator::new(self, width, interner).into_iter()
+        DocumentIterator::new(self, width, context).into_iter()
     }
 
-    pub fn render_to_string(self, width: usize, interner: &Interner) -> String {
-        self.into_iter(width, interner).collect()
+    pub fn render_to_string(
+        self,
+        width: usize,
+        context: DocumentRenderContext,
+    ) -> String {
+        self.into_iter(width, context).collect()
     }
 }
 
@@ -189,18 +212,33 @@ impl Add for Document {
 }
 
 #[derive(Debug)]
+pub struct DocumentRenderContext<'a> {
+    interner: &'a Interner,
+    comments: &'a Vec<String>,
+}
+
+impl<'a> DocumentRenderContext<'a> {
+    pub fn new(
+        interner: &'a Interner,
+        comments: &'a Vec<String>,
+    ) -> DocumentRenderContext<'a> {
+        DocumentRenderContext { interner, comments }
+    }
+}
+
+#[derive(Debug)]
 pub struct DocumentIterator<'doc> {
     consumed_width: usize,
     line_width: usize,
     stack: Vec<FitsParam<'doc>>,
-    interner: &'doc Interner,
+    context: DocumentRenderContext<'doc>,
 }
 
 impl<'doc> DocumentIterator<'doc> {
     fn new(
         doc: &'doc Document,
         width: usize,
-        interner: &'doc Interner,
+        context: DocumentRenderContext<'doc>,
     ) -> Self {
         let params = FitsParam {
             ident: 0,
@@ -211,7 +249,7 @@ impl<'doc> DocumentIterator<'doc> {
             consumed_width: 0,
             line_width: width,
             stack: vec![params],
-            interner,
+            context,
         }
     }
 
@@ -281,6 +319,13 @@ impl<'doc> DocumentIterator<'doc> {
                         return false;
                     }
                 }
+                DocumentInternal::CommentLine { len, .. } => {
+                    if *len <= remain_width {
+                        remain_width -= len;
+                    } else {
+                        return false;
+                    }
+                }
                 DocumentInternal::Nest(more_indent, doc) => stack
                     .push(current.with_document(doc).add_ident(*more_indent)),
                 DocumentInternal::Group(doc) => {
@@ -316,13 +361,20 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
             }
             DocumentInternal::InternalizedText(s, _) => {
                 //We abort the operation if we can't resolve a symbol
-                let new_str = self.interner.resolve(*s).map(String::from)?;
+                //maybe we should instead produce a blank and continue?
+                let new_str =
+                    self.context.interner.resolve(*s).map(String::from)?;
                 Some(self.advance_width_with(new_str))
             }
             // What to do here? we can put s behind a Rc but
             // we want the resulting string to be fully owned by the user.
             DocumentInternal::PlainText(s, _) => {
                 Some(self.advance_width_with(s.clone()))
+            }
+            DocumentInternal::CommentLine { index, .. } => {
+                let new_str =
+                    self.context.comments.get(*index).map(String::from)?;
+                Some(self.advance_width_with(new_str))
             }
             //TODO: move this function to a one that can handle this
             // without returning a empty string.
@@ -350,7 +402,10 @@ mod render_tests {
 
     fn make_test(target_string: &str, doc: Document, width: usize) {
         let interner = Interner::new();
-        assert_eq!(target_string, doc.render_to_string(width, &interner))
+        let comments_accumulator = vec![];
+        let context =
+            DocumentRenderContext::new(&interner, &comments_accumulator);
+        assert_eq!(target_string, doc.render_to_string(width, context))
     }
 
     #[test]
