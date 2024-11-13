@@ -1,7 +1,10 @@
 use octizys_common::{
     identifier::Identifier, module_logic_path::ModuleLogicPath,
 };
-use octizys_pretty::{combinators::concat_iter, document::Document};
+use octizys_pretty::{
+    combinators::{concat_iter, group, nest},
+    document::Document,
+};
 
 #[derive(Debug, Copy, Clone)]
 pub struct PrettyCSTConfig {
@@ -31,6 +34,10 @@ impl PrettyCSTConfig {
             compact_comments: true,
         }
     }
+}
+
+pub fn indent(configuration: PrettyCSTConfig, doc: Document) -> Document {
+    group(nest(configuration.indentation_deep, doc))
 }
 
 pub trait PrettyCST {

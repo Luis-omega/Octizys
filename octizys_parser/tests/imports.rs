@@ -19,6 +19,7 @@ fn roundtrip<T: PrettyCST + Eq + Debug + Clone, E: Debug>(
     let printed2 = parsed2
         .to_document(PrettyCSTConfig::new())
         .render_to_string(80, &interner);
+    assert_eq!(parsed, parsed2);
     assert_eq!(printed, printed2);
     assert_eq!(source, printed);
 }

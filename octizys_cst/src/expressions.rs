@@ -2,9 +2,12 @@ use crate::base::{
     Between, ImportedVariable, OperatorName, Token, TokenInfo, TrailingList,
 };
 use crate::patterns::PatternMatch;
-use crate::pretty::{PrettyCST, PrettyCSTConfig};
+use crate::pretty::{indent, PrettyCST, PrettyCSTConfig};
 use crate::types::Type;
 use octizys_common::identifier::Identifier;
+use octizys_pretty::combinators::{
+    concat, concat_iter, hard_break, soft_break,
+};
 use octizys_pretty::document::Document;
 
 #[derive(Debug)]
@@ -16,8 +19,18 @@ pub struct LetBinding {
 }
 
 impl PrettyCST for LetBinding {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
-        todo!()
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+        self.pattern.to_document(configuration)
+            + indent(
+                configuration,
+                concat(vec![
+                    soft_break(),
+                    self.equal.to_document(configuration, "=".into()),
+                    soft_break(),
+                    self.value.to_document(configuration),
+                    self.semicolon.to_document(configuration, ";".into()),
+                ]),
+            )
     }
 }
 
@@ -30,8 +43,25 @@ pub struct Let {
 }
 
 impl PrettyCST for Let {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
-        todo!()
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+        concat(vec![
+            self.let_.to_document(configuration, "let".into()),
+            indent(
+                configuration,
+                soft_break()
+                    + concat_iter(
+                        self.bindings
+                            .iter()
+                            .map(|x| x.to_document(configuration)),
+                    ),
+            ),
+            hard_break(),
+            self.in_.to_document(configuration, "in".into()),
+            indent(
+                configuration,
+                soft_break() + self.expression.to_document(configuration),
+            ),
+        ])
     }
 }
 

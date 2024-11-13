@@ -19,7 +19,7 @@ use paste::paste;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LexerErrorType {
-    UnexpectedCharacter,
+    UnexpectedCharacter(String),
     UnbalancedComment,
     CantTranslateToToken(Token),
     InvaliedSequenceOfCharacters(String),
@@ -380,53 +380,7 @@ static COMMENT_BLOCKD3: LazyLock<Regex> =
 //  of the precedences.
 static OPERATOR: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"^(x?:)
-        \?
-        |\#
-        |,
-        |::
-        |;
-        |\.
-        |:
-        |\|>
-        |<\|
-        |\+
-        |\^
-        |/
-        |%
-        |<<
-        |>>
-        |<$
-        |$>
-        |<$
-        |<\*
-        |\*>
-        |<\*
-        |\*
-        |==
-        |!=
-        |<=
-        |>=
-        |<
-        |>
-        |!
-        |&&
-        |\|\|
-        |&
-        |\$
-        |=
-        |@
-        |\|
-        |\(
-        |\)
-        |\{
-        |\}
-        |\[
-        |\]
-        |->
-        |<-
-        |-
-        |\\
+        r"^\?|\#|,|::|;|\.|:|\|>|<\||\+|\^|/|%|<<|>>|<$|$>|<$|<\*|\*>|<\*|\*|==|!=|<=|>=|<|>|!|&&|\|\||&|\$|=|@|\||\(|\)|\{|\}|\[|\]|->|<-|-|\\
         ",
     )
     .unwrap()
@@ -480,11 +434,11 @@ impl<'input> Lexer<'input> {
         self: &'a mut Lexer<'input>,
         re: &LazyLock<Regex>,
     ) -> Option<(Span, &'input str)> {
-        println!("re: {:?}", re);
+        //println!("re: {:?}", re);
         let start = self.offset;
         match re.find(self.src) {
             Some(m) => {
-                println!("found: {:?}", m);
+                //println!("found: {:?}", m);
                 let end = m.end();
                 self.src = &self.src[end..];
                 self.offset += end;
@@ -508,7 +462,7 @@ impl<'input> Lexer<'input> {
         kind: CommentKind,
         start: LineCommentStart,
     ) -> Option<CommentLine> {
-        println!("single_line with : {:?} {:?}", kind, start);
+        //println!("single_line with : {:?} {:?}", kind, start);
         let out = match self.satisfy(re) {
             Some((span, full_text)) => {
                 let start_offset = match kind {
@@ -854,7 +808,7 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = Result<(Position, Token, Position), LexerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        println!("new_next : {:?}", self);
+        //println!("new_next : {:?}", self);
         match self.src {
             "" => return None,
             _ => (),
@@ -874,7 +828,18 @@ impl<'input> Iterator for Lexer<'input> {
             }
             Err(comments) => {
                 if comments.len() == 0 {
-                    return None;
+                    if self.src.len() > 0 {
+                        return Some(Err(LexerError {
+                            error_type: LexerErrorType::UnexpectedCharacter(
+                                String::from(self.src),
+                            ),
+                            position: Position {
+                                source_index: self.offset,
+                            },
+                        }));
+                    } else {
+                        return None;
+                    }
                 }
                 let span = match comments.get(0) {
                     Some(s) => s.clone().get_span(),
@@ -935,8 +900,8 @@ mod lexer_tests {
         };
         let token = Token::Identifier(info, identifier);
         let expected = vec![Ok(token)];
-        println!("result: {:?}", result);
-        println!("expected: {:?}", expected);
+        //println!("result: {:?}", result);
+        //println!("expected: {:?}", expected);
         assert!(result == expected);
     }
 
@@ -944,7 +909,7 @@ mod lexer_tests {
         key: &'static str,
         constructor: fn(TokenInfo) -> Token,
     ) {
-        println!("beginging: ");
+        //println!("beginging: ");
         let mut interner = Interner::new();
         let lex = Lexer::new(key, &mut interner);
         let result: Vec<Result<Token, LexerError>> =
@@ -958,8 +923,8 @@ mod lexer_tests {
         };
         let token = constructor(info.clone());
         let expected = vec![Ok(token)];
-        println!("result: {:?}", result);
-        println!("expected: {:?}", expected);
+        //println!("result: {:?}", result);
+        //println!("expected: {:?}", expected);
         assert!(result == expected);
     }
 
@@ -1022,8 +987,8 @@ mod lexer_tests {
         };
         let token = Token::LastComments(vec![comment_line.into()], info);
         let expected = vec![Ok(token)];
-        println!("result:   {:?}", result);
-        println!("expected: {:?}", expected);
+        //println!("result:   {:?}", result);
+        //println!("expected: {:?}", expected);
         assert!(result == expected)
     }
 
@@ -1070,7 +1035,7 @@ mod lexer_tests {
     ) {
         let mut interner = Interner::new();
         let kind_as_str: &str = kind.into();
-        println!("kind: {:?} {:?}", kind, kind_as_str);
+        //println!("kind: {:?} {:?}", kind, kind_as_str);
         let (start_str, end_str): (&'static str, &'static str) = brace.into();
         let trailing_string: String = vec![start_str, kind_as_str].join("");
         let start_gap = trailing_string.len();
@@ -1097,8 +1062,8 @@ mod lexer_tests {
             },
         );
         let expected = vec![Ok(token)];
-        println!("result:   {:?}", result);
-        println!("expected: {:?}", expected);
+        //println!("result:   {:?}", result);
+        //println!("expected: {:?}", expected);
         assert!(result == expected)
     }
 
