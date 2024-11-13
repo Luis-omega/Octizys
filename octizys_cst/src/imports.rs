@@ -1,7 +1,7 @@
 use crate::base::{
     Between, Enclosures, ItemSeparator, Token, TokenInfo, TrailingList,
 };
-use crate::pretty::{PrettyCST, PrettyCSTConfig};
+use crate::pretty::{indent, PrettyCST, PrettyCSTConfig};
 use octizys_common::{
     identifier::Identifier, module_logic_path::ModuleLogicPath,
 };
@@ -43,12 +43,17 @@ impl PrettyCST for Import {
             Some((ti, tm)) => {
                 soft_break()
                     + concat(vec![
-                        ti.to_document(configuration, "as ".into()),
+                        ti.to_document(configuration, "as".into()),
+                        soft_break(),
                         tm.to_document(configuration),
                     ])
             }
             None => empty(),
         };
-        concat(vec![import, unqualified, path, imports, _as])
+        import
+            + indent(
+                configuration,
+                concat(vec![unqualified, path, imports, _as]),
+            )
     }
 }

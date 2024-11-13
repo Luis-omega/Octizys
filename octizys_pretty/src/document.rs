@@ -11,11 +11,14 @@ pub type Interner = DefaultStringInterner;
 ///This type is hidden as we must ensure the invariant of no "\n" in the texts
 enum DocumentInternal {
     Empty,
-    // Flat mode : translated to space
-    // Break mode : translated to \n
+    // Flat mode : space
+    // Break mode : \n
     SoftBreak,
-    // Always translated to HardBreak
+    // Always translated to \n
     HardBreak,
+    // Flat mode : empty
+    // Break mode : \n
+    EmptyBreak,
     //Union of two or more files
     Concat(Vec<DocumentInternal>),
     // between keywords and identifiers used in a file
@@ -93,7 +96,16 @@ impl Document {
         Document(DocumentInternal::HardBreak)
     }
 
+    /// Flat mode : empty doc.
+    /// Break mode : a line break.
+    pub fn empty_break() -> Self {
+        Document(DocumentInternal::EmptyBreak)
+    }
+
     pub fn concat(items: Vec<Document>) -> Self {
+        if items.len() == 0 {
+            return Document::empty();
+        }
         Document(DocumentInternal::Concat(
             items.into_iter().map(|x| x.0).collect(),
         ))
@@ -249,6 +261,7 @@ impl<'doc> DocumentIterator<'doc> {
                     Mode::Break => return true,
                 },
                 DocumentInternal::HardBreak => return true,
+                DocumentInternal::EmptyBreak => return true,
                 DocumentInternal::Concat(v) => {
                     for doc in v.into_iter().rev() {
                         stack.push(current.with_document(doc))
@@ -291,6 +304,10 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
             DocumentInternal::HardBreak => {
                 Some(self.gen_line_break(current.ident))
             }
+            DocumentInternal::EmptyBreak => match current.mode {
+                Mode::Flat => Some(String::new()),
+                Mode::Break => Some(self.gen_line_break(current.ident)),
+            },
             DocumentInternal::Concat(v) => {
                 for doc in v.into_iter().rev() {
                     self.stack.push(current.with_document(doc))

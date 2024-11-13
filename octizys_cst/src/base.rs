@@ -1,9 +1,11 @@
-use crate::pretty::PrettyCST;
+use crate::pretty::{indent, PrettyCST};
 use derivative::Derivative;
 use octizys_common::identifier::Identifier;
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::span::{Position, Span};
-use octizys_pretty::combinators::{concat, empty, group, nest};
+use octizys_pretty::combinators::{
+    concat, empty, group, intersperse, nest, soft_break,
+};
 use octizys_pretty::document::Document;
 
 use crate::{comments::CommentsInfo, pretty::PrettyCSTConfig};
@@ -229,10 +231,7 @@ impl<T> Between<T> {
 
         concat(vec![
             self.left.to_document(configuration, start),
-            group(nest(
-                configuration.indentation_deep,
-                to_document(&self.value, configuration),
-            )),
+            indent(configuration, to_document(&self.value, configuration)),
             self.right.to_document(configuration, end),
         ])
     }
@@ -272,11 +271,13 @@ where
         configuration: PrettyCSTConfig,
         separator: ItemSeparator,
     ) -> Document {
+        let separator_doc = if configuration.leading_commas {
+            soft_break() + separator.to_document(configuration)
+        } else {
+            separator.to_document(configuration) + soft_break()
+        };
         concat(vec![
-            self.separator.to_document(
-                configuration,
-                separator.to_document(configuration),
-            ),
+            self.separator.to_document(configuration, separator_doc),
             self.item.to_document(configuration),
         ])
     }
@@ -300,14 +301,18 @@ where
         configuration: PrettyCSTConfig,
         separator: ItemSeparator,
     ) -> Document {
+        let separator_doc = if configuration.leading_commas {
+            soft_break() + separator.to_document(configuration)
+        } else {
+            separator.to_document(configuration) + soft_break()
+        };
         let trailing = match &self.trailing_sep {
-            Some(separator_info) => separator_info.to_document(
-                configuration,
-                separator.to_document(configuration),
-            ),
+            Some(separator_info) => {
+                separator_info.to_document(configuration, separator_doc)
+            }
             None => {
                 if configuration.add_trailing_separator {
-                    separator.to_document(configuration)
+                    separator_doc
                 } else {
                     empty()
                 }

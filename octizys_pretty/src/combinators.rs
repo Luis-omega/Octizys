@@ -6,12 +6,22 @@ pub fn empty() -> Document {
     Document::empty()
 }
 
+/// Flat mode: " "
+/// Break mode : "\n"
 pub fn soft_break() -> Document {
     Document::soft_break()
 }
 
+/// Flat mode: "\n"
+/// Break mode : "\n"
 pub fn hard_break() -> Document {
     Document::hard_break()
+}
+
+/// Flat mode: ""
+/// Break mode : "\n"
+pub fn empty_break() -> Document {
+    Document::empty_break()
 }
 
 pub fn concat(items: Vec<Document>) -> Document {
@@ -19,7 +29,15 @@ pub fn concat(items: Vec<Document>) -> Document {
 }
 
 pub fn concat_iter<T: IntoIterator<Item = Document>>(items: T) -> Document {
-    Document::concat(items.into_iter().collect())
+    let mut v: Vec<Document> = items.into_iter().collect();
+    let len = v.len();
+    if len == 1 {
+        return v.pop().unwrap();
+    }
+    if len == 0 {
+        return empty();
+    }
+    Document::concat(v)
 }
 
 pub fn internalize(
