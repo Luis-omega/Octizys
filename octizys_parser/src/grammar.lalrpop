@@ -9,6 +9,7 @@ use octizys_cst::{
 use octizys_cst::base;
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::identifier::Identifier;
+use octizys_common::span::Position;
 use crate::lexer;
 
 grammar;
@@ -21,7 +22,7 @@ grammar;
 // This will have a global effect in the formatter.
 
 extern {
-    type Location = usize;
+    type Location = Position;
     type Error = lexer::LexerError;
 
     enum lexer::Token {

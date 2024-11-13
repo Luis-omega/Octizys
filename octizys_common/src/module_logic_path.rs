@@ -12,23 +12,23 @@ pub enum ModuleLogicPathError {
     EmptyString,
 }
 
-impl Into<Document> for ModuleLogicPathError {
-    fn into(self) -> Document {
-        match self {
-            Self::NotIdentifier => {
+impl From<&ModuleLogicPathError> for Document {
+    fn from(value: &ModuleLogicPathError) -> Document {
+        match value {
+            &ModuleLogicPathError::NotIdentifier => {
                 "The passed string contains a non valid Identifier component"
                     .into()
             }
-            Self::EmptyString => {
+            &ModuleLogicPathError::EmptyString => {
                 "Attempt to build from a empty vector or string".into()
             }
         }
     }
 }
 
-impl Into<Error> for ModuleLogicPathError {
-    fn into(self) -> Error {
-        error_from_document(self)
+impl From<&ModuleLogicPathError> for Error {
+    fn from(vaue: &ModuleLogicPathError) -> Error {
+        error_from_document(vaue)
     }
 }
 
@@ -61,9 +61,9 @@ impl ModuleLogicPath {
     }
 }
 
-impl Into<Document> for ModuleLogicPath {
-    fn into(self) -> Document {
-        self.to_document()
+impl From<&ModuleLogicPath> for Document {
+    fn from(value: &ModuleLogicPath) -> Document {
+        value.to_document()
     }
 }
 

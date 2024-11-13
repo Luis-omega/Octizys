@@ -26,3 +26,14 @@ pub struct RecordLabel(Identifier);
 
 #[derive(Debug)]
 pub struct Record<T>(HashMap<RecordLabel, T>);
+
+pub enum ContextResult<T> {
+    Found(T),
+    Multiple(Vec<T>),
+    NotFound,
+}
+
+pub trait ContextTrait<Key, Values> {
+    fn find(&self, key: Key) -> ContextResult<Values>;
+    fn fuzzy_find(&self, key: Key) -> Vec<Values>;
+}

@@ -3,11 +3,12 @@ use crate::base::{
     TrailingList, TrailingListItem,
 };
 use crate::pretty::{PrettyCST, PrettyCSTConfig};
+use derivative::Derivative;
 use octizys_common::identifier::Identifier;
 use octizys_pretty::combinators::*;
 use octizys_pretty::document::Document;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TypeBase {
     U8,
     U16,
@@ -24,7 +25,7 @@ pub enum TypeBase {
 }
 
 impl PrettyCST for TypeBase {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         match self {
             TypeBase::U8 => "U8".into(),
             TypeBase::U16 => "U16".into(),
@@ -42,7 +43,7 @@ impl PrettyCST for TypeBase {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Derivative)]
 pub struct TypeRecordItem {
     pub variable: Token<Identifier>,
     pub separator: TokenInfo,
@@ -53,19 +54,19 @@ pub struct TypeRecordItem {
 }
 
 impl PrettyCST for TypeRecordItem {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
         concat(vec![
             self.variable
                 .info
-                .to_document(configuration, self.variable.value.into()),
+                .to_document(configuration, (&self.variable.value).into()),
             self.separator.to_document(configuration, ":".into()),
             self.expression.to_document(configuration),
         ])
     }
 }
 
-fn pretty_betwee_trailing<T: PrettyCST>(
-    between: Between<TrailingList<T>>,
+fn pretty_between_trailing<T: PrettyCST>(
+    between: &Between<TrailingList<T>>,
     configuration: PrettyCSTConfig,
     sep: ItemSeparator,
     enclosure: Enclosures,
@@ -135,7 +136,7 @@ impl Type {
     }
 
     fn to_document_application_argument(
-        self,
+        &self,
         configuration: PrettyCSTConfig,
     ) -> Document {
         if self.need_parens_application() {
@@ -152,7 +153,7 @@ impl Type {
     }
 
     fn to_document_arrow_arguments(
-        self,
+        &self,
         configuration: PrettyCSTConfig,
     ) -> Document {
         if self.need_parens_arrow() {
@@ -169,21 +170,58 @@ impl Type {
     }
 }
 
-impl PrettyCST for Type {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+/*
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
         match self {
+            Type::Base(b1) => match other {
+                Type::Base(b2) => *b1 == *b2,
+                _ => false,
+            },
+            Type::LocalVariable(v1) => match other {
+                Type::LocalVariable(v2) => *v1 == *v2,
+                _ => false,
+            },
+            Type::ImportedVariable(v1) => match other {
+                Type::ImportedVariable(v2) => *v1 == *v2,
+                _ => false,
+            },
+            Type::Tuple(_) => todo!(),
+            Type::Record(_) => todo!(),
+            Type::Parens(_) => todo!(),
+            Type::Application {
+                start,
+                second,
+                remain,
+            } => todo!(),
+            Type::Arrow { first, remain } => todo!(),
+            Type::Scheme {
+                forall,
+                first_variable,
+                remain_variables,
+                dot,
+                expression,
+            } => todo!(),
+        }
+    }
+}
+*/
+
+impl PrettyCST for Type {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+        match &self {
             Type::Base(token) => token.to_document(configuration),
             Type::LocalVariable(token) => {
-                token.info.to_document(configuration, token.value.into())
+                token.info.to_document(configuration, (&token.value).into())
             }
             Type::ImportedVariable(token) => token.to_document(configuration),
-            Type::Tuple(between) => pretty_betwee_trailing(
+            Type::Tuple(between) => pretty_between_trailing(
                 between,
                 configuration,
                 ItemSeparator::Comma,
                 Enclosures::Parens,
             ),
-            Type::Record(between) => pretty_betwee_trailing(
+            Type::Record(between) => pretty_between_trailing(
                 between,
                 configuration,
                 ItemSeparator::Comma,

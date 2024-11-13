@@ -1,4 +1,5 @@
 use crate::pretty::PrettyCST;
+use derivative::Derivative;
 use octizys_common::identifier::Identifier;
 use octizys_common::module_logic_path::ModuleLogicPath;
 use octizys_common::span::{Position, Span};
@@ -34,7 +35,7 @@ impl TokenInfo {
         todo!()
     }
     pub fn to_document(
-        self,
+        &self,
         configuration: PrettyCSTConfig,
         value: Document,
     ) -> Document {
@@ -42,9 +43,11 @@ impl TokenInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq, Eq)]
 pub struct Token<T> {
     pub value: T,
+    #[derivative(PartialEq = "ignore")]
     pub info: TokenInfo,
 }
 
@@ -66,7 +69,7 @@ impl<T> PrettyCST for Token<T>
 where
     T: PrettyCST,
 {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
         self.info
             .to_document(configuration, self.value.to_document(configuration))
     }
@@ -117,7 +120,7 @@ pub enum OperatorName {
 }
 
 impl PrettyCST for OperatorName {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         let x = match self {
             OperatorName::Interrogation => "?",
             OperatorName::Exclamation => "!",
@@ -171,11 +174,11 @@ pub struct ImportedVariable {
 }
 
 impl PrettyCST for ImportedVariable {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         concat(vec![
-            self.path.to_document(configuration),
+            self.path.to_document(),
             "::".into(),
-            self.name.into(),
+            (&self.name).into(),
         ])
     }
 }
@@ -187,18 +190,20 @@ pub struct ImportedOperator {
 }
 
 impl PrettyCST for ImportedOperator {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         concat(vec![
-            self.path.to_document(configuration),
+            self.path.to_document(),
             "::".into(),
-            self.name.into(),
+            (&self.name).into(),
         ])
     }
 }
-
-#[derive(Debug)]
+#[derive(Debug, Derivative, Clone)]
+#[derivative(PartialEq, Eq)]
 pub struct Between<T> {
+    #[derivative(PartialEq = "ignore")]
     pub left: TokenInfo,
+    #[derivative(PartialEq = "ignore")]
     pub right: TokenInfo,
     pub value: T,
 }
@@ -211,10 +216,10 @@ pub enum Enclosures {
 
 impl<T> Between<T> {
     pub fn to_document(
-        self,
+        &self,
         configuration: PrettyCSTConfig,
         enclosure: Enclosures,
-        to_document: impl FnOnce(T, PrettyCSTConfig) -> Document,
+        to_document: impl FnOnce(&T, PrettyCSTConfig) -> Document,
     ) -> Document {
         let (start, end): (Document, Document) = match enclosure {
             Enclosures::Parens => ("(".into(), ")".into()),
@@ -226,7 +231,7 @@ impl<T> Between<T> {
             self.left.to_document(configuration, start),
             group(nest(
                 configuration.indentation_deep,
-                to_document(self.value, configuration),
+                to_document(&self.value, configuration),
             )),
             self.right.to_document(configuration, end),
         ])
@@ -234,20 +239,22 @@ impl<T> Between<T> {
 }
 
 /// The separator came before the item in the stream
-#[derive(Debug)]
+#[derive(Debug, Derivative, Clone)]
+#[derivative(PartialEq, Eq)]
 pub struct TrailingListItem<T> {
+    #[derivative(PartialEq = "ignore")]
     pub separator: TokenInfo,
     pub item: T,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ItemSeparator {
     Comma,
     Pipe,
     Arrow,
 }
 impl PrettyCST for ItemSeparator {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         match self {
             ItemSeparator::Comma => ",".into(),
             ItemSeparator::Pipe => "|".into(),
@@ -261,7 +268,7 @@ where
     T: PrettyCST,
 {
     pub fn to_document(
-        self,
+        &self,
         configuration: PrettyCSTConfig,
         separator: ItemSeparator,
     ) -> Document {
@@ -275,10 +282,12 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Derivative, Clone)]
+#[derivative(PartialEq, Eq)]
 pub struct TrailingList<T> {
     pub first: T,
     pub items: Vec<TrailingListItem<T>>,
+    #[derivative(PartialEq = "ignore")]
     pub trailing_sep: Option<TokenInfo>,
 }
 
@@ -287,11 +296,11 @@ where
     T: PrettyCST,
 {
     pub fn to_document(
-        self,
+        &self,
         configuration: PrettyCSTConfig,
         separator: ItemSeparator,
     ) -> Document {
-        let trailing = match self.trailing_sep {
+        let trailing = match &self.trailing_sep {
             Some(separator_info) => separator_info.to_document(
                 configuration,
                 separator.to_document(configuration),
@@ -308,7 +317,7 @@ where
             self.first.to_document(configuration),
             concat(
                 self.items
-                    .into_iter()
+                    .iter()
                     .map(|x| x.to_document(configuration, separator))
                     .collect(),
             ),
@@ -317,12 +326,12 @@ where
     }
 }
 
-impl<T, ToInfo> Into<TrailingList<T>> for (T, Vec<(ToInfo, T)>, Option<ToInfo>)
+impl<T, ToInfo> From<(T, Vec<(ToInfo, T)>, Option<ToInfo>)> for TrailingList<T>
 where
     ToInfo: Into<TokenInfo>,
 {
-    fn into(self) -> TrailingList<T> {
-        let items = self
+    fn from(value: (T, Vec<(ToInfo, T)>, Option<ToInfo>)) -> TrailingList<T> {
+        let items = value
             .1
             .into_iter()
             .map(|(separator, item)| TrailingListItem {
@@ -330,8 +339,8 @@ where
                 item,
             })
             .collect();
-        let first = self.0;
-        let trailing_sep = self.2;
+        let first = value.0;
+        let trailing_sep = value.2;
         TrailingList {
             first,
             items,

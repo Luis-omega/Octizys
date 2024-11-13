@@ -34,17 +34,17 @@ impl PrettyCSTConfig {
 }
 
 pub trait PrettyCST {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document;
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document;
 }
 
 impl PrettyCST for Identifier {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         self.into()
     }
 }
 
 impl PrettyCST for ModuleLogicPath {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         self.into()
     }
 }
@@ -53,8 +53,8 @@ impl<T> PrettyCST for Box<T>
 where
     T: PrettyCST,
 {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
-        (*self).to_document(configuration)
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+        (**self).to_document(configuration)
     }
 }
 
@@ -62,27 +62,27 @@ impl<T> PrettyCST for Vec<T>
 where
     T: PrettyCST,
 {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
         concat_iter(self.into_iter().map(|x| x.to_document(configuration)))
     }
 }
 
 impl PrettyCST for &str {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         //TODO:Correctly print strings escaping things
         todo!()
     }
 }
 
 impl PrettyCST for String {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         //TODO:Correctly print strings escaping things
         todo!()
     }
 }
 
 impl PrettyCST for char {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         //TODO:Correctly print strings escaping things
         todo!()
     }

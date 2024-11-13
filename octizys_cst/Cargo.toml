@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 octizys_pretty={path="../octizys_pretty"}
 octizys_common={path="../octizys_common"}
+derivative = "2.2.0"

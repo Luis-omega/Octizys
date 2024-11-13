@@ -12,9 +12,9 @@ pub struct Identifier {
     len: usize,
 }
 
-impl Into<DefaultSymbol> for Identifier {
-    fn into(self) -> DefaultSymbol {
-        self.symbol
+impl From<Identifier> for DefaultSymbol {
+    fn from(value: Identifier) -> Self {
+        value.symbol
     }
 }
 
@@ -61,44 +61,32 @@ impl<'a> Identifier {
     }
 }
 
-impl Into<Document> for Identifier {
-    fn into(self) -> Document {
-        Document::from_symbol_and_len(self.symbol, self.len)
+impl From<&Identifier> for Document {
+    fn from(value: &Identifier) -> Document {
+        Document::from_symbol_and_len(value.symbol, value.len)
     }
 }
 
-impl Into<Document> for &Identifier {
-    fn into(self) -> Document {
-        (*self).into()
-    }
-}
-
-impl Into<Document> for IdentifierError {
-    fn into(self) -> Document {
-        match self {
-            Self::ContainsInvalidCodePoint(s)=> {
+impl From<&IdentifierError> for Document {
+    fn from(value: &IdentifierError) -> Document {
+        match value {
+            IdentifierError::ContainsInvalidCodePoint(s)=> {
                 concat(
                     vec![
                     text("The passed string is not a valid identifier, it contains invalid characters: ")
                     , text(&s)]
                 )
             }
-            Self::EmptyIdentifier => {
+            IdentifierError::EmptyIdentifier => {
                 text("The passed string is not a valid identifier, it is seen as a empty string")
             }
         }
     }
 }
 
-impl Into<Document> for &IdentifierError {
-    fn into(self) -> Document {
-        self.clone().into()
-    }
-}
-
-impl Into<Error> for IdentifierError {
-    fn into(self) -> Error {
-        error_from_document(&self)
+impl From<IdentifierError> for Error {
+    fn from(value: IdentifierError) -> Error {
+        error_from_document(&value)
     }
 }
 

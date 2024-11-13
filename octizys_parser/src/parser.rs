@@ -1,8 +1,5 @@
-use lalrpop_util::lalrpop_mod;
 use octizys_common::error::Error;
 use std::path::PathBuf;
-
-lalrpop_mod!(grammar);
 
 #[derive(Debug)]
 pub enum ParsedFile {}
@@ -10,8 +7,8 @@ pub enum ParsedFile {}
 #[derive(Debug)]
 pub enum ParserError {}
 
-impl Into<Error> for ParserError {
-    fn into(self) -> Error {
+impl From<ParserError> for Error {
+    fn from(value: ParserError) -> Error {
         todo!()
     }
 }

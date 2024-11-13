@@ -16,7 +16,7 @@ pub struct LetBinding {
 }
 
 impl PrettyCST for LetBinding {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }
@@ -30,7 +30,7 @@ pub struct Let {
 }
 
 impl PrettyCST for Let {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }
@@ -43,7 +43,7 @@ pub struct CaseItem {
 }
 
 impl PrettyCST for CaseItem {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }
@@ -57,7 +57,7 @@ pub struct Case {
 }
 
 impl PrettyCST for Case {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }
@@ -70,7 +70,7 @@ pub struct BinaryOperator {
 }
 
 impl PrettyCST for BinaryOperator {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }
@@ -82,7 +82,7 @@ pub struct LambdaExpression {
 }
 
 impl PrettyCST for LambdaExpression {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }
@@ -94,7 +94,7 @@ pub struct ApplicationExpression {
 }
 
 impl PrettyCST for ApplicationExpression {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }
@@ -112,7 +112,7 @@ pub enum ExpressionRecordItem {
 }
 
 impl PrettyCST for ExpressionRecordItem {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }
@@ -124,7 +124,7 @@ pub struct ExpressionSelector {
 }
 
 impl PrettyCST for ExpressionSelector {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }
@@ -183,7 +183,7 @@ impl Expression {
 }
 
 impl PrettyCST for Expression {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         todo!()
     }
 }

@@ -8,14 +8,14 @@ A functional language
 - Parse to CST (Concrete Syntax Tree):
     + It has all the comments.
     + Maintains identifiers in the tree.
-- CST Checks: 
+- CST Checks:
     + Check that every definition is declared.
     + Check that every declaration has a definition.
     + Check that only one definition/declaration for a single identifier.
-    + Find the dependency's for every definition, then we know what 
+    + Find the dependency's for every definition, then we know what
         imports we need.
 - Transform from CST to SAST (Sugared Abstract Syntax Tree):
-    + Transform to nameless representation ready for type inference.
+    + TODO: this should transform to nameless representation or use symbol tables?.
 - Type inference.
     ModuleContext = {MapNameToVariable, MapVariableToName, }
     InferenceContext = {Imports:Context,Module:mut Context, Local: mut Context,constraints}

@@ -8,7 +8,7 @@ use octizys_common::{
 use octizys_pretty::combinators::*;
 use octizys_pretty::document::Document;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Import {
     // import unqualified S.O.M.E.Path(a,b,c) as N.A.Me
     pub import: TokenInfo,
@@ -20,22 +20,26 @@ pub struct Import {
 }
 
 impl PrettyCST for Import {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
         let import = self.import.to_document(configuration, "import".into());
-        let unqualified: Document = soft_break()
-            + self.unqualified.map_or(empty(), |x| {
-                x.to_document(configuration, "unqualified".into())
-            });
+        let unqualified: Document = match &self.unqualified {
+            Some(x) => {
+                soft_break()
+                    + x.to_document(configuration, "unqualified".into())
+            }
+            None => empty(),
+        };
+
         let path = soft_break() + self.module_path.to_document(configuration);
-        let imports = match self.import_list {
+        let imports = match &self.import_list {
             Some(x) => {
                 x.to_document(configuration, Enclosures::Parens, |l, c| {
                     l.to_document(c, ItemSeparator::Comma)
                 })
             }
-            None => "()".into(),
+            None => empty(),
         };
-        let _as = match self.qualified_path {
+        let _as = match &self.qualified_path {
             Some((ti, tm)) => {
                 soft_break()
                     + concat(vec![

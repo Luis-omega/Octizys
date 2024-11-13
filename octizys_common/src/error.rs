@@ -15,6 +15,9 @@ pub fn report_if_error<A, E: Into<Error>>(value: Result<A, E>) -> () {
     }
 }
 
-pub fn error_from_document<P: Into<Document>>(e: P) -> Error {
+pub fn error_from_document<P>(e: &P) -> Error
+where
+    for<'a> &'a P: Into<Document>,
+{
     Error { error: e.into() }
 }

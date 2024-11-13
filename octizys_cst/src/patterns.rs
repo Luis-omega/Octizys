@@ -24,7 +24,7 @@ pub enum PatternMatchRecordItem {
 }
 
 impl PrettyCST for PatternMatchRecordItem {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
         match self {
             PatternMatchRecordItem::OnlyVariable { variable } => {
                 variable.to_document(configuration)
@@ -50,7 +50,7 @@ pub struct PatternMatchBind {
 }
 
 impl PrettyCST for PatternMatchBind {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
         concat(vec![
             self.variable.to_document(configuration),
             self.at.to_document(configuration, "@".into()),
@@ -80,7 +80,7 @@ pub enum PatternMatch {
 
 impl PatternMatch {
     fn to_document_application_argument(
-        self,
+        &self,
         configuration: PrettyCSTConfig,
     ) -> Document {
         match &self {
@@ -107,7 +107,7 @@ impl PatternMatch {
 }
 
 impl PrettyCST for PatternMatch {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
         match self {
             PatternMatch::LocalVariable(tok) => tok.to_document(configuration),
             PatternMatch::ImportedVariable(tok) => {

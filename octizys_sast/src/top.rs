@@ -1,59 +1,61 @@
+use octizys_common::module_logic_path::ModuleLogicPath;
+use octizys_common::span::Span;
+use octizys_core::common::Identifier;
+
 use crate::_type;
 use crate::expression;
 
-use crate::common::{Name, PathPrefix};
-
 #[derive(Debug)]
-pub struct Sast<'prefix, Info> {
-    imports: Vec<Import<'prefix, Info>>,
-    exports: Vec<Export<'prefix, Info>>,
-    data_types: Vec<DataType<'prefix, Info>>,
-    new_types: Vec<NewType<'prefix, Info>>,
-    alias: Vec<Alias<'prefix, Info>>,
-    declarations: Vec<VariableDeclaration<'prefix, Info>>,
-    definitions: Vec<VariableDefinition<'prefix, Info>>,
+pub struct Sast {
+    pub imports: Vec<Import>,
+    pub exports: Vec<Export>,
+    pub data_types: Vec<DataType>,
+    pub new_types: Vec<NewType>,
+    pub alias: Vec<Alias>,
+    pub declarations: Vec<VariableDeclaration>,
+    pub definitions: Vec<VariableDefinition>,
 }
 
 #[derive(Debug)]
-pub struct Import<'prefix, Info> {
-    info: Info,
-    prefix: Option<&'prefix PathPrefix>,
+pub struct Import {
+    pub span: Span,
+    pub prefix: Option<ModuleLogicPath>,
 }
 
 #[derive(Debug)]
-pub struct Export<'prefix, Info> {
-    info: Info,
-    prefix: Option<&'prefix PathPrefix>,
+pub struct Export {
+    pub span: Span,
+    pub prefix: Option<ModuleLogicPath>,
 }
 
 #[derive(Debug)]
-pub struct DataType<'prefix, Info> {
-    info: Info,
-    _type: _type::SumType<'prefix, Info>,
+pub struct DataType {
+    pub span: Span,
+    pub _type: _type::SumType,
 }
 
 #[derive(Debug)]
-pub struct NewType<'prefix, Info> {
-    info: Info,
-    _type: _type::NewType<'prefix, Info>,
+pub struct NewType {
+    pub span: Span,
+    pub _type: _type::NewType,
 }
 
 #[derive(Debug)]
-pub struct Alias<'prefix, Info> {
-    info: Info,
-    _type: _type::Alias<'prefix, Info>,
+pub struct Alias {
+    pub span: Span,
+    pub _type: _type::Alias,
 }
 
 #[derive(Debug)]
-pub struct VariableDeclaration<'prefix, Info> {
-    info: Info,
-    name: Name<Info>,
-    _type: _type::Type<'prefix, Info>,
+pub struct VariableDeclaration {
+    pub span: Span,
+    pub name: (Span, Identifier),
+    pub _type: _type::Type,
 }
 
 #[derive(Debug)]
-pub struct VariableDefinition<'prefix, Info> {
-    info: Info,
-    name: Name<Info>,
-    function: expression::Function<'prefix, Info>,
+pub struct VariableDefinition {
+    pub span: Span,
+    pub name: (Span, Identifier),
+    pub function: expression::Function,
 }

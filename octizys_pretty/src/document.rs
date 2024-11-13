@@ -163,9 +163,9 @@ impl Document {
     }
 }
 
-impl Into<Document> for &str {
-    fn into(self) -> Document {
-        Document::text(self)
+impl From<&str> for Document {
+    fn from(value: &str) -> Document {
+        Document::text(value)
     }
 }
 

@@ -229,7 +229,7 @@ impl From<Token> for TokenInfo {
 macro_rules! make_lexer_token_to_token {
     ($name:tt, $output_constructor:tt, $output_type:tt) => {
         paste!{
-            pub fn [< $name _token_to_token >](t:Token)->Result<base::Token<$output_type>,ParseError<usize,Token,LexerError>>{
+            pub fn [< $name _token_to_token >](t:Token)->Result<base::Token<$output_type>,ParseError<Position,Token,LexerError>>{
                 match t {
                     Token::$output_constructor(info,value) => Ok(base::Token{value,info}),
                     _ => Err(ParseError::User{error: LexerError{error_type:LexerErrorType::CantTranslateToToken(t.clone()),position:{let t2 : TokenInfo =t.into(); t2.span.start}} })
@@ -839,7 +839,8 @@ impl<'input> Lexer<'input> {
         //well, it can be if we return a function that consumes
         //a before and construct a token instead of the token..
         let out = self
-            .identifier_or_keyword(before.clone())
+            .lex_module_logic_path(before.clone())
+            .or_else(|| self.identifier_or_keyword(before.clone()))
             .or_else(|| self.lex_float(before.clone()))
             .or_else(|| self.lex_uint(before.clone()))
             .or_else(|| self.lex_symbol_or_operator(before.clone()))
@@ -872,6 +873,9 @@ impl<'input> Iterator for Lexer<'input> {
                 Some(Err(error_token))
             }
             Err(comments) => {
+                if comments.len() == 0 {
+                    return None;
+                }
                 let span = match comments.get(0) {
                     Some(s) => s.clone().get_span(),
                     None => (usize::MAX, usize::MAX).into(),
@@ -1073,15 +1077,25 @@ mod lexer_tests {
         let content = CommentLineContent::decompose(content_string);
         let lexer_string = [&trailing_string, content_string, end_str].join("");
         let lex = Lexer::new(&lexer_string, &mut interner);
+        let span = (0, lexer_string.len() - 1).into();
         let block = CommentBlock {
             kind,
             brace,
             content,
-            span: (0, lexer_string.len() - 1).into(),
+            span,
         };
         let result: Vec<Result<Token, LexerError>> =
             lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
-        let token = Token::LastComments(vec![block.into()], todo!());
+        let token = Token::LastComments(
+            vec![block.into()],
+            TokenInfo {
+                comments: CommentsInfo {
+                    before: vec![],
+                    after: None,
+                },
+                span,
+            },
+        );
         let expected = vec![Ok(token)];
         println!("result:   {:?}", result);
         println!("expected: {:?}", expected);

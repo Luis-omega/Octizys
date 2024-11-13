@@ -35,14 +35,14 @@ impl CommentLineContent {
 }
 
 impl PrettyCST for CommentLineContent {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         text(&self.content)
     }
 }
 
-impl Into<Document> for CommentLineContent {
-    fn into(self) -> Document {
-        text(&self.content)
+impl From<&CommentLineContent> for Document {
+    fn from(value: &CommentLineContent) -> Document {
+        text(&value.content)
     }
 }
 
@@ -149,7 +149,7 @@ impl CommentBlock {
 }
 
 impl PrettyCST for CommentBlock {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
         let (block_start, block_end) = match self.brace {
             CommentBraceKind::Brace0 => match self.kind {
                 CommentKind::Documentation => ("{- |", "-}"),
@@ -168,7 +168,7 @@ impl PrettyCST for CommentBlock {
                 CommentKind::NonDocumentation => ("{----", "----}"),
             },
         };
-        let content_raw = intersperse(self.content, hard_break());
+        let content_raw = intersperse(&self.content, hard_break());
 
         let content = if configuration.indent_comment_blocks {
             group(nest(
@@ -197,7 +197,7 @@ pub struct CommentLine {
 }
 
 impl PrettyCST for CommentLine {
-    fn to_document(self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
         let line_start = match self.start {
             LineCommentStart::DoubleHypen => match self.kind {
                 CommentKind::Documentation => "-- |",
@@ -208,7 +208,11 @@ impl PrettyCST for CommentLine {
                 CommentKind::NonDocumentation => "//",
             },
         };
-        concat(vec![line_start.into(), self.content.into(), hard_break()])
+        concat(vec![
+            line_start.into(),
+            (&self.content).into(),
+            hard_break(),
+        ])
     }
 }
 
@@ -228,7 +232,7 @@ impl Comment {
 }
 
 impl PrettyCST for Comment {
-    fn to_document(self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
         match self {
             Comment::Line(l) => l.to_document(configuration),
             Comment::Block(l) => l.to_document(configuration),
@@ -236,15 +240,15 @@ impl PrettyCST for Comment {
     }
 }
 
-impl Into<Comment> for CommentLine {
-    fn into(self) -> Comment {
-        Comment::Line(self)
+impl From<CommentLine> for Comment {
+    fn from(value: CommentLine) -> Comment {
+        Comment::Line(value)
     }
 }
 
-impl Into<Comment> for CommentBlock {
-    fn into(self) -> Comment {
-        Comment::Block(self)
+impl From<CommentBlock> for Comment {
+    fn from(value: CommentBlock) -> Comment {
+        Comment::Block(value)
     }
 }
 
@@ -299,30 +303,29 @@ impl CommentsInfo {
     /// Example: Multiple documentation lines became a  documentation block
     /// Example: Multiple NonDocumentation lines became a block
     pub fn compact_comments(mut self) -> Self {
-        todo!()
+        self
     }
 
     pub fn to_document(
-        mut self,
+        &self,
         configuration: PrettyCSTConfig,
         doc: Document,
     ) -> Document {
+        let mut out = self.clone();
         if configuration.move_documentantion_before_object {
-            self = self.move_after_to_before();
+            out = out.move_after_to_before();
         }
         if configuration.compact_comments {
-            self = self.compact_comments();
+            out = out.compact_comments();
         }
         let separe_by = usize::from(configuration.separe_comments_by);
         concat(vec![
             intersperse(
-                self.before
-                    .into_iter()
-                    .map(|x| x.to_document(configuration)),
+                out.before.into_iter().map(|x| x.to_document(configuration)),
                 combinators::repeat(hard_break(), separe_by),
             ),
             doc,
-            self.after.map_or(empty(), |x| x.to_document(configuration)),
+            out.after.map_or(empty(), |x| x.to_document(configuration)),
         ])
     }
 }

@@ -1,4 +1,9 @@
-use octizys_common::{identifier::Identifier, span::Span};
+use octizys_common::{
+    identifier::Identifier, module_logic_path::ModuleLogicPath, span::Span,
+};
+
+#[derive(Debug)]
+pub struct VariableId(pub u32);
 
 #[derive(Debug)]
 pub enum BasicType {
@@ -18,68 +23,72 @@ pub enum BasicType {
 
 #[derive(Debug)]
 pub struct Function {
-    span: Span,
-    arguments: Vec<Type>,
-    output: Box<Type>,
+    pub span: Span,
+    pub arguments: Vec<Span>,
+    pub output: Box<Type>,
 }
 
 #[derive(Debug)]
 pub struct Forall {
-    span: Span,
-    arguments: Vec<Identifier>,
-    output: Box<Type>,
+    pub span: Span,
+    pub arguments: Vec<Span>,
+    pub output: Box<Type>,
 }
 
 #[derive(Debug)]
 pub struct Constructor {
-    info: Info,
-    prefix: Option<&'prefix PathPrefix>,
-    name: Name<Info>,
-    _type: Box<Type<'prefix, Info>>,
+    pub span: Span,
+    pub prefix: Option<ModuleLogicPath>,
+    pub name: (Span, Variable),
+    pub _type: Box<Type>,
 }
 
 #[derive(Debug)]
-pub struct SumType<'prefix, Info> {
-    info: Info,
-    prefix: Option<&'prefix PathPrefix>,
-    name: Name<Info>,
-    bound_variables: Vec<Name<Info>>,
-    constructors: Vec<Constructor<'prefix, Info>>,
+pub struct SumType {
+    pub span: Span,
+    pub prefix: Option<ModuleLogicPath>,
+    pub name: (Span, Identifier),
+    pub bound_variables: Vec<(Span, Identifier)>,
+    pub constructors: Vec<Constructor>,
 }
 
 #[derive(Debug)]
-pub struct NewType<'prefix, Info> {
-    info: Info,
-    prefix: Option<&'prefix PathPrefix>,
-    name: Name<Info>,
-    bound_variables: Vec<Name<Info>>,
-    constructor: Constructor<'prefix, Info>,
+pub struct NewType {
+    pub span: Span,
+    pub prefix: Option<ModuleLogicPath>,
+    pub name: (Span, Identifier),
+    pub bound_variables: Vec<(Span, Identifier)>,
+    pub constructor: Constructor,
 }
 
 #[derive(Debug)]
-pub struct Alias<'prefix, Info> {
-    info: Info,
-    prefix: Option<&'prefix PathPrefix>,
-    name: Name<Info>,
-    bound_variables: Vec<Name<Info>>,
-    _type: Box<Type<'prefix, Info>>,
+pub struct Alias {
+    pub span: Span,
+    pub prefix: Option<ModuleLogicPath>,
+    pub name: (Span, Identifier),
+    pub bound_variables: Vec<(Span, Identifier)>,
+    pub _type: Box<Type>,
 }
 
+/*
 #[derive(Debug)]
-pub struct Record<'prefix, Info> {
-    info: Info,
+pub struct Record {
+    span: Span,
     //TODO: Add row polymorphism
-    record: common::Record<Type<'prefix, Info>>,
+    record: octizys_common::Record<Type>,
 }
+*/
 
 #[derive(Debug)]
 pub enum Type {
     BasicType { _type: BasicType, span: Span },
-    Variable(Name<Info>),
-    Function(Function<'prefix, Info>),
-    Forall(Forall<'prefix, Info>),
-    SumType(SumType<'prefix, Info>),
-    NewType(NewType<'prefix, Info>),
-    Alias(Alias<'prefix, Info>),
-    Record(Record<'prefix, Info>),
+    LocalVariable(VariableId),
+    ExternalVariable(Identifier, Option<ModuleLogicPath>),
+    InferenceVariable(VariableId),
+    Function(Function),
+    Forall(Forall),
+    SumType(SumType),
+    NewType(NewType),
+    Alias(Alias),
+    //Record(Record<'prefix, Info>),
 }
