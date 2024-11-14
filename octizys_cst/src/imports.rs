@@ -1,7 +1,5 @@
-use crate::base::{
-    Between, Enclosures, ItemSeparator, Token, TokenInfo, TrailingList,
-};
-use crate::pretty::{indent, PrettyCST, PrettyCSTConfig};
+use crate::base::{Between, Token, TokenInfo, TrailingList};
+use crate::pretty::{indent, Comma, Parens, PrettyCST, PrettyCSTContext};
 use octizys_common::{
     identifier::Identifier, module_logic_path::ModuleLogicPath,
 };
@@ -14,48 +12,37 @@ pub struct Import {
     pub import: TokenInfo,
     pub unqualified: Option<TokenInfo>,
     pub module_path: Token<ModuleLogicPath>,
-    pub import_list: Option<Between<TrailingList<Token<Identifier>>>>,
+    pub import_list:
+        Option<Between<TrailingList<Token<Identifier>, Comma>, Parens>>,
     // "as name"
     pub qualified_path: Option<(TokenInfo, Token<ModuleLogicPath>)>,
 }
 
 impl PrettyCST for Import {
-    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
-        let import = self.import.to_document(configuration, "import".into());
+    fn to_document(&self, context: &PrettyCSTContext) -> Document {
+        let import = self.import.to_document(context, context.cache.import);
         let unqualified: Document = match &self.unqualified {
             Some(x) => {
-                soft_break()
-                    + x.to_document(configuration, "unqualified".into())
+                soft_break() + x.to_document(context, context.cache.unqualified)
             }
             None => empty(),
         };
 
-        let path = soft_break() + self.module_path.to_document(configuration);
+        let path = soft_break() + self.module_path.to_document(context);
         let imports = match &self.import_list {
-            Some(x) => {
-                x.to_document(configuration, Enclosures::Parens, |l, c| {
-                    l.to_document(c, ItemSeparator::Comma)
-                })
-            }
+            Some(x) => x.to_document(context),
             None => empty(),
         };
         let _as = match &self.qualified_path {
             Some((ti, tm)) => {
                 soft_break()
                     + concat(vec![
-                        ti.to_document(configuration, "as".into()),
-                        indent(
-                            configuration,
-                            soft_break() + tm.to_document(configuration),
-                        ),
+                        ti.to_document(context, context.cache._as),
+                        indent(context, soft_break() + tm.to_document(context)),
                     ])
             }
             None => empty(),
         };
-        import
-            + indent(
-                configuration,
-                concat(vec![unqualified, path, imports, _as]),
-            )
+        import + indent(context, concat(vec![unqualified, path, imports, _as]))
     }
 }

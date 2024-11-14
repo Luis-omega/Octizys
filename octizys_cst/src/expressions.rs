@@ -2,12 +2,12 @@ use crate::base::{
     Between, ImportedVariable, OperatorName, Token, TokenInfo, TrailingList,
 };
 use crate::patterns::PatternMatch;
-use crate::pretty::{indent, PrettyCST, PrettyCSTConfig};
+use crate::pretty::{
+    indent, Braces, Colon, Comma, Parens, PrettyCST, PrettyCSTContext,
+};
 use crate::types::Type;
 use octizys_common::identifier::Identifier;
-use octizys_pretty::combinators::{
-    concat, concat_iter, empty_break, hard_break, soft_break,
-};
+use octizys_pretty::combinators::{concat, concat_iter, soft_break};
 use octizys_pretty::document::Document;
 
 #[derive(Debug)]
@@ -19,16 +19,17 @@ pub struct LetBinding {
 }
 
 impl PrettyCST for LetBinding {
-    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
-        self.pattern.to_document(configuration)
+    fn to_document(&self, context: &PrettyCSTContext) -> Document {
+        self.pattern.to_document(context)
             + indent(
-                configuration,
+                context,
                 concat(vec![
                     soft_break(),
-                    self.equal.to_document(configuration, "=".into()),
+                    self.equal.to_document(context, context.cache.asignation),
                     soft_break(),
-                    self.value.to_document(configuration),
-                    self.semicolon.to_document(configuration, ";".into()),
+                    self.value.to_document(context),
+                    self.semicolon
+                        .to_document(context, context.cache.semicolon),
                 ]),
             )
     }
@@ -43,23 +44,21 @@ pub struct Let {
 }
 
 impl PrettyCST for Let {
-    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, context: &PrettyCSTContext) -> Document {
         concat(vec![
-            self.let_.to_document(configuration, "let".into()),
+            self.let_.to_document(context, context.cache._let),
             indent(
-                configuration,
+                context,
                 soft_break()
                     + concat_iter(
-                        self.bindings
-                            .iter()
-                            .map(|x| x.to_document(configuration)),
+                        self.bindings.iter().map(|x| x.to_document(context)),
                     ),
             ),
             soft_break(),
-            self.in_.to_document(configuration, "in".into()),
+            self.in_.to_document(context, context.cache._in),
             indent(
-                configuration,
-                soft_break() + self.expression.to_document(configuration),
+                context,
+                soft_break() + self.expression.to_document(context),
             ),
         ])
     }
@@ -73,13 +72,13 @@ pub struct CaseItem {
 }
 
 impl PrettyCST for CaseItem {
-    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, context: &PrettyCSTContext) -> Document {
         concat(vec![
-            self.pattern.to_document(configuration),
-            self.arrow.to_document(configuration, " =>".into()),
+            self.pattern.to_document(context),
+            self.arrow.to_document(context, context.cache.more_or_equal),
             indent(
-                configuration,
-                soft_break() + self.expression.to_document(configuration),
+                context,
+                soft_break() + self.expression.to_document(context),
             ),
         ])
     }
@@ -90,20 +89,21 @@ pub struct Case {
     pub case: TokenInfo,
     pub expression: Box<Expression>,
     pub of: TokenInfo,
-    pub cases: Between<TrailingList<CaseItem>>,
+    pub cases: Between<TrailingList<CaseItem, Comma>, Parens>,
 }
 
 impl PrettyCST for Case {
-    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, context: &PrettyCSTContext) -> Document {
         concat(vec![
-            self.case.to_document(configuration, "case".into()),
+            self.case.to_document(context, context.cache.case),
             indent(
-                configuration,
-                soft_break() + self.expression.to_document(configuration),
+                context,
+                soft_break() + self.expression.to_document(context),
             ),
-            self.of.to_document(configuration, "of".into()),
-            self.cases.left.to_document(configuration, "{".into()),
-            //TODO: finish this
+            self.of.to_document(context, context.cache.of),
+            //TODO: finish this, we need a cases especific to_document instead of the default for
+            //between
+            self.cases.to_document(context),
         ])
     }
 }
@@ -116,7 +116,7 @@ pub struct BinaryOperator {
 }
 
 impl PrettyCST for BinaryOperator {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
         todo!()
     }
 }
@@ -128,7 +128,7 @@ pub struct LambdaExpression {
 }
 
 impl PrettyCST for LambdaExpression {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
         todo!()
     }
 }
@@ -140,7 +140,7 @@ pub struct ApplicationExpression {
 }
 
 impl PrettyCST for ApplicationExpression {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
         todo!()
     }
 }
@@ -158,7 +158,7 @@ pub enum ExpressionRecordItem {
 }
 
 impl PrettyCST for ExpressionRecordItem {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
         todo!()
     }
 }
@@ -170,7 +170,7 @@ pub struct ExpressionSelector {
 }
 
 impl PrettyCST for ExpressionSelector {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
         todo!()
     }
 }
@@ -188,10 +188,10 @@ pub enum Expression {
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
     NamedHole(Token<u64>),
-    Tuple(Between<TrailingList<Box<Expression>>>),
-    Record(Between<TrailingList<ExpressionRecordItem>>),
+    Tuple(Between<TrailingList<Box<Expression>, Comma>, Parens>),
+    Record(Between<TrailingList<ExpressionRecordItem, Colon>, Braces>),
     Case(Case),
-    Parens(Between<Box<Expression>>),
+    Parens(Between<Box<Expression>, Parens>),
     Selector(ExpressionSelector),
     Interrogation {
         expression: Box<Expression>,
@@ -229,7 +229,7 @@ impl Expression {
 }
 
 impl PrettyCST for Expression {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
         todo!()
     }
 }

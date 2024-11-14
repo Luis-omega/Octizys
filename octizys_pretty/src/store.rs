@@ -62,6 +62,10 @@ impl NonLineBreakString {
             .map(|s| NonLineBreakString(String::from(s)));
         s
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl From<NonLineBreakStr> for NonLineBreakString {
@@ -98,22 +102,36 @@ impl CommentStore {
         CommentStore { store }
     }
 
+    /// Store a single string without line breaks.
     pub fn add(&mut self, s: NonLineBreakString) -> usize {
         let len = self.store.len();
         self.store.push(s);
         len
     }
 
+    /// Store a iterator of strings without line breaks,
+    /// you may be interested in `NonLineBreakString::decompose`
     pub fn extend<T: Iterator<Item = NonLineBreakString>>(
         &mut self,
         s: T,
-    ) -> [std::ops::Range<usize>; 1] {
+    ) -> std::ops::Range<usize> {
         let original = self.store.len();
         self.store.extend(s);
         let new = self.store.len();
-        [original..new]
+        original..new
     }
 
+    pub fn extend_and_get_lens<'a, T: Iterator<Item = NonLineBreakString>>(
+        &'a mut self,
+        s: T,
+    ) -> std::iter::Map<
+        std::ops::Range<usize>,
+        impl FnMut(usize) -> (usize, usize) + 'a,
+    > {
+        self.extend(s).map(|i| (i, self.store[i].len()))
+    }
+
+    /// Store a single string without line breaks.
     pub fn add_str(&mut self, s: &str) -> Option<usize> {
         let len = self.store.len();
         let converted = NonLineBreakString::make(s)?;

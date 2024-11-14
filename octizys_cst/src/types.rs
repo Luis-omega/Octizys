@@ -1,8 +1,10 @@
 use crate::base::{
-    Between, Enclosures, ImportedVariable, ItemSeparator, Token, TokenInfo,
-    TrailingList, TrailingListItem,
+    Between, ImportedVariable, Token, TokenInfo, TrailingList, TrailingListItem,
 };
-use crate::pretty::{PrettyCST, PrettyCSTConfig};
+use crate::pretty::{
+    indent, Braces, Colon, Comma, Parens, PrettyCST, PrettyCSTContext,
+    RightArrow,
+};
 use derivative::Derivative;
 use octizys_common::identifier::Identifier;
 use octizys_pretty::combinators::*;
@@ -25,21 +27,22 @@ pub enum TypeBase {
 }
 
 impl PrettyCST for TypeBase {
-    fn to_document(&self, _configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, context: &PrettyCSTContext) -> Document {
         match self {
-            TypeBase::U8 => "U8".into(),
-            TypeBase::U16 => "U16".into(),
-            TypeBase::U32 => "U32".into(),
-            TypeBase::U64 => "U64".into(),
-            TypeBase::I8 => "I8".into(),
-            TypeBase::I16 => "I16".into(),
-            TypeBase::I32 => "I32".into(),
-            TypeBase::I64 => "I64".into(),
-            TypeBase::F32 => "F32".into(),
-            TypeBase::F64 => "F64".into(),
-            TypeBase::Char => "Char".into(),
-            TypeBase::String => "String".into(),
+            TypeBase::U8 => context.cache.u8,
+            TypeBase::U16 => context.cache.u16,
+            TypeBase::U32 => context.cache.u32,
+            TypeBase::U64 => context.cache.u16,
+            TypeBase::I8 => context.cache.i8,
+            TypeBase::I16 => context.cache.i16,
+            TypeBase::I32 => context.cache.i32,
+            TypeBase::I64 => context.cache.i64,
+            TypeBase::F32 => context.cache.f32,
+            TypeBase::F64 => context.cache.f64,
+            TypeBase::Char => context.cache.char,
+            TypeBase::String => context.cache.string,
         }
+        .into()
     }
 }
 
@@ -54,24 +57,13 @@ pub struct TypeRecordItem {
 }
 
 impl PrettyCST for TypeRecordItem {
-    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, context: &PrettyCSTContext) -> Document {
         concat(vec![
-            self.variable
-                .info
-                .to_document(configuration, (&self.variable.value).into()),
-            self.separator.to_document(configuration, ":".into()),
-            self.expression.to_document(configuration),
+            self.variable.to_document(context),
+            self.separator.to_document(context, context.cache.colon),
+            self.expression.to_document(context),
         ])
     }
-}
-
-fn pretty_between_trailing<T: PrettyCST>(
-    between: &Between<TrailingList<T>>,
-    configuration: PrettyCSTConfig,
-    sep: ItemSeparator,
-    enclosure: Enclosures,
-) -> Document {
-    between.to_document(configuration, enclosure, |l, c| l.to_document(c, sep))
 }
 
 #[derive(Debug)]
@@ -79,9 +71,9 @@ pub enum Type {
     Base(Token<TypeBase>),
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
-    Tuple(Between<TrailingList<Box<Type>>>),
-    Record(Between<TrailingList<TypeRecordItem>>),
-    Parens(Between<Box<Type>>),
+    Tuple(Between<TrailingList<Box<Type>, Comma>, Parens>),
+    Record(Between<TrailingList<TypeRecordItem, Colon>, Braces>),
+    Parens(Between<Box<Type>, Parens>),
     Application {
         start: Box<Type>,
         second: Box<Type>,
@@ -89,7 +81,7 @@ pub enum Type {
     },
     Arrow {
         first: Box<Type>,
-        remain: Vec<TrailingListItem<Type>>,
+        remain: Vec<TrailingListItem<Type, RightArrow>>,
     },
     Scheme {
         forall: TokenInfo,
@@ -137,7 +129,7 @@ impl Type {
 
     fn to_document_application_argument(
         &self,
-        configuration: PrettyCSTConfig,
+        configuration: &PrettyCSTContext,
     ) -> Document {
         if self.need_parens_application() {
             concat(vec![
@@ -154,7 +146,7 @@ impl Type {
 
     fn to_document_arrow_arguments(
         &self,
-        configuration: PrettyCSTConfig,
+        configuration: &PrettyCSTContext,
     ) -> Document {
         if self.need_parens_arrow() {
             concat(vec![
@@ -170,92 +162,40 @@ impl Type {
     }
 }
 
-/*
-impl PartialEq for Type {
-    fn eq(&self, other: &Self) -> bool {
-        match self {
-            Type::Base(b1) => match other {
-                Type::Base(b2) => *b1 == *b2,
-                _ => false,
-            },
-            Type::LocalVariable(v1) => match other {
-                Type::LocalVariable(v2) => *v1 == *v2,
-                _ => false,
-            },
-            Type::ImportedVariable(v1) => match other {
-                Type::ImportedVariable(v2) => *v1 == *v2,
-                _ => false,
-            },
-            Type::Tuple(_) => todo!(),
-            Type::Record(_) => todo!(),
-            Type::Parens(_) => todo!(),
-            Type::Application {
-                start,
-                second,
-                remain,
-            } => todo!(),
-            Type::Arrow { first, remain } => todo!(),
-            Type::Scheme {
-                forall,
-                first_variable,
-                remain_variables,
-                dot,
-                expression,
-            } => todo!(),
-        }
-    }
-}
-*/
-
 impl PrettyCST for Type {
-    fn to_document(&self, configuration: PrettyCSTConfig) -> Document {
+    fn to_document(&self, context: &PrettyCSTContext) -> Document {
         match &self {
-            Type::Base(token) => token.to_document(configuration),
-            Type::LocalVariable(token) => {
-                token.info.to_document(configuration, (&token.value).into())
-            }
-            Type::ImportedVariable(token) => token.to_document(configuration),
-            Type::Tuple(between) => pretty_between_trailing(
-                between,
-                configuration,
-                ItemSeparator::Comma,
-                Enclosures::Parens,
-            ),
-            Type::Record(between) => pretty_between_trailing(
-                between,
-                configuration,
-                ItemSeparator::Comma,
-                Enclosures::Braces,
-            ),
-            Type::Parens(between) => between.to_document(
-                configuration,
-                Enclosures::Parens,
-                |t, c| t.to_document(c),
-            ),
+            Type::Base(token) => token.to_document(context),
+            Type::LocalVariable(token) => token.to_document(context),
+            Type::ImportedVariable(token) => token.to_document(context),
+            Type::Tuple(between) => between.to_document(context),
+            Type::Record(between) => between.to_document(context),
+            Type::Parens(between) => between.to_document(context),
             Type::Application {
                 start,
                 second,
                 remain,
-            } => group(nest(
-                configuration.indentation_deep,
-                concat(vec![
-                    start.to_document_application_argument(configuration),
-                    soft_break(),
-                    second.to_document_application_argument(configuration),
-                    soft_break(),
-                    intersperse(
-                        remain.into_iter().map(|x| {
-                            x.to_document_application_argument(configuration)
-                        }),
-                        soft_break(),
-                    ),
-                ]),
-            )),
+            } => {
+                start.to_document_application_argument(context)
+                    + indent(
+                        context,
+                        concat(vec![
+                            soft_break(),
+                            second.to_document_application_argument(context),
+                            soft_break(),
+                            intersperse(
+                                remain.into_iter().map(|x| {
+                                    x.to_document_application_argument(context)
+                                }),
+                                soft_break(),
+                            ),
+                        ]),
+                    )
+            }
             Type::Arrow { first, remain } => {
-                let remain_doc = remain.into_iter().map(|arg| {
-                    arg.to_document(configuration, ItemSeparator::Arrow)
-                });
-                first.to_document_arrow_arguments(configuration)
+                let remain_doc =
+                    remain.into_iter().map(|arg| arg.to_document(context));
+                first.to_document_arrow_arguments(context)
                     + concat_iter(remain_doc)
             }
             Type::Scheme {
@@ -265,28 +205,27 @@ impl PrettyCST for Type {
                 dot,
                 expression,
             } => concat(vec![
-                forall.to_document(configuration, "forall".into()),
-                group(nest(
-                    configuration.indentation_deep,
+                forall.to_document(context, context.cache.forall),
+                indent(
+                    context,
                     concat(vec![
                         soft_break(),
-                        first_variable.to_document(configuration),
+                        first_variable.to_document(context),
                         soft_break(),
                         intersperse(
                             remain_variables
                                 .into_iter()
-                                .map(|x| x.to_document(configuration)),
+                                .map(|x| x.to_document(context)),
                             soft_break(),
                         ),
-                        dot.to_document(configuration, ".".into()),
+                        dot.to_document(context, context.cache.dot),
                         soft_break(),
-                        group(nest(
-                            configuration.indentation_deep,
-                            soft_break()
-                                + expression.to_document(configuration),
-                        )),
+                        indent(
+                            context,
+                            soft_break() + expression.to_document(context),
+                        ),
                     ]),
-                )),
+                ),
             ]),
         }
     }
