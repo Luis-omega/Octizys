@@ -1,9 +1,6 @@
 use std::ops::Add;
 
-use crate::{
-    combinators::hard_break,
-    store::{NonLineBreakStr, NonLineBreakString, Store, StoreSymbol},
-};
+use crate::store::{NonLineBreakStr, NonLineBreakString, Store, StoreSymbol};
 
 /// Adapted from the paper Strictly Pretty, Christian Lindig.
 /// Is specialized to handle the source files, that's why
@@ -182,6 +179,11 @@ impl Document {
             return Document(acc.pop().unwrap());
         }
         Document(DocumentInternal::Concat(acc))
+    }
+
+    pub fn external_non_line_break_str(words: NonLineBreakStr) -> Document {
+        let len = words.into_str().len();
+        Document(DocumentInternal::ExternalText(words.into(), len))
     }
 
     pub fn comment_line(

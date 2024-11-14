@@ -33,7 +33,7 @@ impl From<(usize, usize)> for Span {
 
 impl From<&Span> for Document {
     fn from(value: &Span) -> Document {
-        combinators::text(&format!(
+        combinators::external_text(&format!(
             "start: {}, end: {}",
             value.start.source_index, value.end.source_index
         ))

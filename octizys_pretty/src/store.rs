@@ -26,6 +26,10 @@ impl NonLineBreakStr {
     pub fn validate(s: &'static str) -> bool {
         string::find(s, "\n").is_none()
     }
+
+    pub fn into_str(self) -> &'static str {
+        self.0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -151,6 +155,12 @@ impl RegularStore {
         } else {
             None
         }
+    }
+
+    /// Be sure that the string here was already processed to guaranteed
+    /// that it doesn't have line breaks!
+    pub fn unsafe_add(&mut self, s: &str) -> StoreSymbol {
+        self.store.get_or_intern(s)
     }
 
     pub fn get(&self, s: &str) -> Option<StoreSymbol> {

@@ -1,6 +1,7 @@
 use crate::error::{error_from_document, Error};
-use octizys_pretty::combinators::{concat, text};
-use octizys_pretty::document::{self, Document, Interner};
+use octizys_pretty::combinators::external_text;
+use octizys_pretty::document::{aproximate_string_width, Document};
+use octizys_pretty::store::{NonLineBreakStr, Store};
 
 use regex::Regex;
 use std::sync::LazyLock;
@@ -44,14 +45,14 @@ pub static IDENTIFER_LAZY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 impl<'a> Identifier {
     pub fn make(
         s: &str,
-        interner: &mut Interner,
+        store: &mut Store,
     ) -> Result<Identifier, IdentifierError> {
         if s.is_empty() {
             return Err(IdentifierError::EmptyIdentifier);
         }
         if IDENTIFER_LAZY_REGEX.is_match(&s) {
-            let symbol = interner.get_or_intern(s);
-            let len = document::aproximate_string_width(s);
+            let symbol = store.regular.unsafe_add(s);
+            let len = aproximate_string_width(s);
             Ok(Identifier { symbol, len })
         } else {
             return Err(IdentifierError::ContainsInvalidCodePoint(
@@ -71,14 +72,11 @@ impl From<&IdentifierError> for Document {
     fn from(value: &IdentifierError) -> Document {
         match value {
             IdentifierError::ContainsInvalidCodePoint(s)=> {
-                concat(
-                    vec![
-                    text("The passed string is not a valid identifier, it contains invalid characters: ")
-                    , text(&s)]
-                )
+                    Document::external_non_line_break_str(NonLineBreakStr::new("The passed string is not a valid identifier, it contains invalid characters: "))
+                    + external_text(&s.replace("\n","\\n"))
             }
             IdentifierError::EmptyIdentifier => {
-                text("The passed string is not a valid identifier, it is seen as a empty string")
+                Document::external_non_line_break_str(NonLineBreakStr::new("The passed string is not a valid identifier, it is seen as a empty string"))
             }
         }
     }
@@ -93,7 +91,7 @@ impl From<IdentifierError> for Error {
 #[cfg(test)]
 mod tests {
     use crate::identifier::Identifier;
-    use octizys_pretty::document::Interner;
+    use octizys_pretty::store::Store;
     use paste::paste;
 
     macro_rules! make_negative_test {
@@ -102,8 +100,8 @@ mod tests {
                 #[test]
                 fn [<test_ $name _isnt_identifier>]() {
                     let s = $s;
-                    let mut interner = Interner::new();
-                    let result = Identifier::make(s,&mut interner);
+                    let mut store = Store::default();
+                    let result = Identifier::make(s,&mut store);
                     assert!(result.is_err(), "s = {}, result = {:?}", s, result);
                 }
             }
@@ -139,13 +137,13 @@ mod tests {
                 #[test]
                 fn [<test_ $name _is_identifier>]() {
                     let s = $s;
-                    let mut interner = Interner::new();
-                    let result = Identifier::make(s,&mut interner);
+                    let mut store = Store::default();
+                    let result = Identifier::make(s,&mut store);
                     match result {
                         Err(_)=>
                             assert!(false, "s = {}, result = {:?}", s, result),
                         Ok(value)=>
-                            assert!(interner.resolve(value.symbol) == Some(s), "s = {}, value = {:?}", s, value),
+                            assert!(store.regular.resolve(value.symbol) == Some(s), "s = {}, value = {:?}", s, value),
                     }
                 }
             }

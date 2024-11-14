@@ -1,7 +1,8 @@
 use crate::error::{error_from_document, Error};
 use crate::identifier::{Identifier, IdentifierError};
 use octizys_pretty::combinators;
-use octizys_pretty::document::{Document, Interner};
+use octizys_pretty::document::Document;
+use octizys_pretty::store::Store;
 
 const MODULE_LOGIC_PATH_SEPARATOR: &str = "::";
 
@@ -44,11 +45,11 @@ pub struct ModuleLogicPath(Vec<Identifier>);
 impl ModuleLogicPath {
     pub fn make(
         s: &str,
-        interner: &mut Interner,
+        store: &mut Store,
     ) -> Result<ModuleLogicPath, ModuleLogicPathError> {
         let v: Vec<Identifier> = s
             .split(MODULE_LOGIC_PATH_SEPARATOR)
-            .map(|x| Identifier::make(x, interner))
+            .map(|x| Identifier::make(x, store))
             .collect::<Result<Vec<Identifier>, IdentifierError>>()
             .map_err(|_x| ModuleLogicPathError::NotIdentifier)?;
         Ok(ModuleLogicPath(v))
