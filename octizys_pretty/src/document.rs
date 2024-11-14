@@ -1,11 +1,13 @@
 use std::ops::Add;
 
+use crate::{
+    combinators::hard_break,
+    store::{NonLineBreakStr, NonLineBreakString, Store, StoreSymbol},
+};
+
 /// Adapted from the paper Strictly Pretty, Christian Lindig.
 /// Is specialized to handle the source files, that's why
 /// we use internalization of strings.
-use string_interner::{DefaultStringInterner, DefaultSymbol};
-
-pub type Interner = DefaultStringInterner;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 ///This type is hidden as we must ensure the invariant of no "\n" in the texts
@@ -22,13 +24,13 @@ enum DocumentInternal {
     ///Union of two or more files
     Concat(Vec<DocumentInternal>),
     ///Keywords and identifiers used in a file
-    InternalizedText(DefaultSymbol, usize),
+    StoredRegularText(StoreSymbol, usize),
     ///All the text that isn't part of the original document and we didn't
     ///allocate in a separate structure
-    PlainText(String, usize),
+    ExternalText(NonLineBreakString, usize),
     /// For comments stored in a vector as String.
     /// This doesn't add a line beak!
-    CommentLine {
+    StoredCommentText {
         index: usize,
         len: usize,
     },
@@ -118,45 +120,66 @@ impl Document {
         ))
     }
 
-    /// Is expected to be used in keywords and identifiers
-    /// to save space.
-    pub fn internalize(
-        interner: &mut Interner,
-        maybe_word: &str,
+    pub fn try_internalize(
+        store: &mut Store,
+        maybe_words: &str,
     ) -> Option<Self> {
-        match maybe_word.find("\n") {
-            Some(_) => None,
-            None => {
-                let symbol = interner.get_or_intern(maybe_word);
-                Some(Document(DocumentInternal::InternalizedText(
-                    symbol,
-                    aproximate_string_width(maybe_word),
-                )))
-            }
-        }
+        let symbol = store.regular.try_add(maybe_words)?;
+        let len = aproximate_string_width(maybe_words);
+        Some(Document(DocumentInternal::StoredRegularText(symbol, len)))
     }
 
-    pub fn from_symbol_and_len(s: DefaultSymbol, len: usize) -> Self {
-        Document(DocumentInternal::InternalizedText(s, len))
+    /// Returns a document of a string stored in the regular store
+    /// provided that we already know the symbol and len.
+    /// No verification is done on the symbol or the len, is
+    /// user responsibility to check that they are valid.
+    pub fn from_symbol_and_len(s: StoreSymbol, len: usize) -> Self {
+        Document(DocumentInternal::StoredRegularText(s, len))
+    }
+
+    pub fn internalize_non_line_break_string(
+        store: &mut Store,
+        s: NonLineBreakString,
+    ) -> Self {
+        let len = aproximate_string_width((&s).into());
+        let symbol = store.regular.add(s);
+        Document(DocumentInternal::StoredRegularText(symbol, len))
+    }
+
+    /// Returns a document of a string stored in the comments store
+    /// provided that we already know the symbol and len.
+    /// No verification is done on the index or the len, is
+    /// user responsibility to check that they are valid.
+    pub fn from_index_and_len(index: usize, len: usize) -> Self {
+        Document(DocumentInternal::StoredCommentText { index, len })
+    }
+
+    pub fn internalize_non_line_break_str(
+        store: &mut Store,
+        s: NonLineBreakStr,
+    ) -> Self {
+        let len = aproximate_string_width(s.into());
+        let symbol = store.regular.add_str(s);
+        Document(DocumentInternal::StoredRegularText(symbol, len))
     }
 
     /// This function decomposes the given str by "\n" and returns a equivalent document
     /// This preserves line breaks and spaces as is
     /// This doesn't perform internalization of the text
-    pub fn text(words: &str) -> Self {
-        if words.find("\n").is_none() {
-            return Document(DocumentInternal::PlainText(
-                String::from(words),
-                aproximate_string_width(words),
-            ));
-        }
+    pub fn external_text(words: &str) -> Self {
         let mut acc = vec![];
-        for line in words.split("\n") {
-            acc.push(DocumentInternal::PlainText(
-                String::from(line),
-                aproximate_string_width(line),
-            ));
+        for word in NonLineBreakString::decompose(words) {
+            let len = aproximate_string_width((&word).into());
+            let doc = DocumentInternal::ExternalText(word, len);
+            acc.push(doc);
             acc.push(DocumentInternal::HardBreak);
+        }
+        acc.pop();
+        let len = acc.len();
+        if len == 0 {
+            return Document::empty();
+        } else if len == 1 {
+            return Document(acc.pop().unwrap());
         }
         Document(DocumentInternal::Concat(acc))
     }
@@ -167,7 +190,7 @@ impl Document {
     ) -> Document {
         let index = comments_accumulator.len();
         comments_accumulator.push(String::from(source));
-        Document(DocumentInternal::CommentLine {
+        Document(DocumentInternal::StoredCommentText {
             index,
             len: aproximate_string_width(source),
         })
@@ -184,23 +207,19 @@ impl Document {
     pub fn into_iter<'doc>(
         &'doc self,
         width: usize,
-        context: DocumentRenderContext<'doc>,
+        store: &'doc Store,
     ) -> DocumentIterator {
-        DocumentIterator::new(self, width, context).into_iter()
+        DocumentIterator::new(self, width, store).into_iter()
     }
 
-    pub fn render_to_string(
-        self,
-        width: usize,
-        context: DocumentRenderContext,
-    ) -> String {
-        self.into_iter(width, context).collect()
+    pub fn render_to_string(self, width: usize, store: &Store) -> String {
+        self.into_iter(width, store).collect()
     }
 }
 
 impl From<&str> for Document {
     fn from(value: &str) -> Document {
-        Document::text(value)
+        Document::external_text(value)
     }
 }
 
@@ -212,34 +231,15 @@ impl Add for Document {
 }
 
 #[derive(Debug)]
-pub struct DocumentRenderContext<'a> {
-    interner: &'a Interner,
-    comments: &'a Vec<String>,
-}
-
-impl<'a> DocumentRenderContext<'a> {
-    pub fn new(
-        interner: &'a Interner,
-        comments: &'a Vec<String>,
-    ) -> DocumentRenderContext<'a> {
-        DocumentRenderContext { interner, comments }
-    }
-}
-
-#[derive(Debug)]
 pub struct DocumentIterator<'doc> {
     consumed_width: usize,
     line_width: usize,
     stack: Vec<FitsParam<'doc>>,
-    context: DocumentRenderContext<'doc>,
+    store: &'doc Store,
 }
 
 impl<'doc> DocumentIterator<'doc> {
-    fn new(
-        doc: &'doc Document,
-        width: usize,
-        context: DocumentRenderContext<'doc>,
-    ) -> Self {
+    fn new(doc: &'doc Document, width: usize, store: &'doc Store) -> Self {
         let params = FitsParam {
             ident: 0,
             mode: Mode::Flat,
@@ -249,7 +249,7 @@ impl<'doc> DocumentIterator<'doc> {
             consumed_width: 0,
             line_width: width,
             stack: vec![params],
-            context,
+            store,
         }
     }
 
@@ -305,21 +305,21 @@ impl<'doc> DocumentIterator<'doc> {
                         stack.push(current.with_document(doc))
                     }
                 }
-                DocumentInternal::InternalizedText(_, width) => {
+                DocumentInternal::StoredRegularText(_, width) => {
                     if *width <= remain_width {
                         remain_width -= width;
                     } else {
                         return false;
                     }
                 }
-                DocumentInternal::PlainText(_, width) => {
+                DocumentInternal::ExternalText(_, width) => {
                     if *width <= remain_width {
                         remain_width -= width;
                     } else {
                         return false;
                     }
                 }
-                DocumentInternal::CommentLine { len, .. } => {
+                DocumentInternal::StoredCommentText { len, .. } => {
                     if *len <= remain_width {
                         remain_width -= len;
                     } else {
@@ -359,21 +359,24 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
                 }
                 Some(String::new())
             }
-            DocumentInternal::InternalizedText(s, _) => {
+            DocumentInternal::StoredRegularText(s, _) => {
                 //We abort the operation if we can't resolve a symbol
                 //maybe we should instead produce a blank and continue?
                 let new_str =
-                    self.context.interner.resolve(*s).map(String::from)?;
+                    self.store.regular.resolve(*s).map(String::from)?;
                 Some(self.advance_width_with(new_str))
             }
             // What to do here? we can put s behind a Rc but
             // we want the resulting string to be fully owned by the user.
-            DocumentInternal::PlainText(s, _) => {
-                Some(self.advance_width_with(s.clone()))
+            DocumentInternal::ExternalText(s, _) => {
+                Some(self.advance_width_with((*s).clone().into()))
             }
-            DocumentInternal::CommentLine { index, .. } => {
-                let new_str =
-                    self.context.comments.get(*index).map(String::from)?;
+            DocumentInternal::StoredCommentText { index, .. } => {
+                let new_str = self
+                    .store
+                    .comments
+                    .resolve(*index)
+                    .map(|x| (*x).clone().into())?;
                 Some(self.advance_width_with(new_str))
             }
             //TODO: move this function to a one that can handle this
@@ -401,11 +404,8 @@ mod render_tests {
     use crate::document::*;
 
     fn make_test(target_string: &str, doc: Document, width: usize) {
-        let interner = Interner::new();
-        let comments_accumulator = vec![];
-        let context =
-            DocumentRenderContext::new(&interner, &comments_accumulator);
-        assert_eq!(target_string, doc.render_to_string(width, context))
+        let store = Store::default();
+        assert_eq!(target_string, doc.render_to_string(width, &store))
     }
 
     #[test]
@@ -418,8 +418,8 @@ mod render_tests {
     fn concat() {
         let raw1 = "hello world";
         let raw2 = " bye world";
-        let document1 = Document::text(raw1);
-        let document2 = Document::text(raw2);
+        let document1 = Document::external_text(raw1);
+        let document2 = Document::external_text(raw2);
         let document = Document::concat(vec![document1, document2]);
         make_test(&[raw1, raw2].join(""), document, 10)
     }
@@ -427,21 +427,21 @@ mod render_tests {
     #[test]
     fn text() {
         let raw = "hello world";
-        let document = Document::text(raw);
+        let document = Document::external_text(raw);
         make_test(&raw, document, 10)
     }
 
     #[test]
     fn nest_break_group() {
         let document = Document::group(Document::concat(vec![
-            Document::text("hello"),
+            Document::external_text("hello"),
             Document::nest(
                 3,
                 Document::concat(vec![
                     Document::soft_break(),
-                    Document::text("world"),
+                    Document::external_text("world"),
                     Document::soft_break(),
-                    Document::text("!"),
+                    Document::external_text("!"),
                 ]),
             ),
         ]));
@@ -451,14 +451,14 @@ mod render_tests {
     #[test]
     fn nest_break_group_flat() {
         let document = Document::group(Document::concat(vec![
-            Document::text("hello"),
+            Document::external_text("hello"),
             Document::nest(
                 3,
                 Document::concat(vec![
                     Document::soft_break(),
-                    Document::text("world"),
+                    Document::external_text("world"),
                     Document::soft_break(),
-                    Document::text("!"),
+                    Document::external_text("!"),
                 ]),
             ),
         ]));

@@ -1,6 +1,6 @@
 use std::iter;
 
-use crate::document::*;
+use crate::{document::*, store::Store};
 
 pub fn empty() -> Document {
     Document::empty()
@@ -40,15 +40,15 @@ pub fn concat_iter<T: IntoIterator<Item = Document>>(items: T) -> Document {
     Document::concat(v)
 }
 
-pub fn internalize(
-    interner: &mut Interner,
+pub fn try_internalize(
+    store: &mut Store,
     maybe_word: &str,
 ) -> Option<Document> {
-    Document::internalize(interner, maybe_word)
+    Document::try_internalize(store, maybe_word)
 }
 
-pub fn text(words: &str) -> Document {
-    Document::text(words)
+pub fn external_text(words: &str) -> Document {
+    Document::external_text(words)
 }
 
 pub fn comment_line(
@@ -67,24 +67,6 @@ pub fn group(doc: Document) -> Document {
 }
 
 pub fn intersperse<
-    Doc: Into<Document>,
-    Docs: IntoIterator<Item = Doc>,
-    Sep: Into<Document>,
->(
-    docs: Docs,
-    sep: Sep,
-) -> Document {
-    let separator: Document = sep.into();
-    let mut acc: Vec<Document> = vec![];
-    for i in docs {
-        acc.push(i.into());
-        acc.push(separator.clone());
-    }
-    acc.pop();
-    concat(acc)
-}
-
-pub fn intersperse_with_function<
     Doc: Into<Document>,
     Docs: IntoIterator<Item = Doc>,
     Sep: Into<Document>,

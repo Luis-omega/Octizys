@@ -8,4 +8,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+konst = "0.3.9"
 string-interner = "0.17.0"
