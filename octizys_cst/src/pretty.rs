@@ -89,7 +89,7 @@ macro_rules! make_pretty_cache {
 
         impl PrettyCSTCache {
             pub fn new(store: &mut Store) -> PrettyCSTCache {
-                $(let $only_name = make_cache_item(stringify!(only_name), store);)+
+                $(let $only_name = make_cache_item(stringify!($only_name), store);)+
                 $(let $name = make_cache_item($name_string, store);)+
                 PrettyCSTCache { $($only_name ,)+ $($name,)+ }
             }

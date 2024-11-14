@@ -72,7 +72,7 @@ pub enum Type {
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
     Tuple(Between<TrailingList<Box<Type>, Comma>, Parens>),
-    Record(Between<TrailingList<TypeRecordItem, Colon>, Braces>),
+    Record(Between<TrailingList<TypeRecordItem, Comma>, Braces>),
     Parens(Between<Box<Type>, Parens>),
     Application {
         start: Box<Type>,

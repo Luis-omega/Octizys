@@ -10,7 +10,7 @@ use octizys_pretty::{
 
 use crate::pretty::{indent, PrettyCST, PrettyCSTContext};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct CommentLineContent {
     pub index: usize,
     pub len: usize,
@@ -161,7 +161,7 @@ impl PrettyCST for CommentBlock {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct CommentLine {
     pub kind: CommentKind,
     pub start: LineCommentStart,

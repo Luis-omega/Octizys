@@ -64,7 +64,7 @@ pub enum PatternMatch {
     Char(Token<char>),
     AnonHole(TokenInfo),
     Tuple(Between<TrailingList<Box<PatternMatch>, Comma>, Parens>),
-    Record(Between<TrailingList<PatternMatchRecordItem, Colon>, Braces>),
+    Record(Between<TrailingList<PatternMatchRecordItem, Comma>, Braces>),
     Bind(PatternMatchBind),
     Application {
         start: Box<PatternMatch>,

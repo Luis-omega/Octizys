@@ -1,5 +1,7 @@
-use octizys_common::Interner;
-use octizys_cst::pretty::{PrettyCST, PrettyCSTConfig};
+use octizys_common::Store;
+use octizys_cst::pretty::{
+    PrettyCST, PrettyCSTCache, PrettyCSTConfig, PrettyCSTContext,
+};
 use octizys_parser::grammar::import_declarationParser;
 use octizys_parser::lexer::Lexer;
 use octizys_pretty::combinators::group;
@@ -29,11 +31,13 @@ use std::io::{self, Read};
 //Or something better...
 
 fn main() {
-    let mut interner = Interner::new();
+    let mut store = Store::default();
+    let configuration = PrettyCSTConfig::default();
+    let cache = PrettyCSTCache::new(&mut store);
     let mut stdin = io::stdin();
     let input = &mut String::new();
     let p = import_declarationParser::new();
-    let configuration = PrettyCSTConfig::new();
+    let context = PrettyCSTContext::new(configuration, cache);
     loop {
         input.clear();
         stdin.read_line(input);
@@ -41,20 +45,14 @@ fn main() {
         if input == ":q" {
             break;
         }
-        let mut lexer = Lexer::new(input, &mut interner);
+        let mut lexer = Lexer::new(input, &mut store);
         let parsed = p.parse(lexer);
         match parsed {
             Ok(item) => {
                 println!("{:#?}", item);
-                let as_doc = group(item.to_document(configuration));
+                let as_doc = group(item.to_document(&context));
                 println!("{:?}", as_doc);
-                println!(
-                    "{}",
-                    as_doc.render_to_string(
-                        usize::from(configuration.line_width),
-                        &interner
-                    )
-                )
+                println!("{}", as_doc.render_to_string(2, &store))
             }
             Err(t) => println!("Can't parse!\n{:?}", t),
         }

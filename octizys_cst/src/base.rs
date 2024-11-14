@@ -218,7 +218,7 @@ where
     #[derivative(PartialEq = "ignore")]
     pub right: TokenInfo,
     pub value: T,
-    _enclosure_phantom: PhantomData<Enclosure>,
+    pub _enclosure_phantom: PhantomData<Enclosure>,
 }
 
 impl<T, Enclosure> PrettyCST for Between<T, Enclosure>
@@ -254,7 +254,7 @@ where
     #[derivative(PartialEq = "ignore")]
     pub separator: TokenInfo,
     pub item: T,
-    _phantom_separator: PhantomData<SeparatorPhantom>,
+    pub _phantom_separator: PhantomData<SeparatorPhantom>,
 }
 
 impl<T, SeparatorPhantom> PrettyCST for TrailingListItem<T, SeparatorPhantom>

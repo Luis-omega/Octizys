@@ -1,6 +1,7 @@
 use std::str::FromStr;
 use octizys_cst::{
   base::{Between,Token,TrailingList,TokenInfo,ImportedVariable,OperatorName,TrailingListItem},
+  pretty::{Comma,Colon,Braces,Parens},
   comments::{CommentKind,LineCommentStart,Comment},
   imports::{Import},
   types::{Type,TypeRecordItem,TypeBase},
@@ -119,25 +120,30 @@ extern {
 
 // --------------------- Macros ---------------------
 
-separated_list<T,sep>: TrailingList<T> ={
+separated_list<T,sep,phantom>: TrailingList<T,phantom> ={
   <t:T> <mut acc: (sep T)*>=> (t,acc,None).into()
   };
 
-terminated_list<T,sep> : TrailingList<T> =
+terminated_list<T,sep,phantom> : TrailingList<T,phantom> =
   <t:T> <mut acc: (sep T)*> <s:sep>=> (t,acc,Some(s)).into();
 
-trailing_list<T,sep> : TrailingList<T> = {separated_list<T,sep>,terminated_list<T,sep>}
+trailing_list<T,sep,phantom> : TrailingList<T,phantom> = {separated_list<T,sep,phantom>,terminated_list<T,sep,phantom>}
 
-between<left,T,right> : Between<T> =
+Parens : Parens = {}
+Braces: Braces = {}
+Comma: Comma = {}
+Colon: Colon = {}
+
+between<left,T,right,phantom> : Between<T,phantom> =
   <l:left> <t:T> <r:right>
-  => Between{left:l.into(),right:r.into(),value:t};
+  => Between{left:l.into(),right:r.into(),value:t,_enclosure_phantom:Default::default()};
 
-tuple<T> : Between<TrailingList<T>> = {
-  between<"(",terminated_list<T,",">,")"> => <>,
+tuple<T> : Between<TrailingList<T,Comma>,Parens> = {
+  between<"(",terminated_list<T,",",Comma>,")",Parens> => <>,
 };
 
-record<record_item, sep> : Between<TrailingList<record_item>> = {
-  between<"{",trailing_list<record_item,sep>,"}"> => <>,
+record<record_item, sep,phantom> : Between<TrailingList<record_item,phantom>,Braces> = {
+  between<"{",trailing_list<record_item,sep,phantom>,"}",Braces> => <>,
 };
 
 boxed<T> : Box<T> = T => Box::new(<>);
@@ -258,8 +264,8 @@ import_item : Token<Identifier> ={
 //TODO: Add importation of constructors
 
 
-import_list : TrailingList<Token<Identifier>> =
-  trailing_list<import_item,","> => <>;
+import_list : TrailingList<Token<Identifier>,Comma> =
+  trailing_list<import_item,",",Comma> => <>;
 
 import_as : (TokenInfo,Token<ModuleLogicPath>) =
   <a:"as"> <p:module_path>
@@ -267,7 +273,7 @@ import_as : (TokenInfo,Token<ModuleLogicPath>) =
 
 pub import_declaration : Import =
   <import:"import"> <unqualified:"unqualified"?> <module_path:module_path>
-  <import_list:between<"(",<l:import_list>,")">?>
+  <import_list:between<"(",<l:import_list>,")",Parens>?>
   <qualified_path:import_as?>
   => Import{
     import:import.into(),
@@ -353,8 +359,8 @@ type_record_item : TypeRecordItem = {
 
 //TODO: add support for row polymorphism (we need kinds)
 // we may need a different rule than the macro `record`
-type_record : Between<TrailingList<TypeRecordItem>> = {
-  record<type_record_item, ",">
+type_record : Between<TrailingList<TypeRecordItem,Comma>,Braces> = {
+  record<type_record_item, ",",Comma>
 };
 
 type_atom : Type = {
@@ -366,7 +372,8 @@ type_atom : Type = {
     Between{
     left : l.into(),
     right : r.into(),
-    value: Box::new(t)
+    value: Box::new(t),
+    _enclosure_phantom:Default::default()
     }
   ),
 };
@@ -389,7 +396,7 @@ type_arrow : Type = {
     =>
     Type::Arrow{
       first:Box::new(first),
-      remain:remain.into_iter().map(|(x,y)| TrailingListItem{separator:x.into(),item:y}  ).collect()
+      remain:remain.into_iter().map(|(x,y)| TrailingListItem{separator:x.into(),item:y,_phantom_separator:Default::default() }  ).collect()
     },
   type_application => <>
 };
@@ -456,7 +463,7 @@ pattern_record_item : PatternMatchRecordItem = {
 
 //TODO:Add and `...` pattern for `the remaining of the record`.
 pattern_record :PatternMatch = {
-  between<"{", trailing_list<pattern_record_item,",">,"}">
+  between<"{", trailing_list<pattern_record_item,",",Comma>,"}",Braces>
     => PatternMatch::Record(<>) ,
 };
 
@@ -467,7 +474,7 @@ pattern_atom : PatternMatch = {
   pattern_hole => <>,
   pattern_tuple => <>,
   pattern_record => <>,
-  between<"(",boxed<pattern>,")">
+  between<"(",boxed<pattern>,")",Parens>
   => PatternMatch::Parens(<>) ,
 };
 
@@ -539,7 +546,7 @@ expression_record_item : ExpressionRecordItem = {
 };
 
 expression_record : Expression = {
-  between<"{", trailing_list<expression_record_item,",">,"}">
+  between<"{", trailing_list<expression_record_item,",",Comma>,"}",Braces>
     => Expression::Record(<>),
 }
 
@@ -558,7 +565,7 @@ expression_case : Expression = {
   <c:"case">
   <e:expression>
   <o:"of">
-  <remain: between<"{",trailing_list<case_item,",">,"}">>
+  <remain: between<"{",trailing_list<case_item,",",Comma>,"}",Braces>>
     => Expression::Case(
       Case{
         case:c.into(),
@@ -577,7 +584,7 @@ expression_atom : Expression = {
   expression_tuple => <>,
   expression_record => <>,
   expression_case => <>,
-  between<"(",boxed<expression>,")">
+  between<"(",boxed<expression>,")",Parens>
     => Expression::Parens(<>) ,
 };
 

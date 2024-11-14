@@ -89,7 +89,7 @@ pub struct Case {
     pub case: TokenInfo,
     pub expression: Box<Expression>,
     pub of: TokenInfo,
-    pub cases: Between<TrailingList<CaseItem, Comma>, Parens>,
+    pub cases: Between<TrailingList<CaseItem, Comma>, Braces>,
 }
 
 impl PrettyCST for Case {
@@ -189,7 +189,7 @@ pub enum Expression {
     ImportedVariable(Token<ImportedVariable>),
     NamedHole(Token<u64>),
     Tuple(Between<TrailingList<Box<Expression>, Comma>, Parens>),
-    Record(Between<TrailingList<ExpressionRecordItem, Colon>, Braces>),
+    Record(Between<TrailingList<ExpressionRecordItem, Comma>, Braces>),
     Case(Case),
     Parens(Between<Box<Expression>, Parens>),
     Selector(ExpressionSelector),
