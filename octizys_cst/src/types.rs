@@ -1,14 +1,9 @@
 use crate::base::{
-    Between, ImportedVariable, Token, TokenInfo, TrailingList, TrailingListItem,
-};
-use crate::pretty::{
-    indent, Braces, Colon, Comma, Parens, PrettyCST, PrettyCSTContext,
-    RightArrow,
+    Between, Braces, Comma, ImportedVariable, Parens, RightArrow, Token,
+    TokenInfo, TrailingList, TrailingListItem,
 };
 use derivative::Derivative;
 use octizys_common::identifier::Identifier;
-use octizys_pretty::combinators::*;
-use octizys_pretty::document::Document;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TypeBase {
@@ -26,26 +21,6 @@ pub enum TypeBase {
     String,
 }
 
-impl PrettyCST for TypeBase {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        match self {
-            TypeBase::U8 => context.cache.u8,
-            TypeBase::U16 => context.cache.u16,
-            TypeBase::U32 => context.cache.u32,
-            TypeBase::U64 => context.cache.u16,
-            TypeBase::I8 => context.cache.i8,
-            TypeBase::I16 => context.cache.i16,
-            TypeBase::I32 => context.cache.i32,
-            TypeBase::I64 => context.cache.i64,
-            TypeBase::F32 => context.cache.f32,
-            TypeBase::F64 => context.cache.f64,
-            TypeBase::Char => context.cache.char,
-            TypeBase::String => context.cache.string,
-        }
-        .into()
-    }
-}
-
 #[derive(Debug, Derivative)]
 pub struct TypeRecordItem {
     pub variable: Token<Identifier>,
@@ -54,16 +29,6 @@ pub struct TypeRecordItem {
     // otherwise we can drop the Box, maybe put
     // the box in the TrailingList?
     pub expression: Box<Type>,
-}
-
-impl PrettyCST for TypeRecordItem {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        concat(vec![
-            self.variable.to_document(context),
-            self.separator.to_document(context, context.cache.colon),
-            self.expression.to_document(context),
-        ])
-    }
 }
 
 #[derive(Debug)]
@@ -96,7 +61,7 @@ impl Type {
     ///This function tell the pretty printer if the type needs to be
     ///surrounded by parentheses if the type is a argument in a
     ///application.
-    fn need_parens_application(&self) -> bool {
+    pub fn need_parens_application(&self) -> bool {
         match self {
             Type::Base(_) => false,
             Type::LocalVariable(_) => false,
@@ -113,7 +78,7 @@ impl Type {
     ///This function tell the pretty printer if the type needs to be
     ///surrounded by parentheses if the type is a argument in a
     ///arrow.
-    fn need_parens_arrow(&self) -> bool {
+    pub fn need_parens_arrow(&self) -> bool {
         match self {
             Type::Base(_) => false,
             Type::LocalVariable(_) => false,
@@ -124,109 +89,6 @@ impl Type {
             Type::Application { .. } => false,
             Type::Arrow { .. } => true,
             Type::Scheme { .. } => true,
-        }
-    }
-
-    fn to_document_application_argument(
-        &self,
-        configuration: &PrettyCSTContext,
-    ) -> Document {
-        if self.need_parens_application() {
-            concat(vec![
-                "(".into(),
-                soft_break(),
-                self.to_document(configuration),
-                soft_break(),
-                ")".into(),
-            ])
-        } else {
-            self.to_document(configuration)
-        }
-    }
-
-    fn to_document_arrow_arguments(
-        &self,
-        configuration: &PrettyCSTContext,
-    ) -> Document {
-        if self.need_parens_arrow() {
-            concat(vec![
-                "(".into(),
-                soft_break(),
-                self.to_document(configuration),
-                soft_break(),
-                ")".into(),
-            ])
-        } else {
-            self.to_document(configuration)
-        }
-    }
-}
-
-impl PrettyCST for Type {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        match &self {
-            Type::Base(token) => token.to_document(context),
-            Type::LocalVariable(token) => token.to_document(context),
-            Type::ImportedVariable(token) => token.to_document(context),
-            Type::Tuple(between) => between.to_document(context),
-            Type::Record(between) => between.to_document(context),
-            Type::Parens(between) => between.to_document(context),
-            Type::Application {
-                start,
-                second,
-                remain,
-            } => {
-                start.to_document_application_argument(context)
-                    + indent(
-                        context,
-                        concat(vec![
-                            soft_break(),
-                            second.to_document_application_argument(context),
-                            soft_break(),
-                            intersperse(
-                                remain.into_iter().map(|x| {
-                                    x.to_document_application_argument(context)
-                                }),
-                                soft_break(),
-                            ),
-                        ]),
-                    )
-            }
-            Type::Arrow { first, remain } => {
-                let remain_doc =
-                    remain.into_iter().map(|arg| arg.to_document(context));
-                first.to_document_arrow_arguments(context)
-                    + concat_iter(remain_doc)
-            }
-            Type::Scheme {
-                forall,
-                first_variable,
-                remain_variables,
-                dot,
-                expression,
-            } => concat(vec![
-                forall.to_document(context, context.cache.forall),
-                indent(
-                    context,
-                    concat(vec![
-                        soft_break(),
-                        first_variable.to_document(context),
-                        soft_break(),
-                        intersperse(
-                            remain_variables
-                                .into_iter()
-                                .map(|x| x.to_document(context)),
-                            soft_break(),
-                        ),
-                        dot.to_document(context, context.cache.dot),
-                        soft_break(),
-                        indent(
-                            context,
-                            soft_break() + expression.to_document(context),
-                        ),
-                    ]),
-                ),
-            ]),
         }
     }
 }

@@ -1,0 +1,10 @@
+[package]
+name = "octizys_text_store"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+
+[dependencies]
+konst = "0.3.9"
+string-interner = "0.17.0"

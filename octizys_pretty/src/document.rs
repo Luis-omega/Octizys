@@ -1,6 +1,9 @@
 use std::ops::Add;
 
-use crate::store::{NonLineBreakStr, NonLineBreakString, Store, StoreSymbol};
+use octizys_text_store::store::{
+    aproximate_string_width, NonLineBreakStr, NonLineBreakString, Store,
+    StoreSymbol,
+};
 
 /// Adapted from the paper Strictly Pretty, Christian Lindig.
 /// Is specialized to handle the source files, that's why
@@ -25,6 +28,7 @@ enum DocumentInternal {
     ///All the text that isn't part of the original document and we didn't
     ///allocate in a separate structure
     ExternalText(NonLineBreakString, usize),
+    StaticText(NonLineBreakStr, usize),
     /// For comments stored in a vector as String.
     /// This doesn't add a line beak!
     StoredCommentText {
@@ -75,11 +79,6 @@ impl<'doc> FitsParam<'doc> {
     fn with_document(&self, doc: &'doc DocumentInternal) -> Self {
         FitsParam { doc, ..*self }
     }
-}
-
-//TODO: change this to a better approximate using graphemes
-pub fn aproximate_string_width(s: &str) -> usize {
-    s.chars().count()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -181,9 +180,10 @@ impl Document {
         Document(DocumentInternal::Concat(acc))
     }
 
-    pub fn external_non_line_break_str(words: NonLineBreakStr) -> Document {
-        let len = words.into_str().len();
-        Document(DocumentInternal::ExternalText(words.into(), len))
+    pub fn static_str(word: NonLineBreakStr) -> Document {
+        let s = word.as_str();
+        let len = aproximate_string_width(s);
+        Document(DocumentInternal::StaticText(word, len))
     }
 
     pub fn comment_line(
@@ -321,6 +321,13 @@ impl<'doc> DocumentIterator<'doc> {
                         return false;
                     }
                 }
+                DocumentInternal::StaticText(_, width) => {
+                    if *width <= remain_width {
+                        remain_width -= width;
+                    } else {
+                        return false;
+                    }
+                }
                 DocumentInternal::StoredCommentText { len, .. } => {
                     if *len <= remain_width {
                         remain_width -= len;
@@ -372,6 +379,9 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
             // we want the resulting string to be fully owned by the user.
             DocumentInternal::ExternalText(s, _) => {
                 Some(self.advance_width_with((*s).clone().into()))
+            }
+            DocumentInternal::StaticText(s, _) => {
+                Some(self.advance_width_with(String::from((*s).as_str())))
             }
             DocumentInternal::StoredCommentText { index, .. } => {
                 let new_str = self

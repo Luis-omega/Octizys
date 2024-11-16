@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-octizys_pretty={path="../octizys_pretty"}
+octizys_text_store={path="../octizys_text_store"}
 regex = "1.10.6"
 string-interner = "0.17.0"
 

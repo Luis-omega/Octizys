@@ -1,10 +1,7 @@
-use crate::error::{error_from_document, Error};
 use crate::identifier::{Identifier, IdentifierError};
-use octizys_pretty::combinators;
-use octizys_pretty::document::Document;
-use octizys_pretty::store::Store;
+use octizys_text_store::store::Store;
 
-const MODULE_LOGIC_PATH_SEPARATOR: &str = "::";
+pub const MODULE_LOGIC_PATH_SEPARATOR: &str = "::";
 
 #[derive(Debug)]
 pub enum ModuleLogicPathError {
@@ -13,29 +10,9 @@ pub enum ModuleLogicPathError {
     EmptyString,
 }
 
-impl From<&ModuleLogicPathError> for Document {
-    fn from(value: &ModuleLogicPathError) -> Document {
-        match value {
-            &ModuleLogicPathError::NotIdentifier => {
-                "The passed string contains a non valid Identifier component"
-                    .into()
-            }
-            &ModuleLogicPathError::EmptyString => {
-                "Attempt to build from a empty vector or string".into()
-            }
-        }
-    }
-}
-
 impl From<Identifier> for ModuleLogicPath {
     fn from(value: Identifier) -> Self {
         ModuleLogicPath(vec![value])
-    }
-}
-
-impl From<&ModuleLogicPathError> for Error {
-    fn from(vaue: &ModuleLogicPathError) -> Error {
-        error_from_document(vaue)
     }
 }
 
@@ -68,18 +45,6 @@ impl ModuleLogicPath {
     }
 }
 
-impl From<&ModuleLogicPath> for Document {
-    fn from(value: &ModuleLogicPath) -> Document {
-        value.to_document()
-    }
-}
-
-impl ModuleLogicPath {
-    pub fn to_document(&self) -> Document {
-        combinators::intersperse(self.0.iter(), MODULE_LOGIC_PATH_SEPARATOR)
-    }
-}
-
 impl TryFrom<Vec<Identifier>> for ModuleLogicPath {
     type Error = ModuleLogicPathError;
     fn try_from(value: Vec<Identifier>) -> Result<Self, Self::Error> {
@@ -94,5 +59,11 @@ impl TryFrom<Vec<Identifier>> for ModuleLogicPath {
 impl From<ModuleLogicPath> for Vec<Identifier> {
     fn from(value: ModuleLogicPath) -> Self {
         value.0
+    }
+}
+
+impl<'a> From<&'a ModuleLogicPath> for &'a Vec<Identifier> {
+    fn from(value: &'a ModuleLogicPath) -> Self {
+        &value.0
     }
 }

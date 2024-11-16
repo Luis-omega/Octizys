@@ -3,6 +3,11 @@ use konst::string;
 use string_interner::DefaultStringInterner;
 use string_interner::DefaultSymbol;
 
+//TODO: change this to a better approximate using graphemes
+pub fn aproximate_string_width(s: &str) -> usize {
+    s.chars().count()
+}
+
 ///Purpose: Build non line break strings at compilation time
 ///Is a intermediate structure used in NonLineBreakString.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -12,12 +17,11 @@ impl NonLineBreakStr {
     pub const fn new(source: &'static str) -> NonLineBreakStr {
         match string::find(source, "\n") {
             Some(x) => {
-                const_panic::concat_assert!(
-                    true,
-                    "String conatins a line break! at index: {}",
+                const_panic::concat_panic!(
+                    false,
+                    "String conatins a line break! at index: ",
                     x
                 );
-                NonLineBreakStr("")
             }
             None => NonLineBreakStr(source),
         }
@@ -27,7 +31,7 @@ impl NonLineBreakStr {
         string::find(s, "\n").is_none()
     }
 
-    pub fn into_str(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         self.0
     }
 }

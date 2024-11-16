@@ -1,14 +1,5 @@
-use octizys_common::{
-    span::{Position, Span},
-    Store,
-};
-use octizys_pretty::{
-    combinators::{self, concat, empty, hard_break, intersperse, repeat},
-    document::Document,
-    store::NonLineBreakString,
-};
-
-use crate::pretty::{indent, PrettyCST, PrettyCSTContext};
+use octizys_common::span::{Position, Span};
+use octizys_text_store::store::{NonLineBreakString, Store};
 
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct CommentLineContent {
@@ -34,31 +25,10 @@ impl CommentLineContent {
     }
 }
 
-impl PrettyCST for CommentLineContent {
-    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
-        self.into()
-    }
-}
-
-impl From<&CommentLineContent> for Document {
-    fn from(value: &CommentLineContent) -> Document {
-        Document::from_index_and_len(value.index, value.len)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommentKind {
     Documentation,
     NonDocumentation,
-}
-
-impl PrettyCST for CommentKind {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        match self {
-            CommentKind::Documentation => context.cache.comment_kind.into(),
-            _ => empty(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,17 +51,6 @@ impl CommentBraceKind {
             Self::Brace3 => 5,
         }
     }
-    pub fn to_documents(
-        &self,
-        context: &PrettyCSTContext,
-    ) -> (Document, Document) {
-        let number_of_dashes = self.len() - 1;
-        let hypens = repeat(context.cache.hypen.into(), number_of_dashes);
-        (
-            Document::from(context.cache.lbrace) + hypens.clone(),
-            hypens.clone() + context.cache.rbrace.into(),
-        )
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -100,19 +59,6 @@ pub enum LineCommentStart {
     DoubleHypen,
     // //
     DoubleSlash,
-}
-
-impl PrettyCST for LineCommentStart {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        match self {
-            LineCommentStart::DoubleHypen => {
-                repeat(context.cache.hypen.into(), 2)
-            }
-            LineCommentStart::DoubleSlash => {
-                repeat(context.cache.slash.into(), 2)
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,41 +90,12 @@ impl CommentBlock {
     }
 }
 
-impl PrettyCST for CommentBlock {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        let (brace_start0, brace_end) = self.brace.to_documents(context);
-        let block_start = brace_start0 + self.kind.to_document(context);
-        let block_end = self.kind.to_document(context) + brace_end;
-        let content_raw = intersperse(&self.content, hard_break());
-
-        let content = if context.configuration.indent_comment_blocks {
-            indent(context, hard_break() + content_raw) + hard_break()
-        } else {
-            content_raw
-        };
-
-        concat(vec![block_start, content, block_end, hard_break()])
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct CommentLine {
     pub kind: CommentKind,
     pub start: LineCommentStart,
     pub content: CommentLineContent,
     pub span: Span,
-}
-
-impl PrettyCST for CommentLine {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        let line_start =
-            self.start.to_document(context) + self.kind.to_document(context);
-        concat(vec![
-            line_start,
-            Document::from(&self.content),
-            hard_break(),
-        ])
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -192,15 +109,6 @@ impl Comment {
         match self {
             Self::Line(CommentLine { span, .. }) => span,
             Self::Block(CommentBlock { span, .. }) => span,
-        }
-    }
-}
-
-impl PrettyCST for Comment {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        match self {
-            Comment::Line(l) => l.to_document(context),
-            Comment::Block(l) => l.to_document(context),
         }
     }
 }
@@ -270,28 +178,5 @@ impl CommentsInfo {
     /// Example: Multiple NonDocumentation lines became a block
     pub fn compact_comments(mut self) -> Self {
         self
-    }
-
-    pub fn to_document(
-        &self,
-        context: &PrettyCSTContext,
-        doc: Document,
-    ) -> Document {
-        let mut out = self.clone();
-        if context.configuration.move_documentantion_before_object {
-            out = out.move_after_to_before();
-        }
-        if context.configuration.compact_comments {
-            out = out.compact_comments();
-        }
-        let separe_by = usize::from(context.configuration.separe_comments_by);
-        concat(vec![
-            intersperse(
-                out.before.into_iter().map(|x| x.to_document(context)),
-                combinators::repeat(hard_break(), separe_by),
-            ),
-            doc,
-            out.after.map_or(empty(), |x| x.to_document(context)),
-        ])
     }
 }

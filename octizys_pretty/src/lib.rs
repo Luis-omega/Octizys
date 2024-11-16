@@ -1,3 +1,4 @@
 pub mod combinators;
 pub mod document;
-pub mod store;
+
+pub use octizys_text_store::store;

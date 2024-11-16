@@ -6,3 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+octizys_common={path="../octizys_common"}
+octizys_pretty={path="../octizys_pretty"}
+octizys_text_store={path="../octizys_text_store"}
+
+octizys_cst={path="../octizys_cst",optional=true}
+
+[features]
+default = ["cst"]
+cst = ["dep:octizys_cst"]
+
+
+

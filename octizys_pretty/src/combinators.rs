@@ -1,6 +1,7 @@
 use std::iter;
 
-use crate::{document::*, store::Store};
+use crate::document::*;
+use octizys_text_store::store::Store;
 
 pub fn empty() -> Document {
     Document::empty()

@@ -1,14 +1,10 @@
 use crate::base::{
-    Between, ImportedVariable, OperatorName, Token, TokenInfo, TrailingList,
+    Between, Braces, Comma, ImportedVariable, OperatorName, Parens, Token,
+    TokenInfo, TrailingList,
 };
 use crate::patterns::PatternMatch;
-use crate::pretty::{
-    indent, Braces, Colon, Comma, Parens, PrettyCST, PrettyCSTContext,
-};
 use crate::types::Type;
 use octizys_common::identifier::Identifier;
-use octizys_pretty::combinators::{concat, concat_iter, soft_break};
-use octizys_pretty::document::Document;
 
 #[derive(Debug)]
 pub struct LetBinding {
@@ -16,23 +12,6 @@ pub struct LetBinding {
     pub equal: TokenInfo,
     pub value: Expression,
     pub semicolon: TokenInfo,
-}
-
-impl PrettyCST for LetBinding {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        self.pattern.to_document(context)
-            + indent(
-                context,
-                concat(vec![
-                    soft_break(),
-                    self.equal.to_document(context, context.cache.asignation),
-                    soft_break(),
-                    self.value.to_document(context),
-                    self.semicolon
-                        .to_document(context, context.cache.semicolon),
-                ]),
-            )
-    }
 }
 
 #[derive(Debug)]
@@ -43,45 +22,11 @@ pub struct Let {
     pub expression: Box<Expression>,
 }
 
-impl PrettyCST for Let {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        concat(vec![
-            self.let_.to_document(context, context.cache._let),
-            indent(
-                context,
-                soft_break()
-                    + concat_iter(
-                        self.bindings.iter().map(|x| x.to_document(context)),
-                    ),
-            ),
-            soft_break(),
-            self.in_.to_document(context, context.cache._in),
-            indent(
-                context,
-                soft_break() + self.expression.to_document(context),
-            ),
-        ])
-    }
-}
-
 #[derive(Debug)]
 pub struct CaseItem {
     pub pattern: PatternMatch,
     pub arrow: TokenInfo,
     pub expression: Box<Expression>,
-}
-
-impl PrettyCST for CaseItem {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        concat(vec![
-            self.pattern.to_document(context),
-            self.arrow.to_document(context, context.cache.more_or_equal),
-            indent(
-                context,
-                soft_break() + self.expression.to_document(context),
-            ),
-        ])
-    }
 }
 
 #[derive(Debug)]
@@ -92,33 +37,11 @@ pub struct Case {
     pub cases: Between<TrailingList<CaseItem, Comma>, Braces>,
 }
 
-impl PrettyCST for Case {
-    fn to_document(&self, context: &PrettyCSTContext) -> Document {
-        concat(vec![
-            self.case.to_document(context, context.cache.case),
-            indent(
-                context,
-                soft_break() + self.expression.to_document(context),
-            ),
-            self.of.to_document(context, context.cache.of),
-            //TODO: finish this, we need a cases especific to_document instead of the default for
-            //between
-            self.cases.to_document(context),
-        ])
-    }
-}
-
 #[derive(Debug)]
 pub struct BinaryOperator {
     pub left: Box<Expression>,
     pub right: Box<Expression>,
     pub name: Token<OperatorName>,
-}
-
-impl PrettyCST for BinaryOperator {
-    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
-        todo!()
-    }
 }
 
 #[derive(Debug)]
@@ -127,22 +50,10 @@ pub struct LambdaExpression {
     pub expression: Box<Expression>,
 }
 
-impl PrettyCST for LambdaExpression {
-    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
-        todo!()
-    }
-}
-
 #[derive(Debug)]
 pub struct ApplicationExpression {
     pub start: Box<Expression>,
     pub remain: Vec<Expression>,
-}
-
-impl PrettyCST for ApplicationExpression {
-    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
-        todo!()
-    }
 }
 
 #[derive(Debug)]
@@ -157,22 +68,10 @@ pub enum ExpressionRecordItem {
     },
 }
 
-impl PrettyCST for ExpressionRecordItem {
-    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
-        todo!()
-    }
-}
-
 #[derive(Debug)]
 pub struct ExpressionSelector {
     pub expression: Box<Expression>,
     pub accessor: Token<Identifier>,
-}
-
-impl PrettyCST for ExpressionSelector {
-    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
-        todo!()
-    }
 }
 
 #[derive(Debug)]
@@ -225,11 +124,5 @@ impl Expression {
             },
             None => selector,
         }
-    }
-}
-
-impl PrettyCST for Expression {
-    fn to_document(&self, _context: &PrettyCSTContext) -> Document {
-        todo!()
     }
 }

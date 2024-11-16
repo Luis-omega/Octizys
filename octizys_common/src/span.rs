@@ -1,7 +1,5 @@
 use std::ops::Add;
 
-use octizys_pretty::{combinators, document::Document};
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct Position {
     ///The index position based on rust chars
@@ -28,15 +26,6 @@ impl From<(usize, usize)> for Span {
             start: value.0.into(),
             end: value.1.into(),
         }
-    }
-}
-
-impl From<&Span> for Document {
-    fn from(value: &Span) -> Document {
-        combinators::external_text(&format!(
-            "start: {}, end: {}",
-            value.start.source_index, value.end.source_index
-        ))
     }
 }
 

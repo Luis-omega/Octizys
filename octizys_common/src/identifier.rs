@@ -1,7 +1,4 @@
-use crate::error::{error_from_document, Error};
-use octizys_pretty::combinators::external_text;
-use octizys_pretty::document::{aproximate_string_width, Document};
-use octizys_pretty::store::{NonLineBreakStr, Store};
+use octizys_text_store::store::{aproximate_string_width, Store};
 
 use regex::Regex;
 use std::sync::LazyLock;
@@ -11,6 +8,12 @@ use string_interner::DefaultSymbol;
 pub struct Identifier {
     symbol: DefaultSymbol,
     len: usize,
+}
+
+impl Identifier {
+    pub fn as_tuple(&self) -> (DefaultSymbol, usize) {
+        (self.symbol, self.len)
+    }
 }
 
 impl From<Identifier> for DefaultSymbol {
@@ -62,36 +65,10 @@ impl<'a> Identifier {
     }
 }
 
-impl From<&Identifier> for Document {
-    fn from(value: &Identifier) -> Document {
-        Document::from_symbol_and_len(value.symbol, value.len)
-    }
-}
-
-impl From<&IdentifierError> for Document {
-    fn from(value: &IdentifierError) -> Document {
-        match value {
-            IdentifierError::ContainsInvalidCodePoint(s)=> {
-                    Document::external_non_line_break_str(NonLineBreakStr::new("The passed string is not a valid identifier, it contains invalid characters: "))
-                    + external_text(&s.replace("\n","\\n"))
-            }
-            IdentifierError::EmptyIdentifier => {
-                Document::external_non_line_break_str(NonLineBreakStr::new("The passed string is not a valid identifier, it is seen as a empty string"))
-            }
-        }
-    }
-}
-
-impl From<IdentifierError> for Error {
-    fn from(value: IdentifierError) -> Error {
-        error_from_document(&value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::identifier::Identifier;
-    use octizys_pretty::store::Store;
+    use octizys_text_store::store::Store;
     use paste::paste;
 
     macro_rules! make_negative_test {

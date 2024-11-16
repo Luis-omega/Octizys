@@ -367,7 +367,7 @@ dependencies = [
 name = "octizys_common"
 version = "0.1.0"
 dependencies = [
- "octizys_pretty",
+ "octizys_text_store",
  "paste",
  "regex",
  "string-interner",
@@ -391,6 +391,7 @@ dependencies = [
  "derivative",
  "octizys_common",
  "octizys_pretty",
+ "octizys_text_store",
 ]
 
 [[package]]
@@ -400,6 +401,12 @@ version = "0.1.0"
 [[package]]
 name = "octizys_formatter"
 version = "0.1.0"
+dependencies = [
+ "octizys_common",
+ "octizys_cst",
+ "octizys_pretty",
+ "octizys_text_store",
+]
 
 [[package]]
 name = "octizys_parser"
@@ -422,6 +429,7 @@ name = "octizys_pretty"
 version = "0.1.0"
 dependencies = [
  "konst",
+ "octizys_text_store",
  "string-interner",
 ]
 
@@ -431,6 +439,14 @@ version = "0.1.0"
 dependencies = [
  "octizys_common",
  "octizys_core",
+]
+
+[[package]]
+name = "octizys_text_store"
+version = "0.1.0"
+dependencies = [
+ "konst",
+ "string-interner",
 ]
 
 [[package]]
