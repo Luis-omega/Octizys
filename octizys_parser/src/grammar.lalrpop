@@ -1,7 +1,6 @@
 use std::str::FromStr;
 use octizys_cst::{
-  base::{Between,Token,TrailingList,TokenInfo,ImportedVariable,OperatorName,TrailingListItem},
-  pretty::{Comma,Colon,Braces,Parens},
+  base::{Between,Token,TrailingList,TokenInfo,ImportedVariable,OperatorName,TrailingListItem,Comma,Colon,Braces,Parens},
   comments::{CommentKind,LineCommentStart,Comment},
   imports::{Import},
   types::{Type,TypeRecordItem,TypeBase},

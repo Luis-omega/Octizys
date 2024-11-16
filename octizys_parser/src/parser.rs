@@ -1,4 +1,3 @@
-use octizys_common::error::Error;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -6,12 +5,6 @@ pub enum ParsedFile {}
 
 #[derive(Debug)]
 pub enum ParserError {}
-
-impl From<ParserError> for Error {
-    fn from(value: ParserError) -> Error {
-        todo!()
-    }
-}
 
 fn parse(str: String) -> Result<(), ParserError> {
     todo!()

@@ -1,19 +1,18 @@
 use octizys_pretty::store::NonLineBreakStr;
 
 macro_rules! make_keywords {
-    ($($only_name:ident),+ | $($name:ident : $name_string:literal),+) => {
-       $(pub const $only_name : NonLineBreakStr = NonLineBreakStr::new(stringify!($only_name));)+
+    ($($name:ident : $name_string:literal),+) => {
        $(pub const $name : NonLineBreakStr = NonLineBreakStr::new(stringify!($name_string));)+
     };
 }
 
 make_keywords!(
-    IMPORT
-    ,UNQUALIFIED
-    ,FORALL
-    ,CASE
-    ,OF
-    |AS : "as"
+    IMPORT :"import"
+    ,UNQUALIFIED : "unqualified"
+    ,FORALL : "forall"
+    ,CASE:"forall"
+    ,OF: "of"
+    ,AS : "as"
     ,LET: "let"
     ,IN: "in"
     ,UNDERSCORE:"_"

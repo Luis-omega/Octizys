@@ -1,7 +1,7 @@
 use lalrpop_util::ParseError;
 use octizys_common::identifier::Identifier;
 use octizys_common::module_logic_path::ModuleLogicPath;
-use octizys_common::Store;
+use octizys_text_store::store::Store;
 use regex::Regex;
 use std::str::CharIndices;
 use std::sync::LazyLock;

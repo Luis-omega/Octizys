@@ -1,10 +1,9 @@
-use octizys_common::Store;
-use octizys_cst::pretty::{
-    PrettyCST, PrettyCSTCache, PrettyCSTConfig, PrettyCSTContext,
-};
+use octizys_formatter::cst::PrettyCSTConfiguration;
+use octizys_formatter::to_document::ToDocument;
 use octizys_parser::grammar::import_declarationParser;
 use octizys_parser::lexer::Lexer;
 use octizys_pretty::combinators::group;
+use octizys_text_store::store::Store;
 use std::fmt::Debug;
 use std::io::{self, Read};
 
@@ -32,12 +31,10 @@ use std::io::{self, Read};
 
 fn main() {
     let mut store = Store::default();
-    let configuration = PrettyCSTConfig::default();
-    let cache = PrettyCSTCache::new(&mut store);
+    let configuration = PrettyCSTConfiguration::default();
     let mut stdin = io::stdin();
     let input = &mut String::new();
     let p = import_declarationParser::new();
-    let context = PrettyCSTContext::new(configuration, cache);
     loop {
         input.clear();
         stdin.read_line(input);
@@ -50,7 +47,7 @@ fn main() {
         match parsed {
             Ok(item) => {
                 println!("{:#?}", item);
-                let as_doc = group(item.to_document(&context));
+                let as_doc = group(item.to_document(&configuration));
                 println!("{:?}", as_doc);
                 println!("{}", as_doc.render_to_string(2, &store))
             }
