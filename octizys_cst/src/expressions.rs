@@ -77,7 +77,7 @@ pub struct ExpressionSelector {
 #[derive(Debug)]
 pub enum Expression {
     String(Token<String>),
-    Character(Token<char>),
+    Character(Token<String>),
     //TODO: make the lexer return the right type instead of string?
     //The main problem is with floats and uints, they must be in
     //the range or we should issue a warning or error about

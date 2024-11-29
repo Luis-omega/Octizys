@@ -1,14 +1,26 @@
 use octizys_common::span::{Position, Span};
 use octizys_text_store::store::{NonLineBreakString, Store};
 
+/// Represents a single line of a comment without line breaks.
+/// We internalize all the source text in a [`Store`] and handle comments
+/// specially.
+/// This structure represents a pointer to the location of the comment
+/// together with the length of the comment (as understated by the
+/// notion of length on the store).
+/// Storing the length here, allow us to avoid access to the store.
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct CommentLineContent {
-    pub index: usize,
-    pub len: usize,
+    // TODO: a newtype around the index type.:
+    index: usize,
+    len: usize,
 }
 
 impl CommentLineContent {
-    //Register a single line without line breaks
+    /// Stores as single string as a comment string in the store.
+    /// The string is supposed to be a text without line breaks, if it
+    /// contains any line break the function fails.
+    /// To create a [`CommentLineContent`] from an arbitrary string
+    /// without failing use [`CommentLineContent::decomposoe_register`] instead.
     pub fn make_register(value: &str, store: &mut Store) -> Option<Self> {
         store.comments.add_str(value).map(|x| CommentLineContent {
             index: x,
@@ -16,6 +28,8 @@ impl CommentLineContent {
         })
     }
 
+    /// Internalizes an arbitrary string by breaking it at line breaks,
+    /// and returning a vector with reference to every line.
     pub fn decompose_register(value: &str, store: &mut Store) -> Vec<Self> {
         store
             .comments
@@ -23,14 +37,61 @@ impl CommentLineContent {
             .map(|(index, len)| CommentLineContent { index, len })
             .collect()
     }
+
+    /// Returns the length of the stored comment as is understood by the
+    /// pretty printing library.
+    #[inline]
+    pub fn get_len(&self) -> usize {
+        self.len
+    }
+
+    /// Returns a reference to a place in the Store.
+    #[inline]
+    pub fn get_index(&self) -> usize {
+        self.len
+    }
 }
 
+/// Distinguish between regular comments and documentation ones.
+/// A documentation includes a space and a pipe ` |` after the
+/// start of the comment.
+/// In the future we may allow for any amount of spaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommentKind {
     Documentation,
     NonDocumentation,
 }
 
+/// The delimiters for a [`CommentBlock`].
+/// Currently they are four kinds of block delimiters.
+/// All of the are a `{` followed by between 1 and 4
+/// `-`, then the comment of the block and
+/// finish with the same amount of `-` followed
+/// by a `}`.
+///
+/// <div class="warning">
+///
+/// This means that a comment like:
+///
+/// ```txt
+/// {-- some comment {--- inner comment ---} remain --}
+/// ```
+///
+/// Would be processed as
+///
+/// ```txt
+/// {-- some comment {--- inner comment ---}
+/// ```
+///
+/// Causing a syntax error at `--}`.
+/// To nest comments is recommended to begin using a singe hypen
+/// and continue incrementing them as needed.
+///
+/// </div>
+///
+/// We acknowledge the need for nested block comments but at
+/// the same time we believe that a finite amount of them
+/// is enough for most uses if not all of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommentBraceKind {
     // "{- asdf -}"
@@ -53,6 +114,12 @@ impl CommentBraceKind {
     }
 }
 
+/// Represents the begin of a [`CommentLine`], they
+/// can be any of :
+///
+/// - `//`
+/// - `--`
+///
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LineCommentStart {
     // --
@@ -60,6 +127,36 @@ pub enum LineCommentStart {
     // //
     DoubleSlash,
 }
+
+/// A representation of a multi-line of comment in the source.
+/// Every comment has the following components:
+/// - A [`CommentLine::kind`] to distinguish between documentation and
+///   regular comments.
+/// - A [`CommentLine::start`], we support multiple brackets for
+///   block comments, see [`CommentBraceKind`].
+/// - A [`CommentLine::content`] it has all the content of multiple lines
+///   of the comment except from the line breaks and the comment brackets.
+/// - A [`CommentBlock::span`], the region on the source in which the
+///   comment exists.
+///
+/// #Examples
+///
+/// ```txt
+/// {- some
+///    regular
+///    block comment
+/// -}
+///
+/// {- | documentation
+///   block
+///   comment -}
+///
+/// {--- another
+///   regular
+///   block
+///   comment
+///   ---}
+/// ```
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentBlock {
@@ -90,6 +187,23 @@ impl CommentBlock {
     }
 }
 
+/// A representation of a single line of comments in the source.
+/// Every line comment has the following components:
+/// - A [`CommentLine::kind`] to distinguish between documentation and
+///   regular comments.
+/// - A [`CommentLine::start`], we support two ways to began a comment
+///   in a line, by using either `//` or `--`.
+/// - A [`CommentLine::content`] it has all the content of a line
+///   comment after the start delimiter except from the line break.
+/// - A [`CommentLine::span`], the region on the source in which the comment exists.
+///
+/// #Examples
+/// ```txt
+/// -- some regular line comment.
+/// // another line comment comment.
+/// // | a documentation line comment.
+/// -- | another  documentation line comment.
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct CommentLine {
     pub kind: CommentKind,
@@ -98,6 +212,22 @@ pub struct CommentLine {
     pub span: Span,
 }
 
+/// We can categorize the  comments in two types:
+/// - [`Comment::Line`] comments that began in a line and ends
+///   at the end of line.
+/// - [`Comment::Block`] multi-line commentaries.
+///
+/// <div class="warning">Documentation comments can be in any format, but the
+/// official documentation generator is going to use common markdown
+/// or some other dialect of it.</div>
+///
+/// We may represent in the future additional kind of comments like:
+///
+/// - `Todo:`
+/// - `Warning:`
+/// - `Note:`
+///
+/// At the current time we don't know if this is going to be useful.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Comment {
     Line(CommentLine),
@@ -125,31 +255,59 @@ impl From<CommentBlock> for Comment {
     }
 }
 
+/// Every token in a file can have any kind of comment above it and
+/// can have a single line comment in the same line after the token.
+///
+/// #Example
+///
+/// ```txt
+/// -- some line comment
+/// // other comment
+/// -- | Documentation line comment
+/// token  // More comments
+/// ```
+/// This example has 3 comments above the token
+/// and a comment after it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentsInfo {
     pub before: Vec<Comment>,
     pub after: Option<Comment>,
 }
 
-impl CommentsInfo {
-    pub fn empty() -> Self {
+impl Default for CommentsInfo {
+    fn default() -> Self {
         CommentsInfo {
             before: vec![],
             after: None,
         }
     }
+}
 
+impl CommentsInfo {
+    /// A commentaries information that doesn't have any information inside.:
+    /// This is useful if we need to attach information to a node before
+    /// we have the information available.
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Add the elements of a iterator of comments to the comments
+    /// in the before field.
+    /// The comments are added after all the original comments in
+    /// the before field.
     pub fn extend<T>(&mut self, remmain: T) -> ()
     where
-        T: Iterator<Item = Comment>,
+        T: IntoIterator<Item = Comment>,
     {
         self.before.extend(remmain)
     }
 
+    /// Add a single comment to the `before` field.
     pub fn push(&mut self, new: Comment) -> () {
         self.before.push(new)
     }
 
+    ///
     pub fn move_after_to_before(mut self) -> Self {
         match self.after {
             Some(c) => {
@@ -160,9 +318,34 @@ impl CommentsInfo {
             None => return self,
         }
     }
-    //TODO: this is wrong, check the docummentation on grammar about
-    //the expected behaviour
-    pub fn absorb_info(&mut self, other: CommentsInfo) -> () {
+
+    /// Takes another comment info (maybe from another token)
+    /// and combines it with the current one.
+    /// Not every comment before or after a token can made sense,
+    /// and we may choose to move some comments from it's original place
+    /// to another one were it made more sense.
+    ///
+    /// # Examples
+    ///
+    /// In the following block:
+    ///
+    /// ```txt
+    ///  -- | Some comment  about `a`
+    /// let a =
+    ///   (
+    ///     -- | The first before comment of `1`
+    ///     1, -- | The before comment of `,`, going to be moved to the before comments of `1`
+    ///     2,
+    ///     ,3, 4,
+    ///     )
+    /// ```
+    ///
+    /// The third comment is attached to the comma as an after comment.
+    /// The comment can be referring to the second item of the tuple
+    /// or the third. If we choose to move it to the second item
+    /// the end structure is the one described in the comments.
+    //TODO: this is wrong, look at documentation.
+    pub fn consume_info(&mut self, other: CommentsInfo) -> () {
         let CommentsInfo { before, after } = other;
         self.extend(before.into_iter());
         match after {
@@ -171,11 +354,40 @@ impl CommentsInfo {
         }
     }
 
-    //FIXME:
     /// Take a CommentsInfo and transform all the contiguous occurrences
     /// of comments of the same type in a single block
-    /// Example: Multiple documentation lines became a  documentation block
-    /// Example: Multiple NonDocumentation lines became a block
+    ///
+    /// #Example
+    ///
+    /// This
+    ///
+    /// ```txt
+    /// -- | 1
+    /// -- | 2
+    /// -- | 3
+    /// // | 4
+    /// // | 6
+    /// -- 8
+    /// {- 9 -}
+    /// // | 10
+    /// // | 11
+    /// ```
+    ///
+    /// Becomes
+    ///
+    /// ```txt
+    /// {- | 1
+    ///      2
+    ///      3
+    ///      4
+    ///      6 -}
+    /// {- 8
+    ///    9 -}
+    /// {- | 10
+    ///      11
+    /// -}
+    /// ```
+    //FIXME:
     pub fn compact_comments(mut self) -> Self {
         self
     }

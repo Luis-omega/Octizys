@@ -28,7 +28,7 @@ pub enum PatternMatch {
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
     String(Token<String>),
-    Char(Token<char>),
+    Char(Token<String>),
     AnonHole(TokenInfo),
     Tuple(Between<TrailingList<Box<PatternMatch>, Comma>, Parens>),
     Record(Between<TrailingList<PatternMatchRecordItem, Comma>, Braces>),

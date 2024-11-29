@@ -8,13 +8,25 @@ use octizys_common::span::{Position, Span};
 use octizys_text_store::store::NonLineBreakStr;
 
 mod private {
+    /// We want it to create phantom types internally
     pub trait Sealed {}
 }
 
+/// Used to statically determine the kind of separator to use
+/// and tell rust how to represent it as string.
+/// Outside of this crate you can't create  new Separators
+/// We have defined :
+/// - [`Pipe`]
+/// - [`Comma`]
+/// - [`RightArrow`]
+/// - [`Colon`]
 pub trait Separator: private::Sealed {
     fn to_str() -> NonLineBreakStr;
 }
 
+/// Macro used to generate the diverse separators,
+/// all of them must implement the same things and the
+/// only difference is the string they correspond to.
 macro_rules! make_separator_type {
     ($name:ident, $value:expr ) => {
         #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -33,10 +45,20 @@ make_separator_type!(Comma, ",");
 make_separator_type!(RightArrow, "->");
 make_separator_type!(Colon, ":");
 
+/// Used to statically determine the kind of delimiters to use
+/// and tell rust how to represent it as string.
+/// Outside of this crate you can't create  new Separators
+/// We have defined:
+/// - [`Parens`]
+/// - [`Brackets`]
+/// - [`Braces`]
 pub trait Delimiters: private::Sealed {
     fn to_strs() -> (NonLineBreakStr, NonLineBreakStr);
 }
 
+/// Macro used to generate the diverse delimiters,
+/// all of them must implement the same things and the
+/// only difference is the string they correspond to.
 macro_rules! make_delimiter_type {
     ($name:ident, $left:expr,$right:expr ) => {
         #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -54,6 +76,11 @@ make_delimiter_type!(Parens, "(", ")");
 make_delimiter_type!(Brackets, "[", "]");
 make_delimiter_type!(Braces, "{", "}");
 
+/// Used to store the commentaries that belong to a token
+/// and the region of the token in the source file.
+/// See [`CommentsInfo`] for details about how the comments information
+/// is stored.
+/// See [`Span`] for details on how it is calculated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenInfo {
     pub comments: CommentsInfo,
@@ -63,25 +90,27 @@ pub struct TokenInfo {
 impl TokenInfo {
     pub fn make(
         comments_info: CommentsInfo,
-        start: usize,
-        end: usize,
+        start: Position,
+        end: Position,
     ) -> TokenInfo {
         TokenInfo {
             comments: comments_info,
-            span: Span {
-                start: Position {
-                    source_index: start,
-                },
-                end: Position { source_index: end },
-            },
+            span: Span { start, end },
         }
     }
 
+    /// Merges the information of other comment into the
+    /// information of this comment.
+    /// For details look at [`CommentsInfo::consume_info`]
+    /// and [`Span::add`].
     pub fn consume_info(&mut self, _other: Self) -> () {
         todo!()
     }
 }
 
+/// A new type around a token Info.
+/// The principal use of this is for the grammar to type check as
+/// separators and brackets.
 pub struct TokenInfoWithPhantom<P> {
     info: TokenInfo,
     _phantom: PhantomData<P>,
@@ -102,6 +131,11 @@ impl<P> From<TokenInfo> for TokenInfoWithPhantom<P> {
     }
 }
 
+/// A Token has two pieces, a value (the content) and information
+/// like the comments around it and the source position.
+/// We never build a [`Token`] for punctuation elements or keywords,
+/// instead we build a [`TokenInfoWithPhantom`] with the appropriate
+/// phantom type.
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq)]
 pub struct Token<T> {
@@ -111,6 +145,8 @@ pub struct Token<T> {
 }
 
 impl<T> Token<T> {
+    /// Creates a new token with the same info as the one provided
+    /// and transform the content using the given function.
     pub fn map<Out>(self, f: fn(T) -> Out) -> Token<Out> {
         Token {
             value: f(self.value),
@@ -124,7 +160,9 @@ impl<T> Token<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Any set of symbols that aren't identifiers, keywords or brackets, allowed
+/// inside a expression (and maybe in the future to types).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum OperatorName {
     Interrogation,
     Exclamation,
@@ -168,12 +206,20 @@ pub enum OperatorName {
     LambdaStart,
 }
 
+/// Representation of a variable qualified by some path.
+///
+/// # Example
+///
+/// ```txt
+/// core::main::path
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImportedVariable {
     pub path: ModuleLogicPath,
     pub name: Identifier,
 }
 
+/// Some structure surrounded by delimiters like `()` and `{}`
 #[derive(Debug, Derivative, Clone)]
 #[derivative(PartialEq, Eq)]
 pub struct Between<T, Enclosure>
@@ -188,7 +234,15 @@ where
     pub _enclosure_phantom: PhantomData<Enclosure>,
 }
 
-/// The separator came before the item in the stream
+/// A item on a list of items separated by some separator like `,` or `|`.
+/// This item contains the separation comma between itself and the
+/// previous item.
+///
+/// Example:
+///
+/// ```txt
+/// ,b
+/// ```
 #[derive(Debug, Derivative, Clone)]
 #[derivative(PartialEq, Eq)]
 pub struct TrailingListItem<T, SeparatorPhantom>
@@ -201,6 +255,16 @@ where
     pub _phantom_separator: PhantomData<SeparatorPhantom>,
 }
 
+/// A list of items separated by some separator like `,` and `|`
+/// that allow optional final separator without item.
+///
+/// Example
+///
+/// ```txt
+/// a , b, c, d,
+/// ```
+///
+/// The last `,` is optional.
 #[derive(Debug, Derivative, Clone)]
 #[derivative(PartialEq, Eq)]
 pub struct TrailingList<T, SeparatorPhantom>
