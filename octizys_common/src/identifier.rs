@@ -1,10 +1,10 @@
 use octizys_text_store::store::{aproximate_string_width, Store};
 
 use regex::Regex;
-use std::sync::LazyLock;
+use std::{fmt::Display, sync::LazyLock};
 use string_interner::DefaultSymbol;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
 pub struct Identifier {
     symbol: DefaultSymbol,
     len: usize,
@@ -16,16 +16,35 @@ impl Identifier {
     }
 }
 
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Identifier")
+    }
+}
+
 impl From<Identifier> for DefaultSymbol {
     fn from(value: Identifier) -> Self {
         value.symbol
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IdentifierError {
     ContainsInvalidCodePoint(String),
     EmptyIdentifier,
+}
+
+impl Display for IdentifierError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IdentifierError::ContainsInvalidCodePoint(s) => {
+                write!(f, "invalid char in Identifier: {0}", s)
+            }
+            IdentifierError::EmptyIdentifier => {
+                write!(f, "attempt to build empty identifier")
+            }
+        }
+    }
 }
 
 /// Keep this in sync with the lexer definition for Identifier

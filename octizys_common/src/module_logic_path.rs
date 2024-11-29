@@ -1,13 +1,28 @@
+use std::fmt::Display;
+
 use crate::identifier::{Identifier, IdentifierError};
 use octizys_text_store::store::Store;
 
 pub const MODULE_LOGIC_PATH_SEPARATOR: &str = "::";
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ModuleLogicPathError {
     NotIdentifier,
     //To be used by the TryFrom, not by the make smart constructor
     EmptyString,
+}
+
+impl Display for ModuleLogicPathError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ModuleLogicPathError::NotIdentifier => {
+                write!(f, "invalid char in Identifier while building path")
+            }
+            ModuleLogicPathError::EmptyString => {
+                write!(f, "attempt to build empty identifier")
+            }
+        }
+    }
 }
 
 impl From<Identifier> for ModuleLogicPath {
@@ -16,7 +31,7 @@ impl From<Identifier> for ModuleLogicPath {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModuleLogicPath(Vec<Identifier>);
 
 impl ModuleLogicPath {
@@ -65,5 +80,11 @@ impl From<ModuleLogicPath> for Vec<Identifier> {
 impl<'a> From<&'a ModuleLogicPath> for &'a Vec<Identifier> {
     fn from(value: &'a ModuleLogicPath) -> Self {
         &value.0
+    }
+}
+
+impl Display for ModuleLogicPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Logic::Path")
     }
 }
