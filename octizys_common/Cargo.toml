@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 octizys_text_store={path="../octizys_text_store"}
+octizys_pretty={path="../octizys_pretty"}
 regex = "1.10.6"
 string-interner = "0.17.0"
 

@@ -4,6 +4,8 @@ use regex::Regex;
 use std::{fmt::Display, sync::LazyLock};
 use string_interner::DefaultSymbol;
 
+// TODO: Document it!
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
 pub struct Identifier {
     symbol: DefaultSymbol,

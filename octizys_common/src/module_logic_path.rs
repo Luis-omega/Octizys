@@ -31,10 +31,17 @@ impl From<Identifier> for ModuleLogicPath {
     }
 }
 
+/// The abstract representation of a importation path inside the language,
+/// usually called `logic path`.
+// TODO: maybe abbreviate  the name to just `LogicPath` ?
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModuleLogicPath(Vec<Identifier>);
 
 impl ModuleLogicPath {
+    // TODO: Change the definition of this to allow spaces between items
+    // The problem with that is that the grammar has ambiguities if we do that
+    // as we may need to allow comments between items to be consistent
+    // with allowing comments everywhere.
     pub fn make(
         s: &str,
         store: &mut Store,
