@@ -1,296 +1,40 @@
 use lalrpop_util::ParseError;
-use logos::{Lexer, Logos, SpannedIter};
+use octizys_common::identifier::Identifier;
+use octizys_common::module_logic_path::ModuleLogicPath;
+use octizys_text_store::store::Store;
+use regex::Regex;
+use std::str::CharIndices;
+use std::sync::LazyLock;
+use std::{collections::VecDeque, rc::Rc};
+
 use octizys_common::span::{Position, Span};
-use octizys_common::{
-    identifier::Identifier, module_logic_path::ModuleLogicPath,
-};
 use octizys_cst::base;
+use octizys_cst::base::TokenInfo;
 use octizys_cst::comments::{
-    CommentBlock, CommentBraceKind, CommentKind, CommentLine,
+    Comment, CommentBlock, CommentBraceKind, CommentKind, CommentLine,
     CommentLineContent, CommentsInfo, LineCommentStart,
 };
-use octizys_cst::{base::TokenInfo, comments::Comment};
-use octizys_text_store::store::Store;
-
-#[derive(Debug)]
-pub struct LogosLexerContext<'src> {
-    store: &'src mut Store,
-}
 
 use paste::paste;
 
-impl<'input> LogosLexerContext<'input> {
-    pub fn new(store: &'input mut Store) -> Self {
-        LogosLexerContext { store }
-    }
-}
-#[derive(Logos, Debug, PartialEq)]
-#[logos(skip r"[ \t\r]+")]
-#[logos(extras = &'s mut Store)]
-pub enum LogosToken {
-    #[token("?")]
-    Interrogation,
-    #[token("!")]
-    Exclamation,
-    #[token("#")]
-    Hash,
-    #[token(",")]
-    Comma,
-    #[token(":")]
-    Colon,
-    #[token(";")]
-    StatementEnd,
-    #[token(".")]
-    Dot,
-    #[token("::")]
-    ModuleSeparator,
-    #[token("-")]
-    Minus,
-    #[token("|>")]
-    CompositionRight,
-    #[token("<|")]
-    CompositionLeft,
-    #[token("+")]
-    Plus,
-    #[token("^")]
-    Power,
-    #[token("*")]
-    Star,
-    #[token("/")]
-    Div,
-    #[token("%")]
-    Module,
-    #[token("<<")]
-    ShiftLeft,
-    #[token(">>")]
-    ShiftRigth,
-    #[token("<$>")]
-    Map,
-    #[token("$>")]
-    MapConstRigth,
-    #[token("<$")]
-    MapConstLeft,
-    #[token("<*>")]
-    Appliative,
-    #[token("*>")]
-    ApplicativeRight,
-    #[token("<*")]
-    ApplicativeLeft,
-    #[token("==")]
-    Equality,
-    #[token("!=")]
-    NotEqual,
-    #[token("<=")]
-    LessOrEqual,
-    #[token(">=")]
-    MoreOrEqual,
-    #[token("<")]
-    LessThan,
-    #[token(">")]
-    MoreThan,
-    #[token("&&")]
-    And,
-    #[token("||")]
-    Or,
-    #[token("&")]
-    ReverseAppliation,
-    #[token("$")]
-    DollarApplication,
-    #[token("=")]
-    Asignation,
-    #[token("@")]
-    At,
-    #[token("|")]
-    Pipe,
-    #[token("(")]
-    LParen,
-    #[token(")")]
-    RParen,
-    #[token("[")]
-    LBracket,
-    #[token("]")]
-    RBracket,
-    #[token("{")]
-    LBrace,
-    #[token("}")]
-    RBrace,
-    #[token("->")]
-    RightArrow,
-    #[token("<-")]
-    LeftArrow,
-    #[token("\\")]
-    LambdaStart,
-    #[token("let")]
-    Let,
-    #[token("in")]
-    In,
-    #[token("case")]
-    Case,
-    #[token("of")]
-    Of,
-    #[token("import")]
-    Import,
-    #[token("data")]
-    Data,
-    #[token("newtype")]
-    Newtype,
-    #[token("class")]
-    Class,
-    #[token("instance")]
-    Instance,
-    #[token("public")]
-    Public,
-    #[token("alias")]
-    Alias,
-    #[token("as")]
-    As,
-    #[token("unqualified")]
-    Unqualified,
-    #[token("forall")]
-    Forall,
-    #[token("type")]
-    Type,
-    #[token("U8")]
-    U8,
-    #[token("U16")]
-    U16,
-    #[token("U32")]
-    U32,
-    #[token("U64")]
-    U64,
-    #[token("I8")]
-    I8,
-    #[token("I16")]
-    I16,
-    #[token("I32")]
-    I32,
-    #[token("I64")]
-    I64,
-    #[token("F32")]
-    F32,
-    #[token("F64")]
-    F64,
-    #[regex("Char")]
-    CharType,
-    #[regex("String")]
-    StringType,
-    #[regex("--[^\n]*\n", |lex| make_line_comment(lex,CommentKind::NonDocumentation,LineCommentStart::DoubleHypen),priority=5)]
-    #[regex(r"-- \|[^\n]*\n", |lex| make_line_comment(lex,CommentKind::Documentation,LineCommentStart::DoubleHypen), priority = 10)]
-    #[regex("//[^\n]*\n", |lex| make_line_comment(lex,CommentKind::NonDocumentation,LineCommentStart::DoubleSlash),priority=5)]
-    #[regex(r"// \|[^\n]*\n", |lex| make_line_comment(lex,CommentKind::Documentation,LineCommentStart::DoubleSlash),priority=10)]
-    LineComment(CommentLine),
-    #[regex(r"\{-([^-]|-[^-])*-\}", |lex| make_block_comment(lex,CommentKind::Documentation,CommentBraceKind::Brace0),priority=10)]
-    #[regex(r"\{--([^-]|-[^-])*--\}", |lex| make_block_comment(lex,CommentKind::Documentation,CommentBraceKind::Brace1),priority=10)]
-    #[regex(r"\{---([^-]|-[^-])*---\}", |lex| make_block_comment(lex,CommentKind::Documentation,CommentBraceKind::Brace2),priority=10)]
-    #[regex(r"\{----([^-]|-[^-])*----\}", |lex| make_block_comment(lex,CommentKind::Documentation,CommentBraceKind::Brace3),priority=10)]
-    BlockComment(CommentBlock),
-    //TODO: support for multiline_string
-    /*
-    #[regex(r"\"([^"]|(\\\\)\\\")\"")]
-    StringLiteral(String),
-    //TODO:FIXME: real char support
-    #[regex(r#"'[^\n']|(\\')'"#)]
-    CharacterLiteral(String),
-    */
-    #[regex(r#"0[0_]*|[1-9][0-9_]+"#, |x| String::from(x.slice()))]
-    UintLiteral(String),
-    //#[regex(r"{UINT_STRING}\\.UINT_STRING((e|E)UINT_STRING)?")]
-    #[regex(r"(0[0_]*|[1-9][0-9_]+)\.(0[0_]*|[1-9][0-9_]+)((e|E)(0[0_]*|[1-9][0-9_]+))"
-        , |x| String::from(x.slice()))]
-    UFloatLiteral(String),
-    #[regex(r"_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*"
-        , make_identifier)]
-    Identifier(Identifier),
-    #[regex(r"`_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*`"
-        , make_identifier)]
-    InfixIdentifier(Identifier),
-    #[regex(r"\._*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*"
-        , make_identifier)]
-    Selector(Identifier),
-    #[regex("_")]
-    AnonHole,
-    //TODO:FIXME: Handle the UIntError
-    //Probably we don't want to do this, instead use a String and emit a warning
-    #[regex("_(0[0_]*|[1-9][0-9_]+)", |lexer| lexer.slice().parse::<u64>().ok())]
-    NamedHole(u64),
-    #[regex(r"(_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*::)+_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*"
-        , make_module_logic_path)]
-    ModuleLogicPath(ModuleLogicPath),
+#[derive(Debug, PartialEq, Eq)]
+pub enum LexerErrorType {
+    UnexpectedCharacter(String),
+    UnbalancedComment,
+    CantTranslateToToken(Token),
+    InvaliedSequenceOfCharacters(String),
+    CantConvertIdentifierTextToIdentifier(String, TokenInfo),
+    CantConvertToModuleLogicPath(String, TokenInfo),
+    CantParseOperator(String, TokenInfo),
 }
 
-const STRING_REGEX: &'static str = r#"\"([^"\n]|((\\\\)*\\"))*""#;
-
-pub fn logos_span_to_span(lexer: &Lexer<LogosToken>) -> Span {
-    let span = lexer.span();
-    Span {
-        start: Position {
-            source_index: span.start,
-        },
-        end: Position {
-            source_index: span.end,
-        },
-    }
+#[derive(Debug, PartialEq, Eq)]
+pub struct LexerError {
+    pub error_type: LexerErrorType,
+    pub position: Position,
 }
 
-pub fn range_to_span(r: std::ops::Range<usize>) -> Span {
-    Span {
-        start: Position {
-            source_index: r.start,
-        },
-        end: Position {
-            source_index: r.end,
-        },
-    }
-}
-
-pub fn make_line_comment(
-    lexer: &mut Lexer<LogosToken>,
-    kind: CommentKind,
-    start: LineCommentStart,
-) -> Option<CommentLine> {
-    let content =
-        CommentLineContent::make_register(lexer.slice(), &mut lexer.extras)?;
-    Some(CommentLine {
-        kind,
-        start,
-        content,
-        span: logos_span_to_span(&lexer),
-    })
-}
-
-pub fn make_block_comment(
-    lexer: &mut Lexer<LogosToken>,
-    kind: CommentKind,
-    brace: CommentBraceKind,
-) -> CommentBlock {
-    let span = lexer.span();
-
-    CommentBlock::make(
-        kind,
-        brace,
-        lexer.slice(),
-        Position {
-            source_index: span.start,
-        },
-        Position {
-            source_index: span.end,
-        },
-        &mut lexer.extras,
-    )
-}
-
-pub fn make_identifier(lexer: &mut Lexer<LogosToken>) -> Option<Identifier> {
-    //TODO: HAndle the error
-    Identifier::make(lexer.slice(), &mut lexer.extras).ok()
-}
-
-pub fn make_module_logic_path(
-    lexer: &mut Lexer<LogosToken>,
-) -> Option<ModuleLogicPath> {
-    ModuleLogicPath::make(lexer.slice(), &mut lexer.extras).ok()
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     Interrogation(TokenInfo),
     Exclamation(TokenInfo),
@@ -343,8 +87,10 @@ pub enum Token {
     Case(TokenInfo),
     Of(TokenInfo),
     Import(TokenInfo),
+    Export(TokenInfo),
     Data(TokenInfo),
     Newtype(TokenInfo),
+    NewInstance(TokenInfo),
     Class(TokenInfo),
     Instance(TokenInfo),
     Public(TokenInfo),
@@ -365,18 +111,17 @@ pub enum Token {
     F64(TokenInfo),
     CharType(TokenInfo),
     StringType(TokenInfo),
-    Comment(TokenInfo, Comment),
+    LastComments(Vec<Comment>, TokenInfo),
     StringLiteral(TokenInfo, String),
-    CharacterLiteral(TokenInfo, String),
+    CharacterLiteral(TokenInfo, char),
     UintLiteral(TokenInfo, String),
     UFloatLiteral(TokenInfo, String),
     Identifier(TokenInfo, Identifier),
-    InfixIdentifier(TokenInfo, Identifier),
+    InfixIdentifier(TokenInfo, String),
     Selector(TokenInfo, Identifier),
-    AnonHole(TokenInfo),
+    AnonHole(TokenInfo, String),
     NamedHole(TokenInfo, u64),
     ModuleLogicPath(TokenInfo, ModuleLogicPath),
-    LastComments(TokenInfo, Vec<Comment>),
 }
 
 impl From<Token> for TokenInfo {
@@ -433,8 +178,10 @@ impl From<Token> for TokenInfo {
             Token::Case(info) => (info),
             Token::Of(info) => (info),
             Token::Import(info) => (info),
+            Token::Export(info) => (info),
             Token::Data(info) => (info),
             Token::Newtype(info) => (info),
+            Token::NewInstance(info) => (info),
             Token::Class(info) => (info),
             Token::Instance(info) => (info),
             Token::Public(info) => (info),
@@ -455,8 +202,7 @@ impl From<Token> for TokenInfo {
             Token::F64(info) => (info),
             Token::CharType(info) => (info),
             Token::StringType(info) => (info),
-            Token::Comment(info, _) => info,
-            //{
+            Token::LastComments(_, info) => info, //{
             //let span = match comments.get(0) {
             //    Some(s) => s.clone().get_span(),
             //    None => (usize::MAX, usize::MAX).into(),
@@ -473,29 +219,11 @@ impl From<Token> for TokenInfo {
             Token::Identifier(info, _) => info,
             Token::InfixIdentifier(info, _) => info,
             Token::Selector(info, _) => info,
-            Token::AnonHole(info) => info,
+            Token::AnonHole(info, _) => info,
             Token::NamedHole(info, _) => info,
             Token::ModuleLogicPath(info, _) => info,
-            Token::LastComments(info, _) => info,
         }
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum LexerErrorType {
-    UnexpectedCharacter(String),
-    UnbalancedComment,
-    CantTranslateToToken(Token),
-    InvaliedSequenceOfCharacters(String),
-    CantConvertIdentifierTextToIdentifier(String, TokenInfo),
-    CantConvertToModuleLogicPath(String, TokenInfo),
-    CantParseOperator(String, TokenInfo),
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct LexerError {
-    pub error_type: LexerErrorType,
-    pub position: Position,
 }
 
 macro_rules! make_lexer_token_to_token {
@@ -511,234 +239,908 @@ macro_rules! make_lexer_token_to_token {
 
     };
 }
+
 make_lexer_token_to_token!(module, ModuleLogicPath, ModuleLogicPath);
 make_lexer_token_to_token!(identifier, Identifier, Identifier);
 make_lexer_token_to_token!(string, StringLiteral, String);
-make_lexer_token_to_token!(char, CharacterLiteral, String);
+make_lexer_token_to_token!(char, CharacterLiteral, char);
 make_lexer_token_to_token!(uint, UintLiteral, String);
 make_lexer_token_to_token!(ufloat, UFloatLiteral, String);
 make_lexer_token_to_token!(selector, Selector, Identifier);
 make_lexer_token_to_token!(named_hole, NamedHole, u64);
 
-pub fn aux_logos_token_to_token(logos: LogosToken, info: TokenInfo) -> Token {
-    match logos {
-        LogosToken::Interrogation => Token::Interrogation(info),
-        LogosToken::Exclamation => Token::Exclamation(info),
-        LogosToken::Hash => Token::Hash(info),
-        LogosToken::Comma => Token::Comma(info),
-        LogosToken::Colon => Token::Colon(info),
-        LogosToken::StatementEnd => Token::StatementEnd(info),
-        LogosToken::Dot => Token::Dot(info),
-        LogosToken::ModuleSeparator => Token::ModuleSeparator(info),
-        LogosToken::Minus => Token::Minus(info),
-        LogosToken::CompositionRight => Token::CompositionRight(info),
-        LogosToken::CompositionLeft => Token::CompositionLeft(info),
-        LogosToken::Plus => Token::Plus(info),
-        LogosToken::Power => Token::Power(info),
-        LogosToken::Star => Token::Star(info),
-        LogosToken::Div => Token::Div(info),
-        LogosToken::Module => Token::Module(info),
-        LogosToken::ShiftLeft => Token::ShiftLeft(info),
-        LogosToken::ShiftRigth => Token::ShiftRigth(info),
-        LogosToken::Map => Token::Map(info),
-        LogosToken::MapConstRigth => Token::MapConstRigth(info),
-        LogosToken::MapConstLeft => Token::MapConstLeft(info),
-        LogosToken::Appliative => Token::Appliative(info),
-        LogosToken::ApplicativeRight => Token::ApplicativeRight(info),
-        LogosToken::ApplicativeLeft => Token::ApplicativeLeft(info),
-        LogosToken::Equality => Token::Equality(info),
-        LogosToken::NotEqual => Token::NotEqual(info),
-        LogosToken::LessOrEqual => Token::LessOrEqual(info),
-        LogosToken::MoreOrEqual => Token::MoreOrEqual(info),
-        LogosToken::LessThan => Token::LessThan(info),
-        LogosToken::MoreThan => Token::MoreThan(info),
-        LogosToken::And => Token::And(info),
-        LogosToken::Or => Token::Or(info),
-        LogosToken::ReverseAppliation => Token::ReverseAppliation(info),
-        LogosToken::DollarApplication => Token::DollarApplication(info),
-        LogosToken::Asignation => Token::Asignation(info),
-        LogosToken::At => Token::At(info),
-        LogosToken::Pipe => Token::Pipe(info),
-        LogosToken::LParen => Token::LParen(info),
-        LogosToken::RParen => Token::RParen(info),
-        LogosToken::LBracket => Token::LBracket(info),
-        LogosToken::RBracket => Token::RBracket(info),
-        LogosToken::LBrace => Token::LBrace(info),
-        LogosToken::RBrace => Token::RBrace(info),
-        LogosToken::RightArrow => Token::RightArrow(info),
-        LogosToken::LeftArrow => Token::LeftArrow(info),
-        LogosToken::LambdaStart => Token::LambdaStart(info),
-        LogosToken::Let => Token::Let(info),
-        LogosToken::In => Token::In(info),
-        LogosToken::Case => Token::Case(info),
-        LogosToken::Of => Token::Of(info),
-        LogosToken::Import => Token::Import(info),
-        LogosToken::Data => Token::Data(info),
-        LogosToken::Newtype => Token::Newtype(info),
-        LogosToken::Class => Token::Class(info),
-        LogosToken::Instance => Token::Instance(info),
-        LogosToken::Public => Token::Public(info),
-        LogosToken::Alias => Token::Alias(info),
-        LogosToken::As => Token::As(info),
-        LogosToken::Unqualified => Token::Unqualified(info),
-        LogosToken::Forall => Token::Forall(info),
-        LogosToken::Type => Token::Type(info),
-        LogosToken::U8 => Token::U8(info),
-        LogosToken::U16 => Token::U16(info),
-        LogosToken::U32 => Token::U32(info),
-        LogosToken::U64 => Token::U64(info),
-        LogosToken::I8 => Token::I8(info),
-        LogosToken::I16 => Token::I16(info),
-        LogosToken::I32 => Token::I32(info),
-        LogosToken::I64 => Token::I64(info),
-        LogosToken::F32 => Token::F32(info),
-        LogosToken::F64 => Token::F64(info),
-        LogosToken::CharType => Token::CharType(info),
-        LogosToken::StringType => Token::StringType(info),
-        LogosToken::LineComment(c) => Token::Comment(info, Comment::Line(c)),
-        LogosToken::BlockComment(c) => Token::Comment(info, Comment::Block(c)),
-        LogosToken::UintLiteral(s) => Token::UintLiteral(info, s),
-        LogosToken::UFloatLiteral(s) => Token::UFloatLiteral(info, s),
-        LogosToken::Identifier(s) => Token::Identifier(info, s),
-        LogosToken::InfixIdentifier(s) => Token::InfixIdentifier(info, s),
-        LogosToken::Selector(s) => Token::Selector(info, s),
-        LogosToken::AnonHole => Token::AnonHole(info),
-        LogosToken::NamedHole(s) => Token::NamedHole(info, s),
-        LogosToken::ModuleLogicPath(s) => Token::ModuleLogicPath(info, s),
-    }
+fn match_keyword(s: &str, info: TokenInfo) -> Option<Token> {
+    return match s {
+        "let" => Some(Token::Let(info)),
+        "in" => Some(Token::In(info)),
+        "case" => Some(Token::Case(info)),
+        "of" => Some(Token::Of(info)),
+        "import" => Some(Token::Import(info)),
+        "export" => Some(Token::Export(info)),
+        "data" => Some(Token::Data(info)),
+        "newtype" => Some(Token::Newtype(info)),
+        "newinstance" => Some(Token::NewInstance(info)),
+        "class" => Some(Token::Class(info)),
+        "instance" => Some(Token::Instance(info)),
+        "alias" => Some(Token::Alias(info)),
+        "as" => Some(Token::As(info)),
+        "unqualified" => Some(Token::Unqualified(info)),
+        "forall" => Some(Token::Forall(info)),
+        "type" => Some(Token::Type(info)),
+        "U8" => Some(Token::U8(info)),
+        "U16" => Some(Token::U16(info)),
+        "U32" => Some(Token::U32(info)),
+        "U64" => Some(Token::U64(info)),
+        "I8" => Some(Token::I8(info)),
+        "I16" => Some(Token::I16(info)),
+        "I32" => Some(Token::I32(info)),
+        "I64" => Some(Token::I64(info)),
+        "F32" => Some(Token::F32(info)),
+        "F64" => Some(Token::F64(info)),
+        "Char" => Some(Token::CharType(info)),
+        "String" => Some(Token::StringType(info)),
+        _ => None,
+    };
 }
 
-pub struct LexerContext<'src> {
-    source: &'src str,
-    line: usize,
-    previous_token: Option<LogosToken>,
-    lexer: &'src mut SpannedIter<'src, LogosToken>,
+fn match_operator(s: &str, info: TokenInfo) -> Option<Token> {
+    return match s {
+        "?" => Some(Token::Interrogation(info)),
+        "!" => Some(Token::Exclamation(info)),
+        "#" => Some(Token::Hash(info)),
+        "," => Some(Token::Comma(info)),
+        ":" => Some(Token::Colon(info)),
+        ";" => Some(Token::StatementEnd(info)),
+        "." => Some(Token::Dot(info)),
+        "::" => Some(Token::ModuleSeparator(info)),
+        "-" => Some(Token::Minus(info)),
+        "|>" => Some(Token::CompositionRight(info)),
+        "<|" => Some(Token::CompositionLeft(info)),
+        "+" => Some(Token::Plus(info)),
+        "^" => Some(Token::Power(info)),
+        "*" => Some(Token::Star(info)),
+        "/" => Some(Token::Div(info)),
+        "%" => Some(Token::Module(info)),
+        "<<" => Some(Token::ShiftLeft(info)),
+        ">>" => Some(Token::ShiftRigth(info)),
+        "<$>" => Some(Token::Map(info)),
+        "$>" => Some(Token::MapConstRigth(info)),
+        "<$" => Some(Token::MapConstLeft(info)),
+        "<*>" => Some(Token::Appliative(info)),
+        "*>" => Some(Token::ApplicativeRight(info)),
+        "<*" => Some(Token::ApplicativeLeft(info)),
+        "==" => Some(Token::NotEqual(info)),
+        "!=" => Some(Token::NotEqual(info)),
+        "<=" => Some(Token::LessOrEqual(info)),
+        "=>" => Some(Token::MoreOrEqual(info)),
+        "<" => Some(Token::LessThan(info)),
+        ">" => Some(Token::MoreThan(info)),
+        "&&" => Some(Token::And(info)),
+        "||" => Some(Token::Or(info)),
+        "&" => Some(Token::ReverseAppliation(info)),
+        "$" => Some(Token::DollarApplication(info)),
+        "=" => Some(Token::Asignation(info)),
+        "@" => Some(Token::At(info)),
+        "|" => Some(Token::Pipe(info)),
+        "(" => Some(Token::LParen(info)),
+        ")" => Some(Token::RParen(info)),
+        "{" => Some(Token::LBrace(info)),
+        "}" => Some(Token::RBrace(info)),
+        "[" => Some(Token::LBracket(info)),
+        "]" => Some(Token::RBracket(info)),
+        "->" => Some(Token::LeftArrow(info)),
+        "<-" => Some(Token::RightArrow(info)),
+        "\\" => Some(Token::LambdaStart(info)),
+        _ => None,
+    };
+}
+
+static SIMPLE_SPACES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^( |\t)+").unwrap());
+static ALL_SPACES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s+").unwrap());
+static HYPEN_DOCUMENTATION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^-- \|.*\n").unwrap());
+static HYPEN_COMMENT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^--.*\n").unwrap());
+static SLASH_DOCUMENTATION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^// \|.*\n").unwrap());
+static SLASH_COMMENT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^//.*\n").unwrap());
+static COMMENT_BLOCK0: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{-(.|\n)*-\}").unwrap());
+static COMMENT_BLOCK1: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{--(.|\n)*--\}").unwrap());
+static COMMENT_BLOCK2: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{---(.|\n)*---\}").unwrap());
+static COMMENT_BLOCK3: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{----(.|\n)*----\}").unwrap());
+static COMMENT_BLOCKD0: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{- \|(.|\n)*-\}").unwrap());
+static COMMENT_BLOCKD1: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{-- \|(.|\n)*--\}").unwrap());
+static COMMENT_BLOCKD2: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{--- \|(.|\n)*---\}").unwrap());
+static COMMENT_BLOCKD3: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\{---- \|(.|\n)*----\}").unwrap());
+//TODO: choose operator hierarchies
+// not_alone ->
+// not_alone <-
+// not_alone ,
+// not_alone :
+// not_alone |
+// not_contains ;
+// TODO: we aren't going to support custom operators but instead
+// would offer a fixed set of operators with know fixities like :
+// +,-, <+>, <<+>>  , ++, ++++,
+//  `a +> b +> c` became  `(a +> b) +> c`
+//  not sure about this, maybe all of them should be left associative?
+//  yes, `a - b - c` must be `(a - b) - c`  and the C language table
+//  uses  all binary ops as left associative, we only need to take care
+//  of the precedences.
+static OPERATOR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^\?|\#|,|::|;|\.|:|\|>|<\||\+|\^|/|%|<<|>>|<$|$>|<$|<\*|\*>|<\*|\*|==|!=|<=|>=|<|>|!|&&|\|\||&|\$|=|@|\||\(|\)|\{|\}|\[|\]|->|<-|-|\\
+        ",
+    )
+    .unwrap()
+});
+static MULTILINE_STRING: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"^""".*""""#).unwrap());
+static LINE_STRING: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"^"([^"\n]|((\\\\)*\\\"))*""#).unwrap());
+static UINT_STRING: &'static str = r"^0[0_]*|[1-9][0-9_]+";
+static UINT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(UINT_STRING).unwrap());
+static FLOAT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!("^{UINT_STRING}\\.UINT_STRING((e|E)UINT_STRING)?"))
+        .unwrap()
+});
+// For docummentation on this, see the octizys_commmon::identifier::IDENTIFER_LAZY_REGEX
+static IDENTIFIER_STRING: &'static str = r"_*(\p{Alphabetic}|\p{M}|\p{Join_Control})(_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*";
+static IDENTIFER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&format!("^{:}", IDENTIFIER_STRING)).unwrap());
+static INFIX_IDENTIFIER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!("^`{:}`", IDENTIFIER_STRING)).unwrap()
+});
+static SELECTOR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!("^\\.{re}", re = IDENTIFIER_STRING)).unwrap()
+});
+static HOLE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&format!("^_{re}", re = UINT_STRING)).unwrap());
+static MODULE_LOGIC_PATH: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!("^(({re}::)+{re})", re = IDENTIFIER_STRING)).unwrap()
+});
+
+#[derive(Debug)]
+pub struct Lexer<'input> {
+    src: &'input str,
+    offset: usize,
     found_error: bool,
+    store: &'input mut Store,
 }
 
-impl<'src> LexerContext<'src> {
-    fn new(
-        source: &'src str,
-        line: usize,
-        previous_token: Option<LogosToken>,
-        lexer: &'src mut SpannedIter<'src, LogosToken>,
-        found_error: bool,
-    ) -> Self {
-        LexerContext {
-            source,
-            line,
-            previous_token,
-            lexer,
-            found_error,
+impl<'input> Lexer<'input> {
+    pub fn new(src: &'input str, store: &'input mut Store) -> Self {
+        Lexer {
+            src,
+            offset: 0,
+            found_error: false,
+            store,
         }
     }
-}
 
-pub fn advance_line_count<'a>(
-    token: &'a LogosToken,
-    line_count: &'a mut usize,
-) -> () {
-    todo!()
-}
+    pub fn satisfy<'a>(
+        self: &'a mut Lexer<'input>,
+        re: &LazyLock<Regex>,
+    ) -> Option<(Span, &'input str)> {
+        //println!("re: {:?}", re);
+        let start = self.offset;
+        match re.find(self.src) {
+            Some(m) => {
+                //println!("found: {:?}", m);
+                let end = m.end();
+                self.src = &self.src[end..];
+                self.offset += end;
+                Some(((start, self.offset - 1).into(), m.as_str()))
+            }
+            None => None,
+        }
+    }
 
-pub fn acumulate_comments<'src>(
-    lexer: &'src mut SpannedIter<'src, LogosToken>,
-    line_count: &'src mut usize,
-    acc: &mut Vec<(Span, usize, Comment)>,
-) -> Result<Option<(Span, usize, LogosToken)>, ()> {
-    let mut out: Result<Option<(Span, usize, LogosToken)>, ()> = Ok(None);
-    loop {
-        let current_line = *line_count;
-        match lexer.next() {
-            Some((maybe_token, logos_span)) => match maybe_token {
-                Ok(token) => {
-                    advance_line_count(&token, line_count);
-                    match token {
-                        LogosToken::LineComment(l) => {
-                            acc.push((
-                                range_to_span(logos_span),
-                                current_line,
-                                Comment::Line(l),
-                            ));
-                        }
-                        LogosToken::BlockComment(b) => {
-                            acc.push((
-                                range_to_span(logos_span),
-                                *line_count,
-                                Comment::Block(b),
-                            ));
-                        }
-                        _ => {
-                            out = Ok(Some((
-                                range_to_span(logos_span),
-                                *line_count,
-                                token,
-                            )));
-                            break;
-                        }
-                    }
-                }
-                _ => {
-                    //TODO: HAndle errors
-                    out = Err(());
+    pub fn simple_spaces(&mut self) -> () {
+        self.satisfy(&SIMPLE_SPACES);
+    }
+
+    pub fn all_spaces(&mut self) -> () {
+        self.satisfy(&ALL_SPACES);
+    }
+
+    pub fn single_line_comment_aux(
+        &mut self,
+        re: &LazyLock<Regex>,
+        kind: CommentKind,
+        start: LineCommentStart,
+    ) -> Option<CommentLine> {
+        //println!("single_line with : {:?} {:?}", kind, start);
+        let out = match self.satisfy(re) {
+            Some((span, full_text)) => {
+                let start_offset = match kind {
+                    CommentKind::NonDocumentation => 2,
+                    CommentKind::Documentation => 4,
+                };
+                let text = &full_text[start_offset..full_text.len() - 1];
+                let content =
+                    CommentLineContent::decompose_register(&text, self.store)
+                        [0];
+                Some(CommentLine {
+                    kind,
+                    start,
+                    content,
+                    span,
+                })
+            }
+            None => None,
+        };
+        out
+    }
+
+    pub fn single_line_comment(&mut self) -> Option<CommentLine> {
+        self.single_line_comment_aux(
+            &HYPEN_DOCUMENTATION,
+            CommentKind::Documentation,
+            LineCommentStart::DoubleHypen,
+        )
+        .or_else(|| {
+            self.single_line_comment_aux(
+                &HYPEN_COMMENT,
+                CommentKind::NonDocumentation,
+                LineCommentStart::DoubleHypen,
+            )
+        })
+        .or_else(|| {
+            self.single_line_comment_aux(
+                &SLASH_DOCUMENTATION,
+                CommentKind::Documentation,
+                LineCommentStart::DoubleSlash,
+            )
+        })
+        .or_else(|| {
+            self.single_line_comment_aux(
+                &SLASH_COMMENT,
+                CommentKind::NonDocumentation,
+                LineCommentStart::DoubleSlash,
+            )
+        })
+    }
+
+    pub fn comment_block(&mut self) -> Option<CommentBlock> {
+        let cases = [
+            (
+                &COMMENT_BLOCKD3,
+                CommentKind::Documentation,
+                CommentBraceKind::Brace3,
+            ),
+            (
+                &COMMENT_BLOCK3,
+                CommentKind::NonDocumentation,
+                CommentBraceKind::Brace3,
+            ),
+            (
+                &COMMENT_BLOCKD2,
+                CommentKind::Documentation,
+                CommentBraceKind::Brace2,
+            ),
+            (
+                &COMMENT_BLOCK2,
+                CommentKind::NonDocumentation,
+                CommentBraceKind::Brace2,
+            ),
+            (
+                &COMMENT_BLOCKD1,
+                CommentKind::Documentation,
+                CommentBraceKind::Brace1,
+            ),
+            (
+                &COMMENT_BLOCK1,
+                CommentKind::NonDocumentation,
+                CommentBraceKind::Brace1,
+            ),
+            (
+                &COMMENT_BLOCKD0,
+                CommentKind::Documentation,
+                CommentBraceKind::Brace0,
+            ),
+            (
+                &COMMENT_BLOCK0,
+                CommentKind::NonDocumentation,
+                CommentBraceKind::Brace0,
+            ),
+        ];
+        let mut result: Option<((Span, &str), CommentKind, CommentBraceKind)> =
+            None;
+        for (re, kind, brace) in cases {
+            match self.satisfy(re) {
+                Some(text) => {
+                    result = Some((text, kind, brace));
                     break;
                 }
-            },
-            None => break,
-        }
-    }
-    out
-}
-
-impl<'src> Iterator for LexerContext<'src> {
-    type Item = Result<Token, ()>;
-    fn next(&mut self) -> Option<Self::Item> {
-        // First iter:
-        // get_comments
-        // get next token
-        // get next token
-        // if comment return a token,
-        // else save new token to context and return a token
-        // continue
-        // Intermediate iter:
-        // if saved token :
-        //   get next token, if comment, return a token and clear context
-        //                      else return a token and put the new token in the context
-        // else :
-        //  get comments
-        //  get next token
-        //  get next token
-        match &self.previous_token {
-            Some(previous) => {
-                todo!()
+                None => continue,
             }
-            None => {
-                let mut acc = vec![];
-                acumulate_comments(&mut self.lexer, &mut self.line, &mut acc);
-                match self.lexer.next() {
-                    Some(next_token) => {}
-                    None => Ok(Token::LastComments(_, acc)),
+        }
+
+        let ((span, text), kind, brace) = result?;
+        let len = brace.len();
+        let start_offset = len
+            + match kind {
+                CommentKind::Documentation => 2,
+                _ => 0,
+            };
+        //Spans are inclusive while rust use [a,b) for ranges
+        // so we need a +1
+        let end_offset = span.end.source_index - len + 1;
+        let block = CommentBlock {
+            kind,
+            brace,
+            content: CommentLineContent::decompose_register(
+                &text[start_offset..end_offset],
+                self.store,
+            ),
+            span,
+        };
+        Some(block)
+    }
+
+    pub fn any_comment(&mut self) -> Option<Comment> {
+        let comment = self
+            .single_line_comment()
+            .map(|x| x.into())
+            .or_else(|| self.comment_block().map(|x| x.into()));
+        self.all_spaces();
+        comment
+    }
+
+    pub fn before_comments(&mut self) -> Vec<Comment> {
+        self.all_spaces();
+        let mut acc = vec![];
+        loop {
+            match self.any_comment() {
+                Some(comment) => acc.push(comment),
+                None => break,
+            }
+        }
+        self.all_spaces();
+        acc
+    }
+
+    pub fn after_comments(&mut self) -> Option<Comment> {
+        self.simple_spaces();
+        let comment = self.single_line_comment();
+        self.all_spaces();
+        comment.map(|x| x.into())
+    }
+
+    pub fn lex_with_value(
+        &mut self,
+        re: &LazyLock<Regex>,
+        before: Vec<Comment>,
+        mut make_token: impl FnOnce(&str, TokenInfo) -> Result<Token, LexerError>,
+    ) -> Option<Result<Token, LexerError>> {
+        let (span, text) = self.satisfy(re)?;
+        let after = self.after_comments();
+        let comments = CommentsInfo { before, after };
+        let info = TokenInfo { comments, span };
+        Some(make_token(text, info))
+    }
+
+    pub fn lex_with_value_store(
+        &mut self,
+        re: &LazyLock<Regex>,
+        before: Vec<Comment>,
+        mut make_token: impl FnOnce(
+            &str,
+            TokenInfo,
+            &mut Store,
+        ) -> Result<Token, LexerError>,
+    ) -> Option<Result<Token, LexerError>> {
+        let (span, text) = self.satisfy(re)?;
+        let after = self.after_comments();
+        let comments = CommentsInfo { before, after };
+        let info = TokenInfo { comments, span };
+        Some(make_token(text, info, &mut self.store))
+    }
+
+    pub fn identifier_or_keyword(
+        &mut self,
+        before: Vec<Comment>,
+    ) -> Option<Result<Token, LexerError>> {
+        //let (span, text) = self.satisfy(&IDENTIFER)?;
+        //let after = self.after_comments();
+        //let comments = cst::CommentsInfo { before, after };
+        //let info = TokenInfo { comments, span };
+        self.lex_with_value_store(&IDENTIFER, before, |text, info, store| {
+            match match_keyword(text, info.clone()){
+                Some(x) => Ok(x),
+                None =>{
+                    match Identifier::make(text,store) {
+                        Ok(identifier) => Ok(Token::Identifier(info, identifier)),
+                        Err(_) => {let position = info.span.start; Err(LexerError {
+                            error_type:
+                                LexerErrorType::CantConvertIdentifierTextToIdentifier(
+                                    text.into(),
+                                    info,
+                                ),
+                            position,
+                        })},
+                    }
                 }
-                todo!()
+            }
+        })
+    }
+
+    pub fn lex_uint(
+        &mut self,
+        before: Vec<Comment>,
+    ) -> Option<Result<Token, LexerError>> {
+        self.lex_with_value(&UINT, before, |text, info| {
+            //TODO: check boundaries of UINT?
+            Ok(Token::UintLiteral(info, String::from(text)))
+        })
+    }
+
+    pub fn lex_float(
+        &mut self,
+        before: Vec<Comment>,
+    ) -> Option<Result<Token, LexerError>> {
+        self.lex_with_value(&FLOAT, before, |text, info| {
+            //TODO: check boundaries of FLOAT?
+            Ok(Token::UFloatLiteral(info, String::from(text)))
+        })
+    }
+
+    pub fn lex_module_logic_path(
+        &mut self,
+        before: Vec<Comment>,
+    ) -> Option<Result<Token, LexerError>> {
+        self.lex_with_value_store(
+            &MODULE_LOGIC_PATH,
+            before,
+            |text, info, store| match ModuleLogicPath::make(text, store) {
+                Ok(path) => Ok(Token::ModuleLogicPath(info, path)),
+                Err(_) => {
+                    let position = info.span.start;
+                    Err(LexerError {
+                        error_type:
+                            LexerErrorType::CantConvertToModuleLogicPath(
+                                String::from(text),
+                                info,
+                            ),
+                        position,
+                    })
+                }
+            },
+        )
+    }
+
+    pub fn lex_symbol_or_operator(
+        &mut self,
+        before: Vec<Comment>,
+    ) -> Option<Result<Token, LexerError>> {
+        self.lex_with_value(&OPERATOR, before, |text, info| match text {
+            "?" => Ok(Token::Interrogation(info)),
+            "!" => Ok(Token::Exclamation(info)),
+            "#" => Ok(Token::Hash(info)),
+            "," => Ok(Token::Comma(info)),
+            ":" => Ok(Token::Colon(info)),
+            ";" => Ok(Token::StatementEnd(info)),
+            "." => Ok(Token::Dot(info)),
+            "::" => Ok(Token::ModuleSeparator(info)),
+            "-" => Ok(Token::Minus(info)),
+            "|>" => Ok(Token::CompositionLeft(info)),
+            "<|" => Ok(Token::CompositionRight(info)),
+            "+" => Ok(Token::Plus(info)),
+            "^" => Ok(Token::Power(info)),
+            "*" => Ok(Token::Star(info)),
+            "/" => Ok(Token::Div(info)),
+            "%" => Ok(Token::Module(info)),
+            "<<" => Ok(Token::ShiftLeft(info)),
+            ">>" => Ok(Token::ShiftRigth(info)),
+            //TODO: Add "<&>" = \ x y -> y $ x
+            "<$>" => Ok(Token::Map(info)),
+            "$>" => Ok(Token::MapConstRigth(info)),
+            "<$" => Ok(Token::MapConstLeft(info)),
+            //TODO: add <|> and <?>
+            "<*>" => Ok(Token::Appliative(info)),
+            "*>" => Ok(Token::ApplicativeRight(info)),
+            "<*" => Ok(Token::ApplicativeRight(info)),
+            "==" => Ok(Token::Equality(info)),
+            "!=" => Ok(Token::NotEqual(info)),
+            "<=" => Ok(Token::LessOrEqual(info)),
+            ">=" => Ok(Token::MoreOrEqual(info)),
+            "<" => Ok(Token::LessThan(info)),
+            ">" => Ok(Token::MoreThan(info)),
+            "&&" => Ok(Token::And(info)),
+            "||" => Ok(Token::Or(info)),
+            "&" => Ok(Token::ReverseAppliation(info)),
+            "$" => Ok(Token::DollarApplication(info)),
+            "=" => Ok(Token::Asignation(info)),
+            "@" => Ok(Token::At(info)),
+            "|" => Ok(Token::Pipe(info)),
+            "(" => Ok(Token::LParen(info)),
+            ")" => Ok(Token::RParen(info)),
+            "{" => Ok(Token::LBrace(info)),
+            "}" => Ok(Token::RBrace(info)),
+            "[" => Ok(Token::LBracket(info)),
+            "]" => Ok(Token::RBracket(info)),
+            "->" => Ok(Token::RightArrow(info)),
+            "<-" => Ok(Token::LeftArrow(info)),
+            "\\" => Ok(Token::LambdaStart(info)),
+            _ => {
+                let position = info.span.start;
+                Err(LexerError {
+                    error_type: LexerErrorType::CantParseOperator(
+                        text.into(),
+                        info,
+                    ),
+                    position,
+                })
+            }
+        })
+    }
+
+    pub fn one_token(
+        &mut self,
+    ) -> Result<Result<Token, LexerError>, Vec<Comment>> {
+        let before = self.before_comments();
+        //TODO: is there a way to remove the clone of before?
+        //well, it can be if we return a function that consumes
+        //a before and construct a token instead of the token..
+        let out = self
+            .lex_module_logic_path(before.clone())
+            .or_else(|| self.identifier_or_keyword(before.clone()))
+            .or_else(|| self.lex_float(before.clone()))
+            .or_else(|| self.lex_uint(before.clone()))
+            .or_else(|| self.lex_symbol_or_operator(before.clone()))
+            .ok_or(before);
+        println!("out : {:?}", out);
+        out
+    }
+}
+
+impl<'input> Iterator for Lexer<'input> {
+    type Item = Result<(Position, Token, Position), LexerError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        //println!("new_next : {:?}", self);
+        match self.src {
+            "" => return None,
+            _ => (),
+        }
+        if self.found_error {
+            return None;
+        }
+        match self.one_token() {
+            Ok(Ok(token)) => {
+                let info = TokenInfo::from(token.clone());
+                let out = Some(Ok((info.span.start, token, info.span.start)));
+                return out;
+            }
+            Ok(Err(error_token)) => {
+                self.found_error = true;
+                Some(Err(error_token))
+            }
+            Err(comments) => {
+                if comments.len() == 0 {
+                    if self.src.len() > 0 {
+                        return Some(Err(LexerError {
+                            error_type: LexerErrorType::UnexpectedCharacter(
+                                String::from(self.src),
+                            ),
+                            position: Position {
+                                source_index: self.offset,
+                            },
+                        }));
+                    } else {
+                        return None;
+                    }
+                }
+                let span = match comments.get(0) {
+                    Some(s) => s.clone().get_span(),
+                    None => (usize::MAX, usize::MAX).into(),
+                };
+                let info = TokenInfo {
+                    comments: CommentsInfo::empty(),
+                    span,
+                };
+                let token = Token::LastComments(comments, info);
+                //TODO: this is a hack to make lexer to stop if we couldn't identify a token
+                //To fix it, we need to get a notion of "we tried everything and we didn't find
+                //anything and we still have input" and check for it
+                self.found_error = true;
+                return Some(Ok((span.start, token, span.end)));
             }
         }
     }
 }
 
-/*
-pub fn gen_tokens<'src>(
-    source: &'src str,
-    store: &mut Store,
-) -> Result<Vec<Token>, ()> {
-    let mut context = LexerContext::new(source, 0, None);
-    let logos = LogosToken::lexer_with_extras(source, store);
-    let mut comments_acc: Vec<Comment> = vec![];
-    let mut previous_token: Option<Comment> = None;
-    let mut acc: Vec<Token> = vec![];
-    let iter = logos.spanned();
-    while true {
-        let current = logos.next();
+#[cfg(test)]
+mod lexer_tests {
+
+    use crate::lexer::*;
+
+    //fn generic_test_by_spaces(s: &'static str) {
+    //    let lex = Lexer::new(s);
+    //    let result: Vec<Result<Token, LexerError>> =
+    //        lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
+    //    let splitted = s.split(" ").map().collect();
+    //    assert!(result == vec![])
+    //}
+
+    #[test]
+    fn empty_string() {
+        let input = "";
+        let mut store = Store::default();
+        let lex = Lexer::new(&input, &mut store);
+        let result: Vec<Result<Token, LexerError>> =
+            lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
+        assert!(result == vec![])
     }
-    Ok(acc)
+
+    #[test]
+    fn identifier() {
+        let s = "helloWorld";
+        let mut store = Store::default();
+        let mut lex = Lexer::new(s, &mut store);
+        let result: Vec<Result<Token, LexerError>> =
+            lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
+        let identifier = Identifier::make(s, &mut store).unwrap();
+        let info = TokenInfo {
+            comments: CommentsInfo {
+                before: vec![],
+                after: None,
+            },
+            span: (0, 9).into(),
+        };
+        let token = Token::Identifier(info, identifier);
+        let expected = vec![Ok(token)];
+        //println!("result: {:?}", result);
+        //println!("expected: {:?}", expected);
+        assert!(result == expected);
+    }
+
+    fn make_keyword_test(
+        key: &'static str,
+        constructor: fn(TokenInfo) -> Token,
+    ) {
+        //println!("beginging: ");
+        let mut store = Store::default();
+        let lex = Lexer::new(key, &mut store);
+        let result: Vec<Result<Token, LexerError>> =
+            lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
+        let info = TokenInfo {
+            comments: CommentsInfo {
+                before: vec![],
+                after: None,
+            },
+            span: (0, key.len() - 1).into(),
+        };
+        let token = constructor(info.clone());
+        let expected = vec![Ok(token)];
+        //println!("result: {:?}", result);
+        //println!("expected: {:?}", expected);
+        assert!(result == expected);
+    }
+
+    macro_rules! make_keyword_test_macro {
+        ($macro_name:tt, $name:tt,$constructor_name:tt) => {
+            paste! {
+                #[test]
+                fn [< keword_ $macro_name _test >](){
+                    make_keyword_test($name,Token::$constructor_name)
+                }
+            }
+        };
+    }
+
+    make_keyword_test_macro!("import", "import", Import);
+    make_keyword_test_macro!("export", "export", Export);
+    make_keyword_test_macro!("data", "data", Data);
+    make_keyword_test_macro!("newtype", "newtype", Newtype);
+    make_keyword_test_macro!("alias", "alias", Alias);
+    make_keyword_test_macro!("as", "as", As);
+    make_keyword_test_macro!("unqualified", "unqualified", Unqualified);
+    make_keyword_test_macro!("forall", "forall", Forall);
+    make_keyword_test_macro!("type", "type", Type);
+    make_keyword_test_macro!("u8", "U8", U8);
+    make_keyword_test_macro!("u16", "U16", U16);
+    make_keyword_test_macro!("u32", "U32", U32);
+    make_keyword_test_macro!("u64", "U64", U64);
+    make_keyword_test_macro!("i8", "I8", I8);
+    make_keyword_test_macro!("i16", "I16", I16);
+    make_keyword_test_macro!("i32", "I32", I32);
+    make_keyword_test_macro!("i64", "I64", I64);
+    make_keyword_test_macro!("f32", "F32", F32);
+    make_keyword_test_macro!("f64", "F64", F64);
+
+    /*TODO: repair the test!
+    fn make_line_comment_documentation_test(
+        content_string: &'static str,
+        kind: CommentKind,
+        start: LineCommentStart,
+    ) {
+        let mut store = Store::default();
+        let start_str: &'static str = start.into();
+        let trailing_string: String = vec![start_str, kind.into()].join("");
+        let start_gap = trailing_string.len();
+        let raw_string: String =
+            trailing_string.clone() + content_string + "\n";
+        let lex = Lexer::new(&raw_string, &mut store);
+        let result: Vec<Result<Token, LexerError>> =
+            lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
+        let content = CommentLineContent::make(content_string).unwrap();
+        let comment_line = CommentLine {
+            kind,
+            start,
+            content,
+            // -1 here as the len give us a bigger index
+            span: (0, raw_string.len() - 1).into(),
+        };
+        let info = TokenInfo {
+            comments: CommentsInfo::empty(),
+            span: comment_line.span,
+        };
+        let token = Token::LastComments(vec![comment_line.into()], info);
+        let expected = vec![Ok(token)];
+        //println!("result:   {:?}", result);
+        //println!("expected: {:?}", expected);
+        assert!(result == expected)
+    }
+
+    #[test]
+    fn line_comment_hypen() {
+        make_line_comment_documentation_test(
+            " some",
+            CommentKind::NonDocumentation,
+            LineCommentStart::DoubleHypen,
+        )
+    }
+
+    #[test]
+    fn line_comment_slash() {
+        make_line_comment_documentation_test(
+            " some string ra>msf-- asfer832*cvssdfs=were#'  commenting things",
+            CommentKind::NonDocumentation,
+            LineCommentStart::DoubleSlash,
+        )
+    }
+
+    #[test]
+    fn line_documentation_hypen() {
+        make_line_comment_documentation_test(
+            " some string ra>msf-- asfer832*cvssdfs=were#'  commenting things",
+            CommentKind::Documentation,
+            LineCommentStart::DoubleHypen,
+        )
+    }
+
+    #[test]
+    fn line_documentation_slash() {
+        make_line_comment_documentation_test(
+            " some string ra>msf-- asfer832*cvssdfs=were#'  commenting things",
+            CommentKind::Documentation,
+            LineCommentStart::DoubleSlash,
+        )
+    }
+
+    fn make_block_test(
+        content_string: &'static str,
+        kind: CommentKind,
+        brace: CommentBraceKind,
+    ) {
+        let mut interner = Interner::new();
+        let kind_as_str: &str = kind.into();
+        //println!("kind: {:?} {:?}", kind, kind_as_str);
+        let (start_str, end_str): (&'static str, &'static str) = brace.into();
+        let trailing_string: String = vec![start_str, kind_as_str].join("");
+        let start_gap = trailing_string.len();
+        let content = CommentLineContent::decompose(content_string);
+        let lexer_string = [&trailing_string, content_string, end_str].join("");
+        let lex = Lexer::new(&lexer_string, &mut interner);
+        let span = (0, lexer_string.len() - 1).into();
+        let block = CommentBlock {
+            kind,
+            brace,
+            content,
+            span,
+        };
+        let result: Vec<Result<Token, LexerError>> =
+            lex.into_iter().map(|x| x.map(|(_, y, _)| y)).collect();
+        let token = Token::LastComments(
+            vec![block.into()],
+            TokenInfo {
+                comments: CommentsInfo {
+                    before: vec![],
+                    after: None,
+                },
+                span,
+            },
+        );
+        let expected = vec![Ok(token)];
+        //println!("result:   {:?}", result);
+        //println!("expected: {:?}", expected);
+        assert!(result == expected)
+    }
+
+    #[test]
+    fn block0_comment() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::NonDocumentation,
+            CommentBraceKind::Brace0,
+        );
+    }
+
+    #[test]
+    fn block1_comment() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::NonDocumentation,
+            CommentBraceKind::Brace1,
+        );
+    }
+
+    #[test]
+    fn block2_comment() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::NonDocumentation,
+            CommentBraceKind::Brace2,
+        );
+    }
+
+    #[test]
+    fn block3_comment() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::NonDocumentation,
+            CommentBraceKind::Brace2,
+        );
+    }
+
+    #[test]
+    fn block0_documentation() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::Documentation,
+            CommentBraceKind::Brace0,
+        );
+    }
+
+    #[test]
+    fn block1_documentation() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::Documentation,
+            CommentBraceKind::Brace1,
+        );
+    }
+
+    #[test]
+    fn block2_documentation() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::Documentation,
+            CommentBraceKind::Brace2,
+        );
+    }
+
+    #[test]
+    fn block3_documentation() {
+        make_block_test(
+            "some\ncontent\n in the \n 343 string to \n parse+sfd--asdf \n end",
+            CommentKind::Documentation,
+            CommentBraceKind::Brace2,
+        );
+    }
+    */
 }
-*/

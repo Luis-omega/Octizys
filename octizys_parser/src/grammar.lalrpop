@@ -33,7 +33,7 @@ extern {
       ,":" => lexer::Token::Colon(TokenInfo)
       ,";" => lexer::Token::StatementEnd(TokenInfo)
       ,"." => lexer::Token::Dot(TokenInfo)
-      ,"::" => lexer::Token::ModuleSeparator(TokenInfo)
+      //,"::" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"-" => lexer::Token::Minus(TokenInfo)
       ,"|>" => lexer::Token::CompositionLeft(TokenInfo)
       ,"<|" => lexer::Token::CompositionRight(TokenInfo)
@@ -79,7 +79,6 @@ extern {
       ,"case" => lexer::Token::Case(TokenInfo)
       ,"of" => lexer::Token::Of(TokenInfo)
       ,"import" => lexer::Token::Import(TokenInfo)
-      ,"export" => lexer::Token::Export(TokenInfo)
       ,"data" => lexer::Token::Data(TokenInfo)
       ,"newtype" => lexer::Token::Newtype(TokenInfo)
       ,"newinstance" => lexer::Token::Newtype(TokenInfo)
@@ -111,7 +110,7 @@ extern {
       ,Identifier=> lexer::Token::Identifier(TokenInfo,String)
       ,InfixIdentifier=> lexer::Token::InfixIdentifier(TokenInfo,String)
       ,Selector=> lexer::Token::Selector(TokenInfo,String)
-      ,"_"=> lexer::Token::AnonHole(TokenInfo,String)
+      ,"_"=> lexer::Token::AnonHole(TokenInfo)
       ,NamedHole=> lexer::Token::NamedHole(TokenInfo,u64)
       ,ModuleLogicPath=> lexer::Token::ModuleLogicPath(TokenInfo,String)
     }
@@ -151,7 +150,7 @@ boxed<T> : Box<T> = T => Box::new(<>);
 
 pub string :Token<String> = StringLiteral =>? lexer::string_token_to_token(<>);
 
-character : Token<char> = CharacterLiteral =>? lexer::char_token_to_token(<>);
+character : Token<String> = CharacterLiteral =>? lexer::char_token_to_token(<>);
 
 uint : Token<String> = UintLiteral =>? lexer::uint_token_to_token(<>);
 
@@ -172,7 +171,7 @@ operator_name : Token<OperatorName> = {
       ,":" => base::Token{value: OperatorName::Colon,info:<>.into()}
       ,";" => base::Token{value: OperatorName::StatementEnd,info:<>.into()}
       ,"." => base::Token{value: OperatorName::Dot,info:<>.into()}
-      ,"::" => base::Token{value: OperatorName::ModuleSeparator,info:<>.into()}
+      //,"::" => base::Token{value: OperatorName::ModuleSeparator,info:<>.into()}
       ,"-" => base::Token{value: OperatorName::Minus,info:<>.into()}
       ,"|>" => base::Token{value: OperatorName::CompositionLeft,info:<>.into()}
       ,"<|" => base::Token{value: OperatorName::CompositionRight,info:<>.into()}
