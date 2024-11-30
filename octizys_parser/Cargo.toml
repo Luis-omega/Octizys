@@ -21,14 +21,12 @@ octizys_formatter = {path = "../octizys_formatter",optional=true}
 lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
 paste = "1.0.15"
 regex = "1.10.6"
-logos = "0.14.2"
 
 [features]
 repl = ["dep:octizys_formatter","dep:octizys_pretty"]
 
 
 [build-dependencies]
-#cfgrammar = "0.13"
 lalrpop = "0.21.0"
 
 [lints.rust]

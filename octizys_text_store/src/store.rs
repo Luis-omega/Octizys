@@ -96,7 +96,7 @@ impl From<NonLineBreakStr> for &'static str {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommentStore {
     store: Vec<NonLineBreakString>,
 }
@@ -148,7 +148,7 @@ impl CommentStore {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RegularStore {
     store: DefaultStringInterner,
 }
@@ -194,7 +194,7 @@ impl RegularStore {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Store {
     pub regular: RegularStore,
     pub comments: CommentStore,

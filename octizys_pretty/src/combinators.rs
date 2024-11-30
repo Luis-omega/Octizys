@@ -88,3 +88,27 @@ pub fn intersperse<
 pub fn repeat(doc: Document, n: usize) -> Document {
     concat(iter::repeat(doc).take(n).collect())
 }
+
+/*
+#[derive(Debug)]
+struct Example<'a> {
+    mutable: &'a mut u8,
+    immutable: &'a u8,
+}
+
+pub fn consume<'a>(x: &'a Example<'a>) -> &'a u8 {
+    x.mutable
+}
+
+pub fn main() {
+    let mut x = 8;
+    let y = 9;
+    let mut e = Example {
+        mutable: &mut x,
+        immutable: &y,
+    };
+    let t = &x;
+    let j = consume(&e);
+    let w = e.mutable;
+}
+*/

@@ -6,11 +6,8 @@ use std::{fmt::Display, ops::Add};
 #[derive(Debug, Copy, Clone, Hash)]
 pub struct Position {
     pub source_index: usize,
-    /// This imposes a maximum amount of lines above 400,000,000
-    /// Current lsp (3.17) uses 2**31 -1  as maximum value
-    pub line: u32,
-    /// As in line  this limits to 400,000,000 of bytes per column
-    pub column: u32,
+    pub line: usize,
+    pub column: usize,
 }
 
 impl PartialEq for Position {
@@ -50,8 +47,8 @@ impl Display for Position {
     }
 }
 
-impl From<(usize, u32, u32)> for Position {
-    fn from(input: (usize, u32, u32)) -> Self {
+impl From<(usize, usize, usize)> for Position {
+    fn from(input: (usize, usize, usize)) -> Self {
         let (source_index, line, column) = input;
         Position {
             source_index,
@@ -76,8 +73,8 @@ impl Display for Span {
     }
 }
 
-impl From<((usize, u32, u32), (usize, u32, u32))> for Span {
-    fn from(value: ((usize, u32, u32), (usize, u32, u32))) -> Self {
+impl From<((usize, usize, usize), (usize, usize, usize))> for Span {
+    fn from(value: ((usize, usize, usize), (usize, usize, usize))) -> Self {
         Span {
             start: value.0.into(),
             end: value.1.into(),

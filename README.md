@@ -1,9 +1,28 @@
 # Octizys
 A functional language
 
+## Syntax
+```lark
+type_record_item : label ":" multiplicity? type
+record_predicate : "has" label | "lacks" label
+type_record : "{"  type_record_item ("," type_record_item)* ","? [| record_predicate+] "}"
+```
+
+## TypeSystem
+
+```
+
+------------------------
+ |- u8_literal : 1 u8
 
 
-# Compiler Stages
+------------------------
+ |- u8_literal : 1 u8
+
+```
+
+
+## Compiler Stages
 
 - Parse to CST (Concrete Syntax Tree):
     + It has all the comments.
@@ -23,3 +42,4 @@ A functional language
     check : sast_expression -> sast_type -> InferenceContext -> Either core_type_withHoles Errors
     solve_constraints : Context -> Option Errors
 - Core transformation.
+

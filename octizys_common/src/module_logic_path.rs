@@ -33,6 +33,13 @@ impl From<Identifier> for ModuleLogicPath {
 
 /// The abstract representation of a importation path inside the language,
 /// usually called `logic path`.
+///
+/// Example:
+///
+/// ```txt
+/// a::b::cder::
+/// ```
+///
 // TODO: maybe abbreviate  the name to just `LogicPath` ?
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModuleLogicPath(Vec<Identifier>);
@@ -46,24 +53,15 @@ impl ModuleLogicPath {
         s: &str,
         store: &mut Store,
     ) -> Result<ModuleLogicPath, ModuleLogicPathError> {
-        let v: Vec<Identifier> = s
-            .split(MODULE_LOGIC_PATH_SEPARATOR)
+        let mut splited: Vec<&str> =
+            s.split(MODULE_LOGIC_PATH_SEPARATOR).collect();
+        splited.pop();
+        let v: Vec<Identifier> = splited
+            .into_iter()
             .map(|x| Identifier::make(x, store))
             .collect::<Result<Vec<Identifier>, IdentifierError>>()
             .map_err(|_x| ModuleLogicPathError::NotIdentifier)?;
         Ok(ModuleLogicPath(v))
-    }
-
-    pub fn split_head(self) -> (Option<ModuleLogicPath>, Identifier) {
-        //the split used in the make constructor guaranties that we
-        //always have a element in the internal vector
-        let mut v = self.0;
-        let last = v.pop().unwrap();
-        if v.len() == 0 {
-            (None, last)
-        } else {
-            (Some(ModuleLogicPath(v)), last)
-        }
     }
 }
 

@@ -80,7 +80,7 @@ pub fn indent(
 
 impl ToDocument<PrettyCSTConfiguration> for CommentLineContent {
     fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        Document::from_index_and_len(self.index, self.len)
+        Document::from_index_and_len(self.get_index(), self.get_len())
     }
 }
 
