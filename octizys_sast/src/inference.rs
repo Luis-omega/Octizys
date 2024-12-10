@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use octizys_common::{
-    identifier::Identifier, module_logic_path::ModuleLogicPath, span::Span,
+    identifier::Identifier, module_logic_path::LogicPath, span::Span,
 };
 
 use crate::{
@@ -24,7 +24,7 @@ pub struct Table {
 #[derive(Debug)]
 pub enum InferenceError {
     CantFindVariable(VariableId),
-    CantFindExternalVariable(Identifier, Option<ModuleLogicPath>),
+    CantFindExternalVariable(Identifier, Option<LogicPath>),
 }
 
 pub fn infer<Context>(

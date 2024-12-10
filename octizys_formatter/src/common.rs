@@ -1,6 +1,6 @@
 use octizys_common::identifier::{Identifier, IdentifierError};
-use octizys_common::module_logic_path::{
-    ModuleLogicPath, ModuleLogicPathError, MODULE_LOGIC_PATH_SEPARATOR,
+use octizys_common::logic_path::{
+    LogicPath, LogicPathError, MODULE_LOGIC_PATH_SEPARATOR,
 };
 use octizys_common::span::Span;
 use octizys_pretty::combinators::{self, external_text};
@@ -30,21 +30,21 @@ impl<T> ToDocument<T> for IdentifierError {
     }
 }
 
-impl<T> ToDocument<T> for ModuleLogicPathError {
+impl<T> ToDocument<T> for LogicPathError {
     fn to_document(&self, _configuration: &T) -> Document {
         match self {
-            &ModuleLogicPathError::NotIdentifier => {
+            &LogicPathError::NotIdentifier => {
                 "The passed string contains a non valid Identifier component"
                     .into()
             }
-            &ModuleLogicPathError::EmptyString => {
+            &LogicPathError::EmptyString => {
                 "Attempt to build from a empty vector or string".into()
             }
         }
     }
 }
 
-impl<T> ToDocument<T> for ModuleLogicPath {
+impl<T> ToDocument<T> for LogicPath {
     fn to_document(&self, _configuration: &T) -> Document {
         combinators::intersperse(
             (<&Vec<Identifier>>::from(self))

@@ -1,5 +1,5 @@
 use octizys_common::{
-    identifier::Identifier, module_logic_path::ModuleLogicPath, span::Span,
+    identifier::Identifier, module_logic_path::LogicPath, span::Span,
 };
 
 #[derive(Debug)]
@@ -38,7 +38,7 @@ pub struct Forall {
 #[derive(Debug)]
 pub struct Constructor {
     pub span: Span,
-    pub prefix: Option<ModuleLogicPath>,
+    pub prefix: Option<LogicPath>,
     pub name: (Span, Variable),
     pub _type: Box<Type>,
 }
@@ -46,7 +46,7 @@ pub struct Constructor {
 #[derive(Debug)]
 pub struct SumType {
     pub span: Span,
-    pub prefix: Option<ModuleLogicPath>,
+    pub prefix: Option<LogicPath>,
     pub name: (Span, Identifier),
     pub bound_variables: Vec<(Span, Identifier)>,
     pub constructors: Vec<Constructor>,
@@ -55,7 +55,7 @@ pub struct SumType {
 #[derive(Debug)]
 pub struct NewType {
     pub span: Span,
-    pub prefix: Option<ModuleLogicPath>,
+    pub prefix: Option<LogicPath>,
     pub name: (Span, Identifier),
     pub bound_variables: Vec<(Span, Identifier)>,
     pub constructor: Constructor,
@@ -64,7 +64,7 @@ pub struct NewType {
 #[derive(Debug)]
 pub struct Alias {
     pub span: Span,
-    pub prefix: Option<ModuleLogicPath>,
+    pub prefix: Option<LogicPath>,
     pub name: (Span, Identifier),
     pub bound_variables: Vec<(Span, Identifier)>,
     pub _type: Box<Type>,
@@ -83,7 +83,7 @@ pub struct Record {
 pub enum Type {
     BasicType { _type: BasicType, span: Span },
     LocalVariable(VariableId),
-    ExternalVariable(Identifier, Option<ModuleLogicPath>),
+    ExternalVariable(Identifier, Option<LogicPath>),
     InferenceVariable(VariableId),
     Function(Function),
     Forall(Forall),

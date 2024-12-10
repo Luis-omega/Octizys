@@ -1,5 +1,5 @@
 use octizys_common::identifier::Identifier;
-use octizys_common::module_logic_path::ModuleLogicPath;
+use octizys_common::module_logic_path::LogicPath;
 use octizys_common::span::Span;
 
 use crate::_type::{self as T, VariableId};
@@ -57,7 +57,7 @@ pub struct Let {
 #[derive(Debug)]
 pub struct PatternApplication {
     pub span: Span,
-    pub prefix: Option<ModuleLogicPath>,
+    pub prefix: Option<LogicPath>,
     pub name: (Span, Identifier),
     pub arguments: Vec<Pattern>,
 }
@@ -96,7 +96,7 @@ pub struct Application {
 pub enum Expression {
     BasicTerm(BasicExpressionInfo),
     LocalVariable(VariableId),
-    ExternalVariable(Identifier, Option<ModuleLogicPath>),
+    ExternalVariable(Identifier, Option<LogicPath>),
     Function(Function),
     Annotation(Annotation),
     Let(Let),

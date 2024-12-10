@@ -308,14 +308,14 @@ impl CommentsInfo {
     }
 
     ///
-    pub fn move_after_to_before(mut self) -> Self {
-        match self.after {
+    pub fn move_after_to_before(&mut self) -> () {
+        match &self.after {
             Some(c) => {
-                self.before.push(c);
+                self.before.push(c.to_owned());
                 self.after = None;
-                return self;
+                return ();
             }
-            None => return self,
+            None => return (),
         }
     }
 
@@ -344,8 +344,8 @@ impl CommentsInfo {
     /// The comment can be referring to the second item of the tuple
     /// or the third. If we choose to move it to the second item
     /// the end structure is the one described in the comments.
-    //TODO: this is wrong, look at documentation.
     pub fn consume_info(&mut self, other: CommentsInfo) -> () {
+        self.move_after_to_before();
         let CommentsInfo { before, after } = other;
         self.extend(before.into_iter());
         match after {
@@ -388,7 +388,5 @@ impl CommentsInfo {
     /// -}
     /// ```
     //FIXME:
-    pub fn compact_comments(mut self) -> Self {
-        self
-    }
+    pub fn compact_comments(&mut self) -> () {}
 }

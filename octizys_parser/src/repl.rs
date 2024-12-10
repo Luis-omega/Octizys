@@ -1,11 +1,10 @@
-use logos::Logos;
 use octizys_common::span::Position;
 use octizys_cst::base::TokenInfo;
 use octizys_formatter::cst::PrettyCSTConfiguration;
 use octizys_formatter::to_document::ToDocument;
 use octizys_parser::grammar::import_declarationParser;
 use octizys_parser::lexer::{
-    LexerContext, LexerError, LogosLexerContext, LogosToken, Token,
+    BaseLexerContext, BaseToken, LexerContext, LexerError, Token,
 };
 use octizys_pretty::combinators::group;
 use octizys_text_store::store::Store;
@@ -41,7 +40,7 @@ use std::rc::Rc;
 //
 
 fn main() {
-    let store = Rc::new(RefCell::new(Store::default()));
+    let mut store = Store::default();
     let configuration = PrettyCSTConfiguration::default();
     let mut stdin = io::stdin();
     let input = &mut String::new();
@@ -53,26 +52,21 @@ fn main() {
         if input == ":q" {
             break;
         }
-        let mut logos_context = RefCell::new(LogosLexerContext::new(
-            store.clone(),
-            Position::default(),
-        ));
-        let mut lexer = LogosToken::lexer_with_extras(
-            input.as_str(),
-            logos_context.borrow_mut().clone(),
-        )
-        .spanned();
-        let iterator = LexerContext::new(input.as_str(), None, &mut lexer);
+        let mut base_context = BaseLexerContext::new(input, &mut store);
+        let iterator = LexerContext::new(None, &mut base_context);
         let parsed = p.parse(iterator.map(|x| {
-            println!("{:?}", x);
+            match x.clone() {
+                Ok((_, tok, _)) => println!("Ok({:?})", tok),
+                Err(e) => println!("Err({:?})", e),
+            }
             x
         }));
         match parsed {
             Ok(item) => {
-                println!("{:#?}", item);
+                //println!("{:#?}", item);
                 let as_doc = group(item.to_document(&configuration));
-                println!("{:?}", as_doc);
-                println!("{}", as_doc.render_to_string(2, &((*store).borrow())))
+                //println!("{:?}", as_doc);
+                println!("{}", as_doc.render_to_string(2, &store))
             }
             Err(t) => println!("Can't parse!\n{:?}", t),
         }

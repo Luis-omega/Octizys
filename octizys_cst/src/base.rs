@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::comments::CommentsInfo;
 use derivative::Derivative;
 use octizys_common::identifier::Identifier;
-use octizys_common::module_logic_path::ModuleLogicPath;
+use octizys_common::logic_path::LogicPath;
 use octizys_common::span::{Position, Span};
 use octizys_text_store::store::NonLineBreakStr;
 
@@ -20,6 +20,7 @@ mod private {
 /// - [`Comma`]
 /// - [`RightArrow`]
 /// - [`Colon`]
+/// - [`LogicPathSeparator`]
 pub trait Separator: private::Sealed {
     fn to_str() -> NonLineBreakStr;
 }
@@ -44,6 +45,7 @@ make_separator_type!(Pipe, "|");
 make_separator_type!(Comma, ",");
 make_separator_type!(RightArrow, "->");
 make_separator_type!(Colon, ":");
+make_separator_type!(LogicPathSeparator, "::");
 
 /// Used to statically determine the kind of delimiters to use
 /// and tell rust how to represent it as string.
@@ -103,8 +105,9 @@ impl TokenInfo {
     /// information of this comment.
     /// For details look at [`CommentsInfo::consume_info`]
     /// and [`Span::add`].
-    pub fn consume_info(&mut self, _other: Self) -> () {
-        todo!()
+    pub fn consume_info(&mut self, other: Self) -> () {
+        self.comments.consume_info(other.comments);
+        self.span = self.span + other.span;
     }
 }
 
@@ -215,7 +218,7 @@ pub enum OperatorName {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImportedVariable {
-    pub path: ModuleLogicPath,
+    pub path: LogicPath,
     pub name: Identifier,
 }
 
@@ -301,6 +304,26 @@ where
             first,
             items,
             trailing_sep: trailing_sep.map(|x| x.into()),
+        }
+    }
+}
+
+impl From<TrailingList<Token<Identifier>, LogicPathSeparator>>
+    for Token<LogicPath>
+{
+    fn from(
+        value: TrailingList<Token<Identifier>, LogicPathSeparator>,
+    ) -> Self {
+        let mut info = value.first.info;
+        let mut acc = vec![value.first.value];
+        for i in value.items {
+            acc.push(i.item.value);
+            info.comments.consume_info(i.item.info.comments)
+        }
+        // Safe to unwrap since acc has at least one element
+        Token {
+            value: acc.try_into().unwrap(),
+            info,
         }
     }
 }

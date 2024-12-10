@@ -168,10 +168,10 @@ pub fn comments_info_to_document(
 ) -> Document {
     let mut out = comment.clone();
     if configuration.move_documentantion_before_object {
-        out = out.move_after_to_before();
+        out.move_after_to_before();
     }
     if configuration.compact_comments {
-        out = out.compact_comments();
+        out.compact_comments();
     }
     let separe_by = usize::from(configuration.separe_comments_by);
     concat(vec![
@@ -371,7 +371,7 @@ impl ToDocument<PrettyCSTConfiguration> for Import {
             None => empty(),
         };
 
-        let path = soft_break() + self.module_path.to_document(configuration);
+        let path = soft_break() + self.logic_path.to_document(configuration);
         let imports = match &self.import_list {
             Some(x) => x.to_document(configuration),
             None => empty(),

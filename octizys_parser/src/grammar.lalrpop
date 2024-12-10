@@ -1,13 +1,13 @@
 use std::str::FromStr;
 use octizys_cst::{
-  base::{Between,Token,TrailingList,TokenInfo,ImportedVariable,OperatorName,TrailingListItem,Comma,Colon,Braces,Parens},
+  base::{Between,Token,TrailingList,TokenInfo,ImportedVariable,OperatorName,TrailingListItem,Comma,Colon,Braces,Parens,LogicPathSeparator},
   comments::{CommentKind,LineCommentStart,Comment},
   imports::{Import},
   types::{Type,TypeRecordItem,TypeBase},
   patterns::{PatternMatch,PatternMatchRecordItem, PatternMatchBind},
   expressions::{Expression,CaseItem,Case,ExpressionSelector,ExpressionRecordItem}};
 use octizys_cst::base;
-use octizys_common::module_logic_path::ModuleLogicPath;
+use octizys_common::logic_path::LogicPath;
 use octizys_common::identifier::Identifier;
 use octizys_common::span::Position;
 use crate::lexer;
@@ -33,7 +33,7 @@ extern {
       ,":" => lexer::Token::Colon(TokenInfo)
       ,";" => lexer::Token::StatementEnd(TokenInfo)
       ,"." => lexer::Token::Dot(TokenInfo)
-      //,"::" => lexer::Token::ModuleSeparator(TokenInfo)
+      ,"::" => lexer::Token::ModuleSeparator(TokenInfo)
       ,"-" => lexer::Token::Minus(TokenInfo)
       ,"|>" => lexer::Token::CompositionLeft(TokenInfo)
       ,"<|" => lexer::Token::CompositionRight(TokenInfo)
@@ -44,11 +44,12 @@ extern {
       ,"%" => lexer::Token::Module(TokenInfo)
       ,"<<" => lexer::Token::ShiftLeft(TokenInfo)
       ,">>" => lexer::Token::ShiftRigth(TokenInfo)
-      //TODO: Add "<&>" = \ x y -> y $ x
+      ,"<&>" => lexer::Token::FlippedMap(TokenInfo)
       ,"<$>" => lexer::Token::Map(TokenInfo)
       ,"$>" => lexer::Token::MapConstRigth(TokenInfo)
       ,"<$" => lexer::Token::MapConstLeft(TokenInfo)
-      //TODO: add <|> and <?>
+      ,"<|>" => lexer::Token::Alternative(TokenInfo)
+      ,"<?>" => lexer::Token::Annotate(TokenInfo)
       ,"<*>" => lexer::Token::Appliative(TokenInfo)
       ,"*>" => lexer::Token::ApplicativeRight(TokenInfo)
       ,"<*" => lexer::Token::ApplicativeLeft(TokenInfo)
@@ -112,7 +113,6 @@ extern {
       ,Selector=> lexer::Token::Selector(TokenInfo,String)
       ,"_"=> lexer::Token::AnonHole(TokenInfo)
       ,NamedHole=> lexer::Token::NamedHole(TokenInfo,u64)
-      ,ModuleLogicPath=> lexer::Token::ModuleLogicPath(TokenInfo,String)
     }
 }
 
@@ -131,6 +131,7 @@ Parens : Parens = {}
 Braces: Braces = {}
 Comma: Comma = {}
 Colon: Colon = {}
+LogicPathSeparator: LogicPathSeparator = {}
 
 between<left,T,right,phantom> : Between<T,phantom> =
   <l:left> <t:T> <r:right>
@@ -156,11 +157,23 @@ uint : Token<String> = UintLiteral =>? lexer::uint_token_to_token(<>);
 
 ufloat : Token<String> = UFloatLiteral =>? lexer::ufloat_token_to_token(<>);
 
-//FIXME: This means that only paths of two elements or more can be created
-// we want to fix this to have imports of only one identifier!
-module_path : Token<ModuleLogicPath>  ={
-  ModuleLogicPath =>? lexer::module_token_to_token(<>),
-  };
+logic_path: Token<LogicPath>  ={
+  //<l:terminated_list<identifier,"::",LogicPathSeparator>> => l.into() ,
+  //TODO:handle_comments
+  <l:identifier> <s:"::"> => {
+    let mut info = l.info;
+    info.consume_info(s.into());
+    let path = LogicPath::try_from(vec![l.value]).unwrap();
+    Token{value:path,info:info}
+    },
+  <p:logic_path> <l:identifier> <s:"::"> => {
+    let Token{mut value,mut info} = p;
+    info.consume_info(l.info);
+    info.consume_info(s.into());
+    value.push(l.value);
+    Token{value,info}
+  },
+};
 
 identifier : Token<Identifier> = Identifier =>? lexer::identifier_token_to_token(<>);
 operator_name : Token<OperatorName> = {
@@ -214,7 +227,7 @@ selector : Token<Identifier> = Selector =>? lexer::selector_token_to_token(<>);
 //head, but we choose to do this instead.
 //We may consider the other approach if we get a conflict in lalrpop.
 imported_variable : Token<ImportedVariable> =
-  module_path => {
+  <path:logic_path> <head:identifier> => {
   todo!()
   //let (maybe_remain,head) = <>.split_head();
   //// The regex in the lexer is `(identifier ::)+ identifier`
@@ -265,18 +278,18 @@ import_item : Token<Identifier> ={
 import_list : TrailingList<Token<Identifier>,Comma> =
   trailing_list<import_item,",",Comma> => <>;
 
-import_as : (TokenInfo,Token<ModuleLogicPath>) =
-  <a:"as"> <p:module_path>
+import_as : (TokenInfo,Token<LogicPath>) =
+  <a:"as"> <p:logic_path>
   => (a.into(),p);
 
 pub import_declaration : Import =
-  <import:"import"> <unqualified:"unqualified"?> <module_path:module_path>
+  <import:"import"> <unqualified:"unqualified"?> <logic_path:logic_path>
   <import_list:between<"(",<l:import_list>,")",Parens>?>
   <qualified_path:import_as?>
   => Import{
     import:import.into(),
     unqualified:unqualified.map(|x| x.into())
-    ,module_path,import_list,qualified_path};
+    ,logic_path,import_list,qualified_path};
 
 
 //TODO: add kinds,
@@ -286,6 +299,7 @@ pub import_declaration : Import =
 // Additionally consider if we would add effects!
 
 //Types
+
 
 type_base : Token<TypeBase> = {
   U8 => {
@@ -426,6 +440,7 @@ pub type_expression : Type = {
 
 // --------------------- PatternMatch  ---------------------
 
+/*
 pattern_variable : PatternMatch = {
   local_variable => PatternMatch::LocalVariable(<>),
   imported_variable => PatternMatch::ImportedVariable(<>),
@@ -622,7 +637,7 @@ expression_application : Expression = {
 
 pub expression = expression_application;
 
-/*
+
 
 expression_infix_application : Expression = {
   expression_application (InfixIdentifier expression_application)? => todo!(),
