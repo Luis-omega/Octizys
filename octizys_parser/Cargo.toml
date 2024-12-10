@@ -9,21 +9,18 @@ name = "parser-repl"
 test = false
 bench = false
 path = "src/repl.rs"
-required-features = ["repl"]
 
 [dependencies]
 octizys_text_store = {path = "../octizys_text_store"}
 octizys_common = {path = "../octizys_common"}
 octizys_cst = {path = "../octizys_cst"}
-octizys_pretty = {path = "../octizys_pretty", optional=true}
-octizys_formatter = {path = "../octizys_formatter",optional=true}
+octizys_pretty = {path = "../octizys_pretty"}
+octizys_formatter = {path = "../octizys_formatter",features=["cst"]}
 
 lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
 paste = "1.0.15"
 regex = "1.10.6"
 
-[features]
-repl = ["dep:octizys_formatter","dep:octizys_pretty"]
 
 
 [build-dependencies]
@@ -32,6 +29,3 @@ lalrpop = "0.21.0"
 [lints.rust]
 unused = "allow"
 unsafe_code = "forbid"
-
-[dev-dependencies]
-octizys_formatter = { path = "../octizys_formatter" , features=["cst"]}

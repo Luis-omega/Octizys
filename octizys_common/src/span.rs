@@ -47,6 +47,67 @@ impl Display for Position {
     }
 }
 
+/// Takes a index and try to find the boundary for a char before the index.
+fn split_string_before(src: &str, i: usize) -> (&str, usize) {
+    let mut index = i;
+    for _ in [0..4] {
+        match src.split_at_checked(index) {
+            Some((_, x)) => {
+                return (x, index);
+            }
+            None => (),
+        };
+        index = index.saturating_sub(1);
+    }
+    // given the 4 bytes boundary we may succed in 4 steps always.
+    return (src, 0);
+}
+
+/// Takes a index and try to find the boundary for a char after the index.
+fn split_string_after(src: &str, i: usize) -> (&str, usize) {
+    let mut index = i;
+    for _ in [0..4] {
+        match src.split_at_checked(index) {
+            Some((_, x)) => {
+                return (x, index);
+            }
+            None => (),
+        };
+        index = index.saturating_add(1);
+    }
+    // given the 4 bytes boundary we may succed in 4 steps always.
+    return (src, src.len());
+}
+
+impl Position {
+    /// Lookups the [`Position::source_index`] in the text and returns a
+    /// little before and after as much as it can without line breaks.
+    /// The first element is before the text (exclusive).
+    /// The last element is after the text (inclusive).
+    pub fn get_text_at<'source>(
+        &self,
+        src: &'source str,
+        max_len: Option<usize>,
+    ) -> (&'source str, &'source str) {
+        let size_range: usize =
+            max_len.map(|x| if x < 2 { 2 } else { x }).unwrap_or(20) / 2;
+        let (_, start_index) = split_string_before(
+            src,
+            self.source_index.saturating_sub(size_range),
+        );
+        let (_, end_index) = split_string_after(
+            src,
+            self.source_index.saturating_add(size_range),
+        );
+        let before_pre = &src[start_index..self.source_index];
+        let after_pre = &src[self.source_index..end_index];
+        let before =
+            before_pre.split("\n").collect::<Vec<&str>>().pop().unwrap();
+        let after = after_pre.split("\n").collect::<Vec<&str>>()[0];
+        (before, after)
+    }
+}
+
 impl From<(usize, usize, usize)> for Position {
     fn from(input: (usize, usize, usize)) -> Self {
         let (source_index, line, column) = input;
@@ -97,5 +158,35 @@ impl Add for Span {
         let start = std::cmp::min(self.start, rhs.start);
         let end = std::cmp::max(self.end, rhs.end);
         (start, end).into()
+    }
+}
+
+impl Span {
+    /// Returns the span content including line breaks.
+    pub fn get_text_at<'source>(
+        &self,
+        src: &'source str,
+        max_len: Option<usize>,
+    ) -> (&'source str, &'source str, &'source str) {
+        let size_range: usize =
+            max_len.map(|x| if x < 2 { 2 } else { x }).unwrap_or(20) / 2;
+        let (_, start_index) = split_string_before(
+            src,
+            self.start.source_index.saturating_sub(size_range),
+        );
+        let (_, end_index) = split_string_after(
+            src,
+            self.end.source_index.saturating_add(size_range),
+        );
+        let before_pre = &src[start_index..self.start.source_index];
+        let after_pre = &src[self.end.source_index..end_index];
+        let before =
+            before_pre.split("\n").collect::<Vec<&str>>().pop().unwrap();
+        let after = after_pre.split("\n").collect::<Vec<&str>>()[0];
+        (
+            before,
+            &src[self.start.source_index..self.end.source_index],
+            after,
+        )
     }
 }

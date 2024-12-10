@@ -7,7 +7,11 @@ use octizys_cst::base::{TokenInfo, TokenInfoWithPhantom};
 use octizys_cst::comments::{
     Comment, CommentBlock, CommentBraceKind, CommentLine, CommentsInfo,
 };
-use octizys_text_store::store::Store;
+use octizys_pretty::{
+    combinators::{concat, empty, external_text, hard_break, nest, repeat},
+    document::Document,
+};
+use octizys_text_store::store::{aproximate_string_width, Store};
 
 use lalrpop_util::ParseError;
 use paste::paste;
@@ -114,6 +118,77 @@ pub enum LexerError {
     Notu64NamedHole(String, Span),
     CantCreateIdentifier(String, Span),
     CantTranslateToToken(Token),
+}
+
+/// Creates the part of the error report before the offending text.
+/// It has the error type, a short description, maybe the file name and
+/// the line and column.
+pub fn make_error_info_start(
+    error_name: &str,
+    description: &str,
+    src_name: Option<&str>,
+    position: &Position,
+) -> Document {
+    let position_info = concat(vec![
+        external_text("Line{"),
+        external_text(position.line.to_string().as_str()),
+        external_text("}"),
+        external_text("::Column{"),
+        external_text(position.column.to_string().as_str()),
+        external_text("}."),
+    ]);
+    let location_info = match src_name {
+        Some(name) => concat(vec![
+            external_text("-->"),
+            external_text(name),
+            external_text("::"),
+            position_info,
+        ]),
+        None => concat(vec![external_text("-->"), position_info]),
+    };
+    let info = concat(vec![
+        external_text("Error!["),
+        external_text(error_name),
+        external_text("]: "),
+        external_text(description),
+        nest(1, hard_break() + location_info),
+    ]);
+    info
+}
+
+impl LexerError {
+    pub fn to_document(&self, src: &str, src_name: Option<&str>) -> Document {
+        match self {
+            LexerError::UnexpectedCharacter(p) => {
+                let error_preamble = make_error_info_start(
+                    "UnexpectedCharacter",
+                    "A character not know by the octizys lexer.",
+                    src_name,
+                    p,
+                );
+                let (before, after) = p.get_text_at(src, Some(20));
+                let pre_spaces = aproximate_string_width(before);
+                let spaces = " ".repeat(pre_spaces) + "^";
+                let error_source = concat(vec![
+                    external_text(before),
+                    external_text(after),
+                    hard_break(),
+                    external_text(&spaces),
+                ]);
+                /// TODO: accept suggestions of expected values.
+                let error_long_description = empty();
+                concat(vec![
+                    error_preamble,
+                    nest(4, hard_break() + error_source),
+                    nest(2, hard_break() + error_long_description),
+                ])
+            }
+            LexerError::UnexpectedPunctuationMatch(_, _) => todo!(),
+            LexerError::Notu64NamedHole(_, _) => todo!(),
+            LexerError::CantCreateIdentifier(_, _) => todo!(),
+            LexerError::CantTranslateToToken(_) => todo!(),
+        }
+    }
 }
 
 /*
@@ -443,7 +518,7 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
             "instance" => Some(Ok((span, BaseToken::Instance))),
             "public" => Some(Ok((span, BaseToken::Public))),
             "alias" => Some(Ok((span, BaseToken::Alias))),
-            "As" => Some(Ok((span, BaseToken::As))),
+            "as" => Some(Ok((span, BaseToken::As))),
             "unqualified" => Some(Ok((span, BaseToken::Unqualified))),
             "forall" => Some(Ok((span, BaseToken::Forall))),
             "type" => Some(Ok((span, BaseToken::Type))),
@@ -752,6 +827,100 @@ pub enum Token {
 impl From<Token> for TokenInfo {
     fn from(value: Token) -> TokenInfo {
         match value {
+            Token::Interrogation(info) => (info),
+            Token::Exclamation(info) => (info),
+            Token::Hash(info) => (info),
+            Token::Comma(info) => (info),
+            Token::Colon(info) => (info),
+            Token::StatementEnd(info) => (info),
+            Token::Dot(info) => (info),
+            Token::ModuleSeparator(info) => (info),
+            Token::Minus(info) => (info),
+            Token::CompositionRight(info) => (info),
+            Token::CompositionLeft(info) => (info),
+            Token::Plus(info) => (info),
+            Token::Power(info) => (info),
+            Token::Star(info) => (info),
+            Token::Div(info) => (info),
+            Token::Module(info) => (info),
+            Token::ShiftLeft(info) => (info),
+            Token::ShiftRigth(info) => (info),
+            Token::Map(info) => (info),
+            Token::MapConstRigth(info) => (info),
+            Token::MapConstLeft(info) => (info),
+            Token::Appliative(info) => (info),
+            Token::ApplicativeRight(info) => (info),
+            Token::ApplicativeLeft(info) => (info),
+            Token::Equality(info) => (info),
+            Token::NotEqual(info) => (info),
+            Token::LessOrEqual(info) => (info),
+            Token::MoreOrEqual(info) => (info),
+            Token::LessThan(info) => (info),
+            Token::MoreThan(info) => (info),
+            Token::And(info) => (info),
+            Token::Or(info) => (info),
+            Token::ReverseAppliation(info) => (info),
+            Token::DollarApplication(info) => (info),
+            Token::Asignation(info) => (info),
+            Token::At(info) => (info),
+            Token::Pipe(info) => (info),
+            Token::Alternative(info) => (info),
+            Token::FlippedMap(info) => (info),
+            Token::Annotate(info) => (info),
+            Token::LParen(info) => (info),
+            Token::RParen(info) => (info),
+            Token::LBracket(info) => (info),
+            Token::RBracket(info) => (info),
+            Token::LBrace(info) => (info),
+            Token::RBrace(info) => (info),
+            Token::RightArrow(info) => (info),
+            Token::LeftArrow(info) => (info),
+            Token::LambdaStart(info) => (info),
+            Token::Let(info) => (info),
+            Token::In(info) => (info),
+            Token::Case(info) => (info),
+            Token::Of(info) => (info),
+            Token::Import(info) => (info),
+            Token::Data(info) => (info),
+            Token::Newtype(info) => (info),
+            Token::Class(info) => (info),
+            Token::Instance(info) => (info),
+            Token::Public(info) => (info),
+            Token::Alias(info) => (info),
+            Token::As(info) => (info),
+            Token::Unqualified(info) => (info),
+            Token::Forall(info) => (info),
+            Token::Type(info) => (info),
+            Token::U8(info) => (info),
+            Token::U16(info) => (info),
+            Token::U32(info) => (info),
+            Token::U64(info) => (info),
+            Token::I8(info) => (info),
+            Token::I16(info) => (info),
+            Token::I32(info) => (info),
+            Token::I64(info) => (info),
+            Token::F32(info) => (info),
+            Token::F64(info) => (info),
+            Token::CharType(info) => (info),
+            Token::StringType(info) => (info),
+            Token::Comment(info, _) => info,
+            Token::StringLiteral(info, _) => info,
+            Token::CharacterLiteral(info, _) => info,
+            Token::UintLiteral(info, _) => info,
+            Token::UFloatLiteral(info, _) => info,
+            Token::Identifier(info, _) => info,
+            Token::InfixIdentifier(info, _) => info,
+            Token::Selector(info, _) => info,
+            Token::AnonHole(info) => info,
+            Token::NamedHole(info, _) => info,
+            Token::LastComments(info, _) => info,
+        }
+    }
+}
+
+impl<'a> From<&'a Token> for &'a TokenInfo {
+    fn from(value: &'a Token) -> &'a TokenInfo {
+        match &value {
             Token::Interrogation(info) => (info),
             Token::Exclamation(info) => (info),
             Token::Hash(info) => (info),

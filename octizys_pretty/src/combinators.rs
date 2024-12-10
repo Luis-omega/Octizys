@@ -25,10 +25,12 @@ pub fn empty_break() -> Document {
     Document::empty_break()
 }
 
+/// Concatenates a vector of documents into a single one.
 pub fn concat(items: Vec<Document>) -> Document {
     Document::concat(items)
 }
 
+/// Concatenates an iterator of documents into a single document.
 pub fn concat_iter<T: IntoIterator<Item = Document>>(items: T) -> Document {
     let mut v: Vec<Document> = items.into_iter().collect();
     let len = v.len();
@@ -41,6 +43,8 @@ pub fn concat_iter<T: IntoIterator<Item = Document>>(items: T) -> Document {
     Document::concat(v)
 }
 
+/// Attempt to store a non comment string and returns a document that
+/// can be used to refer to this string.
 pub fn try_internalize(
     store: &mut Store,
     maybe_word: &str,
@@ -48,10 +52,15 @@ pub fn try_internalize(
     Document::try_internalize(store, maybe_word)
 }
 
+/// Takes an arbitrary string and split it to store as the internal adequate
+/// representation of a document, it attempts to keep the original format of
+/// the text.
 pub fn external_text(words: &str) -> Document {
     Document::external_text(words)
 }
 
+/// Stores a given string as a comment in the [`Store`] and returns a
+/// document that can be used to refer to it.
 pub fn comment_line(
     source: &str,
     comments_accumulator: &mut Vec<String>,
@@ -59,14 +68,24 @@ pub fn comment_line(
     Document::comment_line(source, comments_accumulator)
 }
 
+/// Augment the indentation level with respect to the current one.
+/// This won't create a line break or add spaces, to see the effect
+/// one must provide line breaks in the inner document.
+/// The size of one level of indentation is determined at rendering time!
 pub fn nest(indentation_level: u16, doc: Document) -> Document {
     Document::nest(indentation_level, doc)
 }
 
+/// Surround a document with a group.
+/// This make the soft breaks inside the content of the document to possibly
+/// be rendered as real line breaks or as a single space depending on the
+/// available line width.
 pub fn group(doc: Document) -> Document {
     Document::group(doc)
 }
 
+/// Create an iterator interspersing the provided document with
+/// the elements of the provided iterator of documents.
 pub fn intersperse<
     Doc: Into<Document>,
     Docs: IntoIterator<Item = Doc>,
@@ -85,6 +104,7 @@ pub fn intersperse<
     concat(acc)
 }
 
+/// Repeat the same document [`n`] times.
 pub fn repeat(doc: Document, n: usize) -> Document {
     concat(iter::repeat(doc).take(n).collect())
 }
