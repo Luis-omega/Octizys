@@ -4,11 +4,14 @@ use crate::lexer::{
 use octizys_common::span::{Position, Span};
 use octizys_pretty::{
     combinators::{
-        concat, empty, external_text, foreground, group, hard_break,
+        concat, emphasis, empty, external_text, foreground, group, hard_break,
         intersperse, nest, repeat,
     },
     document::Document,
-    highlight::base_colors::{BLUE, RED},
+    highlight::{
+        base_colors::{BLUE, CYAN, MAGENTA, MODERATE_GREEN, RED},
+        Emphasis,
+    },
 };
 use octizys_text_store::store::{aproximate_string_width, Store};
 
@@ -78,7 +81,7 @@ pub trait ParserErrorReport {
 }
 
 /// Generate the beginning of the error report (the part before we
-/// show the source code signaling the error).
+/// show the source code signalling the error).
 pub fn make_error_info_start<E: ParserErrorReport>(
     error: &E,
     context: &ParserErrorContext,
@@ -87,8 +90,8 @@ pub fn make_error_info_start<E: ParserErrorReport>(
     let error_name = error.get_error_name();
     let short_description = error.get_short_description();
     let location_doc = concat(vec![
-        foreground(BLUE, external_text("-->")),
-        external_text(context.src_name),
+        foreground(CYAN, external_text("-->")),
+        foreground(MODERATE_GREEN, external_text(context.src_name)),
         location.to_document(),
     ]);
     concat(vec![
@@ -119,7 +122,12 @@ fn expected_to_document(expected: Option<&Vec<String>>) -> Document {
             }
             external_text(previous_text)
                 + intersperse(
-                    v.into_iter().map(|x| external_text(&x)),
+                    v.into_iter().map(|x| {
+                        emphasis(
+                            Emphasis::Bold,
+                            foreground(CYAN, external_text(&x)),
+                        )
+                    }),
                     external_text(", "),
                 )
         }
@@ -140,11 +148,14 @@ fn make_source_error<E: ParserErrorReport>(
             //TODO:FIXME: multi line spans won't render right!
             concat(vec![
                 external_text(before),
-                external_text(content),
+                emphasis(
+                    Emphasis::Underline(RED),
+                    foreground(MAGENTA, external_text(content)),
+                ),
                 external_text(after),
                 hard_break(),
-                external_text(&spaces),
-                expected_to_document(e.get_expected()),
+                foreground(RED, external_text(&spaces)),
+                foreground(RED, expected_to_document(e.get_expected())),
             ])
         }
         ErrorLocation::Position(position) => {
@@ -155,8 +166,8 @@ fn make_source_error<E: ParserErrorReport>(
                 external_text(before),
                 external_text(after),
                 hard_break(),
-                external_text(&spaces),
-                expected_to_document(e.get_expected()),
+                foreground(RED, external_text(&spaces)),
+                foreground(RED, expected_to_document(e.get_expected())),
             ])
         }
     }

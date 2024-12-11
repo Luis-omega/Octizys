@@ -151,11 +151,11 @@ impl Default for Highlight {
             background: Default::default(),
             foreground: Color {
                 color4: Color4Bits::White,
-                color8: Color8Bits { color: 15 },
+                color8: Color8Bits { color: 254 },
                 color24: Color24Bits {
-                    r: 255,
-                    g: 255,
-                    b: 255,
+                    r: 229,
+                    g: 229,
+                    b: 229,
                 },
             },
             emphasis: Default::default(),
@@ -309,6 +309,18 @@ pub mod base_colors {
     };
 
     pub const CYAN: Color = Color {
+        color4: Color4Bits::Cyan,
+        color8: Color8Bits { color: 33 },
+        color24: Color24Bits {
+            r: 58,
+            g: 150,
+            b: 221,
+            //TODO correct cyan but save this color
+        },
+    };
+
+    /// Found by mistake while setting CYAN.
+    pub const MODERATE_GREEN: Color = Color {
         color4: Color4Bits::Cyan,
         color8: Color8Bits { color: 33 },
         color24: Color24Bits {
