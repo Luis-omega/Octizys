@@ -353,7 +353,7 @@ impl ParserErrorReport for ParseError<Position, Token, LexerError> {
     fn get_long_description(&self) -> Option<&str> {
         match self {
             ParseError::InvalidToken { .. } => Some("The internal library used to parse the code has this disabled by octizys.\nIf you see this, a bug in the parser generator may happened!"),
-            ParseError::UnrecognizedEof { .. } =>Some("You may need to provide more code.\nWe read all what you provided but we still couln't understand it!"),
+            ParseError::UnrecognizedEof { .. } =>Some("You may need to provide more code.\nWe read all what you provided but we still couldn't understand it!"),
             ParseError::UnrecognizedToken { .. } => Some("Something is wrong with the code structure.\nThere's a chance that the error happenned before this point.\nBut in such case we were able to understand (wrong) the code until we reached this place."),
             ParseError::ExtraToken { .. } => Some("We belive that we finished reading and understanding your code before we really read everything.\nThis means that you may have other errors in the middle or that you may want to delete the excess of code."),
             ParseError::User { error } => error.get_long_description(),
