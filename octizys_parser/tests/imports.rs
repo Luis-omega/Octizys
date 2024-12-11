@@ -7,6 +7,9 @@ use octizys_parser::grammar::import_declarationParser;
 use octizys_parser::lexer::{
     BaseLexerContext, BaseToken, LexerContext, LexerError, Token,
 };
+use octizys_pretty::highlight::{
+    EmptyRender, HighlightRenderer, TerminalRender24,
+};
 use octizys_text_store::store::Store;
 use pretty_assertions::{assert_eq, assert_ne};
 use std::fmt::Debug;
@@ -26,13 +29,21 @@ fn parse<T: ToDocument<PrettyCSTConfiguration> + Clone>(
     match parser(lexer) {
         Ok(x) => (
             x.clone(),
-            x.to_document(&configuration).render_to_string(80, &store),
+            x.to_document(&configuration).render_to_string(
+                80,
+                EmptyRender::render_highlight,
+                &store,
+            ),
         ),
         Err(e) => {
             let mut error_context = ParserErrorContext::default();
             error_context.src = &source;
             let report = create_error_report(&e, &error_context);
-            let as_str = report.render_to_string(80, &store);
+            let as_str = report.render_to_string(
+                80,
+                TerminalRender24::render_highlight,
+                &store,
+            );
             panic!("{}", as_str);
         }
     }
