@@ -3,13 +3,16 @@ use octizys_common::{
     logic_path::LogicPath,
     span::{Position, Span},
 };
-use octizys_cst::comments::{
-    Comment, CommentBlock, CommentBraceKind, CommentLine, CommentLineContent,
-    CommentsInfo, LineCommentStart,
-};
 use octizys_cst::{
     base::{TokenInfo, TokenInfoWithPhantom},
     comments::CommentKind,
+};
+use octizys_cst::{
+    comments::{
+        Comment, CommentBlock, CommentBraceKind, CommentLine,
+        CommentLineContent, CommentsInfo, LineCommentStart,
+    },
+    types::{OwnershipLiteral, OwnershipVariable},
 };
 use octizys_pretty::{
     combinators::{concat, empty, external_text, hard_break, nest, repeat},
@@ -111,6 +114,8 @@ pub enum BaseToken {
     Selector(Identifier),
     AnonHole,
     NamedHole(u64),
+    OwnershipLiteral(OwnershipLiteral),
+    OwnershipVariable(OwnershipVariable),
 }
 
 #[derive(Debug, Clone)]
@@ -138,8 +143,20 @@ pub enum LexerError {
     /// is expected.
     CouldntMatchBlockComment(String, CommentBraceKind, Span),
     Notu64NamedHole(String, Span),
+    /// We expected a identifier and the regex should guarantee it!
+    /// but if not...
+    /// this is a bug.
     CantCreateIdentifier(String, Span),
+    /// We have some unsafe functions that translate a
+    /// [`Token`] in this file to a [`octizys_cst::base::Token`],
+    /// they are mainly used in the parser and shouldn't fail!
+    /// this is a bug.
     CantTranslateToToken(Token),
+    /// We found a match for a ownership_literal but
+    /// then it wasn't a match! most probably the
+    /// regex was update without updating the handler!
+    /// this is a bug.
+    UnexpectedOwnershipLiteralMatch(String, Span),
 }
 
 /*
@@ -382,7 +399,7 @@ fn make_line_comment(
 }
 
 impl<'store, 'source> BaseLexerContext<'store, 'source> {
-    //TODO: make this function capable to start everywere in the source
+    //TODO: make this function capable to start everywhere in the source
     pub fn new(source: &'source str, store: &'store mut Store) -> Self {
         BaseLexerContext {
             source,
@@ -674,14 +691,49 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
         &mut self,
         m: Match,
     ) -> Option<Result<(Span, BaseToken), LexerError>> {
-        todo!()
+        let matched = m.as_str();
+        let span = self.advance_non_line_breaks(matched);
+        match matched {
+            "'0" => Some(Ok((
+                span,
+                BaseToken::OwnershipLiteral(OwnershipLiteral::Zero),
+            ))),
+            "'1" => Some(Ok((
+                span,
+                BaseToken::OwnershipLiteral(OwnershipLiteral::One),
+            ))),
+            "'inf" => Some(Ok((
+                span,
+                BaseToken::OwnershipLiteral(OwnershipLiteral::Inf),
+            ))),
+            _ => Some(Err(LexerError::UnexpectedOwnershipLiteralMatch(
+                matched.to_string(),
+                span,
+            ))),
+        }
     }
 
     fn ownership_variable(
         &mut self,
         m: Match,
     ) -> Option<Result<(Span, BaseToken), LexerError>> {
-        todo!()
+        let matched = m.as_str();
+        let span = self.advance_non_line_breaks(matched);
+        //This is safe since ownership_variables start with `'`, an ascii
+        //character.
+        let maybe_identifier = &matched[1..];
+        match Identifier::make(maybe_identifier, &mut self.store) {
+            Ok(idn) => Some(Ok((
+                span,
+                BaseToken::OwnershipVariable(OwnershipVariable {
+                    variable: idn,
+                }),
+            ))),
+            _ => Some(Err(LexerError::CantCreateIdentifier(
+                matched.to_string(),
+                span,
+            ))),
+        }
     }
 
     fn octal(
@@ -952,6 +1004,8 @@ pub enum Token {
     AnonHole(TokenInfo),
     NamedHole(TokenInfo, u64),
     LastComments(TokenInfo, Vec<Comment>),
+    OwnershipLiteral(TokenInfo, OwnershipLiteral),
+    OwnershipVariable(TokenInfo, OwnershipVariable),
 }
 
 impl From<Token> for TokenInfo {
@@ -1044,6 +1098,8 @@ impl From<Token> for TokenInfo {
             Token::AnonHole(info) => info,
             Token::NamedHole(info, _) => info,
             Token::LastComments(info, _) => info,
+            Token::OwnershipLiteral(info, _) => info,
+            Token::OwnershipVariable(info, _) => info,
         }
     }
 }
@@ -1138,6 +1194,8 @@ impl<'a> From<&'a Token> for &'a TokenInfo {
             Token::AnonHole(info) => info,
             Token::NamedHole(info, _) => info,
             Token::LastComments(info, _) => info,
+            Token::OwnershipLiteral(info, _) => info,
+            Token::OwnershipVariable(info, _) => info,
         }
     }
 }
@@ -1257,6 +1315,8 @@ pub fn aux_base_token_to_token(
         BaseToken::Selector(s) => Token::Selector(info, s),
         BaseToken::AnonHole => Token::AnonHole(info),
         BaseToken::NamedHole(s) => Token::NamedHole(info, s),
+        BaseToken::OwnershipLiteral(s) => Token::OwnershipLiteral(info, s),
+        BaseToken::OwnershipVariable(s) => Token::OwnershipVariable(info, s),
     }
 }
 
@@ -1384,8 +1444,6 @@ impl<'store, 'src> Iterator for LexerContext<'store, 'src> {
         //println!("{:?}", self);
         match &self.previous_token {
             Some(previous) => match previous {
-                //TODO: catch the error if it is the default value and
-                //cast to a error with position
                 Err(e) => Some(Err(e.to_owned())),
                 // We had a previous token that may be a comment
                 // that isn't attached or any other token.

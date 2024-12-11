@@ -165,9 +165,22 @@ fn make_source_error<E: ParserErrorReport>(
             let (before, after) = position.get_text_at(context.src, Some(40));
             let pre_spaces = aproximate_string_width(before);
             let spaces = " ".repeat(pre_spaces) + "^";
+            let mut after_iter = after.chars();
+            let after_doc = match after_iter.next() {
+                Some(c) => {
+                    emphasis(
+                        Emphasis::Underline(RED),
+                        foreground(MAGENTA, external_text(&String::from(c))),
+                    ) + {
+                        let remain: String = after_iter.collect();
+                        external_text(&remain)
+                    }
+                }
+                None => empty(),
+            };
             concat(vec![
                 external_text(before),
-                external_text(after),
+                after_doc,
                 hard_break(),
                 foreground(RED, external_text(&spaces)),
                 foreground(RED, expected_to_document(e.get_expected())),
@@ -201,15 +214,17 @@ impl ParserErrorReport for LexerError {
                 "Internal:UnexpectedPunctuationMatch"
             }
             LexerError::UnexpectedCommentMatch(_, _) => {
-                "UnexpectedCommentMatch"
+                "Internal:UnexpectedCommentMatch"
             }
             LexerError::NonFinishedLineComment(_, _) => {
-                "NonFinishedLineComment"
+                "Internal:NonFinishedLineComment"
             }
             LexerError::NonContentInLineComment(_, _) => {
-                "NonContentInLineComment"
+                "Internal:NonContentInLineComment"
             }
-            LexerError::CantCreateCommentLine(_, _) => "CantCreateCommentLine",
+            LexerError::CantCreateCommentLine(_, _) => {
+                "Internal:CantCreateCommentLine"
+            }
             LexerError::CouldntMatchBlockComment(_, _, _) => {
                 "CouldntMatchBlockComment"
             }
@@ -219,6 +234,9 @@ impl ParserErrorReport for LexerError {
             }
             LexerError::CantTranslateToToken(_) => {
                 "Internal:CantTranslateToToken"
+            }
+            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => {
+                "Internal:UnexpectedOwnershipLiteralMatch"
             }
         }
     }
@@ -239,6 +257,7 @@ impl ParserErrorReport for LexerError {
             }
             LexerError::CantCreateIdentifier(_, _) => common,
             LexerError::CantTranslateToToken(_) => common,
+            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => common,
         }
     }
     fn get_long_description(&self) -> Option<&str> {
@@ -253,6 +272,7 @@ impl ParserErrorReport for LexerError {
             LexerError::Notu64NamedHole(_, _) => "Internally the named holes are stored as u64 integers.\nThe provided value for the hole is out of the bound for this range.\nPlease modify the hole value to something between 0 and 2^64 -1",
             LexerError::CantCreateIdentifier(_, _) => "Internally we expected something to follow the same rules as an identifier, but it didn't follow those rules",
             LexerError::CantTranslateToToken(_) => "The internal translation between simple Tokens and the CST::Tokens failed!",
+            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => "We find what seems to look like a ownership literal, but something unexpected passed while working with it!",
         })
     }
     fn get_expected(&self) -> Option<Vec<String>> {
@@ -296,6 +316,9 @@ impl ParserErrorReport for LexerError {
             LexerError::CantTranslateToToken(token) => ErrorLocation::Span(
                 <&Token as Into<&TokenInfo>>::into(token).span,
             ),
+            LexerError::UnexpectedOwnershipLiteralMatch(_, span) => {
+                ErrorLocation::Span(span.clone())
+            }
         }
     }
 }
@@ -329,9 +352,9 @@ impl ParserErrorReport for ParseError<Position, Token, LexerError> {
     }
     fn get_long_description(&self) -> Option<&str> {
         match self {
-            ParseError::InvalidToken { .. } => Some("The internal library used to parse the code has this disabled by octizys, if you see this, a bug in the parser generator may happened!"),
-            ParseError::UnrecognizedEof { .. } =>Some("You may be missing some additional code. We read all what you provided but we still can't understand everything you provided."),
-            ParseError::UnrecognizedToken { .. } => Some("Something is wrong with the code structure.\nThere's a chance that the error happenned before this point, but in such case we were able to understan (wrong) what you provided until this point."),
+            ParseError::InvalidToken { .. } => Some("The internal library used to parse the code has this disabled by octizys.\nIf you see this, a bug in the parser generator may happened!"),
+            ParseError::UnrecognizedEof { .. } =>Some("You may need to provide more code.\nWe read all what you provided but we still couln't understand it!"),
+            ParseError::UnrecognizedToken { .. } => Some("Something is wrong with the code structure.\nThere's a chance that the error happenned before this point.\nBut in such case we were able to understand (wrong) the code until we reached this place."),
             ParseError::ExtraToken { .. } => Some("We belive that we finished reading and understanding your code before we really read everything.\nThis means that you may have other errors in the middle or that you may want to delete the excess of code."),
             ParseError::User { error } => error.get_long_description(),
         }

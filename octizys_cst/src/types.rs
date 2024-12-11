@@ -21,6 +21,19 @@ pub enum TypeBase {
     String,
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Clone, Copy)]
+pub enum OwnershipLiteral {
+    #[default]
+    Zero,
+    One,
+    Inf,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub struct OwnershipVariable {
+    pub variable: Identifier,
+}
+
 #[derive(Debug, Derivative)]
 pub struct TypeRecordItem {
     pub variable: Token<Identifier>,
