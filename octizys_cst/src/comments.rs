@@ -48,7 +48,7 @@ impl CommentLineContent {
     /// Returns a reference to a place in the Store.
     #[inline]
     pub fn get_index(&self) -> usize {
-        self.len
+        self.index
     }
 }
 
@@ -104,6 +104,9 @@ pub enum CommentBraceKind {
     Brace3,
 }
 impl CommentBraceKind {
+    /// Returns the total lenght in bytes of the start of a block
+    /// with the given kind, this means that it has the length of
+    /// the full `{--`.
     pub fn len(self) -> usize {
         match self {
             Self::Brace0 => 2,
