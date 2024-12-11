@@ -5,7 +5,7 @@ use octizys_text_store::store::{
     StoreSymbol,
 };
 
-use crate::highlight::Highlight;
+use crate::highlight::{Color, Emphasis, Highlight};
 
 /// Adapted from the paper Strictly Pretty, Christian Lindig.
 /// Is specialized to handle the source files, that's why
@@ -41,6 +41,12 @@ enum DocumentInternal {
     Nest(u16, Box<DocumentInternal>),
     /// Enable the option to be in flat or break mode
     Group(Box<DocumentInternal>),
+    /// Establish only the background color
+    Background(Color, Box<DocumentInternal>),
+    /// Establish only the foreground color
+    Foreground(Color, Box<DocumentInternal>),
+    /// Establish only the emphasis for the document
+    Emphasis(Emphasis, Box<DocumentInternal>),
     /// Use the given Highlight for the given document.
     Highlight(Highlight, Box<DocumentInternal>),
 }
@@ -215,6 +221,18 @@ impl Document {
         Document(DocumentInternal::Group(Box::new(doc.0)))
     }
 
+    pub fn background(color: Color, doc: Document) -> Document {
+        Document(DocumentInternal::Background(color, Box::new(doc.0)))
+    }
+
+    pub fn foreground(color: Color, doc: Document) -> Document {
+        Document(DocumentInternal::Foreground(color, Box::new(doc.0)))
+    }
+
+    pub fn emphasis(emphasis: Emphasis, doc: Document) -> Document {
+        Document(DocumentInternal::Emphasis(emphasis, Box::new(doc.0)))
+    }
+
     pub fn highlight(highlight: Highlight, doc: Document) -> Document {
         Document(DocumentInternal::Highlight(highlight, Box::new(doc.0)))
     }
@@ -368,6 +386,15 @@ impl<'doc> DocumentIterator<'doc> {
                 DocumentInternal::Group(doc) => {
                     stack.push(current.with_document(doc).as_flat())
                 }
+                DocumentInternal::Foreground(_, doc) => {
+                    stack.push(current.with_document(doc))
+                }
+                DocumentInternal::Background(_, doc) => {
+                    stack.push(current.with_document(doc))
+                }
+                DocumentInternal::Emphasis(_, doc) => {
+                    stack.push(current.with_document(doc))
+                }
                 DocumentInternal::Highlight(_, doc) => {
                     stack.push(current.with_document(doc))
                 }
@@ -472,6 +499,36 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
                 } else {
                     self.stack.push(current.with_document(doc).as_break())
                 }
+                Some(String::new())
+            }
+            DocumentInternal::Background(c, d) => {
+                let new_highlight = Highlight {
+                    background: *c,
+                    ..current.highlight
+                };
+                self.stack.push(
+                    current.with_document(d).with_highlight(new_highlight),
+                );
+                Some(String::new())
+            }
+            DocumentInternal::Foreground(c, d) => {
+                let new_highlight = Highlight {
+                    foreground: *c,
+                    ..current.highlight
+                };
+                self.stack.push(
+                    current.with_document(d).with_highlight(new_highlight),
+                );
+                Some(String::new())
+            }
+            DocumentInternal::Emphasis(e, d) => {
+                let new_highlight = Highlight {
+                    emphasis: *e,
+                    ..current.highlight
+                };
+                self.stack.push(
+                    current.with_document(d).with_highlight(new_highlight),
+                );
                 Some(String::new())
             }
             DocumentInternal::Highlight(h, d) => {

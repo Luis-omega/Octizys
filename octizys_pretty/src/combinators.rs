@@ -1,6 +1,7 @@
 use std::iter;
 
 use crate::document::*;
+use crate::highlight::{Color, Emphasis};
 use octizys_text_store::store::Store;
 
 pub fn empty() -> Document {
@@ -107,6 +108,18 @@ pub fn intersperse<
 /// Repeat the same document [`n`] times.
 pub fn repeat(doc: Document, n: usize) -> Document {
     concat(iter::repeat(doc).take(n).collect())
+}
+
+pub fn background(color: Color, doc: Document) -> Document {
+    Document::background(color, doc)
+}
+
+pub fn foreground(color: Color, doc: Document) -> Document {
+    Document::foreground(color, doc)
+}
+
+pub fn emphasis(emphasis: Emphasis, doc: Document) -> Document {
+    Document::emphasis(emphasis, doc)
 }
 
 /*
