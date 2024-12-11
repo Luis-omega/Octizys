@@ -56,10 +56,9 @@ pub static IDENTIFER_LAZY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         ^ #match from the begin
         # can begin with underscores, but not digits
         _*
-        #  regular \w contains digits, so, we use instead this
-        (\p{Alphabetic}|\p{M}|\p{Join_Control})
+        \p{XID_START}
         # after we found a valid Alphabetic, we can allow underscores and digits
-        (_|\d|\p{Alphabetic}|\p{M}|\p{Join_Control})*
+        \p{XID_CONTINUE}*
         $ #match until the end
         ",
     )
