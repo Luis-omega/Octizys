@@ -546,10 +546,9 @@ mod render_tests {
 
     fn make_test(target_string: &str, doc: Document, width: usize) {
         let store = Store::default();
-        assert_eq!(
-            target_string,
-            doc.render_to_string(width, EmptyRender::render_highlight, &store)
-        )
+        let result =
+            doc.render_to_string(width, EmptyRender::render_highlight, &store);
+        assert_eq!(target_string, result)
     }
 
     #[test]

@@ -241,7 +241,7 @@ impl ColorRender for TerminalRender24 {
         let gf = foreground.color24.g;
         let bf = foreground.color24.b;
         (
-            format!("\x1b[38;2;;{rf};{gf};{bf}m\x1b[48;2;;{rb};{gb};{bb}m"),
+            format!("\x1b[38;2;{rf};{gf};{bf}m\x1b[48;2;{rb};{gb};{bb}m"),
             Color24Bits::ansi_end(),
         )
     }
