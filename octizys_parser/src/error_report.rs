@@ -73,10 +73,13 @@ impl ErrorLocation {
 
 pub trait ParserErrorReport {
     fn get_error_name(&self) -> &str;
+    // TODO: change the str for document or String?
     fn get_short_description(&self) -> &str;
+    // TODO: change the str for document or String?
+    // We want more dinamyc errors!
     fn get_long_description(&self) -> Option<&str>;
     /// A vector of strings describing what is expected.
-    fn get_expected(&self) -> Option<&Vec<String>>;
+    fn get_expected(&self) -> Option<Vec<String>>;
     fn get_location(&self) -> ErrorLocation;
 }
 
@@ -108,7 +111,7 @@ pub fn make_error_info_start<E: ParserErrorReport>(
     ])
 }
 
-fn expected_to_document(expected: Option<&Vec<String>>) -> Document {
+fn expected_to_document(expected: Option<Vec<String>>) -> Document {
     match expected {
         None => empty(),
         Some(v) => {
@@ -197,6 +200,19 @@ impl ParserErrorReport for LexerError {
             LexerError::UnexpectedPunctuationMatch(_, _) => {
                 "Internal:UnexpectedPunctuationMatch"
             }
+            LexerError::UnexpectedCommentMatch(_, _) => {
+                "UnexpectedCommentMatch"
+            }
+            LexerError::NonFinishedLineComment(_, _) => {
+                "NonFinishedLineComment"
+            }
+            LexerError::NonContentInLineComment(_, _) => {
+                "NonContentInLineComment"
+            }
+            LexerError::CantCreateCommentLine(_, _) => "CantCreateCommentLine",
+            LexerError::CouldntMatchBlockComment(_, _, _) => {
+                "CouldntMatchBlockComment"
+            }
             LexerError::Notu64NamedHole(_, _) => "Notu64NamedHole",
             LexerError::CantCreateIdentifier(_, _) => {
                 "Internal:CantCreateIdentifier"
@@ -213,6 +229,11 @@ impl ParserErrorReport for LexerError {
                 "The provided character doesn't correspond to a valid program."
             }
             LexerError::UnexpectedPunctuationMatch(_, _) => common,
+            LexerError::UnexpectedCommentMatch(_, _) => common,
+            LexerError::NonFinishedLineComment(_, _) => common,
+            LexerError::NonContentInLineComment(_, _) => common,
+            LexerError::CantCreateCommentLine(_, _) => common,
+            LexerError::CouldntMatchBlockComment(_,_, _) => "We found the begining of a block comment but couldn't finished it!",
             LexerError::Notu64NamedHole(_, _) => {
                 "Named holes are limited to u64 integers."
             }
@@ -224,13 +245,24 @@ impl ParserErrorReport for LexerError {
         Some(match self {
             LexerError::UnexpectedCharacter(_) => "While reading the code, we were unable to understand this particular character.",
             LexerError::UnexpectedPunctuationMatch(_, _) => "The internal way to find punctuation marks and operators failed, it recognized a character that we did'nt suppor!",
+            LexerError::UnexpectedCommentMatch(_, _) => "The intnernal way to find a comment failed after succeding!",
+            LexerError::NonFinishedLineComment(_, _) => "We find the start of a comment but not the end for some reason (not unbalanced brackets)",
+            LexerError::NonContentInLineComment(_, _) => "We find a comment but we were unable to retrieve the content",
+            LexerError::CantCreateCommentLine(_, _) => "We got the content of a comment but the internalizer disagree with us that this comment has the right format!",
+            LexerError::CouldntMatchBlockComment(_,_, _) => "We were looking for a matching end for the comment.\nEither we didn't find it and we consumed all the code looking for it.\nOr something else got wrong in the search (unprobable)",
             LexerError::Notu64NamedHole(_, _) => "Internally the named holes are stored as u64 integers.\nThe provided value for the hole is out of the bound for this range.\nPlease modify the hole value to something between 0 and 2^64 -1",
             LexerError::CantCreateIdentifier(_, _) => "Internally we expected something to follow the same rules as an identifier, but it didn't follow those rules",
             LexerError::CantTranslateToToken(_) => "The internal translation between simple Tokens and the CST::Tokens failed!",
         })
     }
-    fn get_expected(&self) -> Option<&Vec<String>> {
-        None
+    fn get_expected(&self) -> Option<Vec<String>> {
+        match self {
+            LexerError::CouldntMatchBlockComment(_, kind, _) => {
+                let hypens = "-".repeat(kind.len() - 1);
+                Some(vec![hypens + "}"])
+            }
+            _ => None,
+        }
     }
     fn get_location(&self) -> ErrorLocation {
         match self {
@@ -238,6 +270,21 @@ impl ParserErrorReport for LexerError {
                 ErrorLocation::Position(p.clone())
             }
             LexerError::UnexpectedPunctuationMatch(_, span) => {
+                ErrorLocation::Span(span.clone())
+            }
+            LexerError::UnexpectedCommentMatch(_, span) => {
+                ErrorLocation::Span(span.clone())
+            }
+            LexerError::NonFinishedLineComment(_, span) => {
+                ErrorLocation::Span(span.clone())
+            }
+            LexerError::NonContentInLineComment(_, span) => {
+                ErrorLocation::Span(span.clone())
+            }
+            LexerError::CantCreateCommentLine(_, span) => {
+                ErrorLocation::Span(span.clone())
+            }
+            LexerError::CouldntMatchBlockComment(_, _, span) => {
                 ErrorLocation::Span(span.clone())
             }
             LexerError::Notu64NamedHole(_, span) => {
@@ -289,11 +336,15 @@ impl ParserErrorReport for ParseError<Position, Token, LexerError> {
             ParseError::User { error } => error.get_long_description(),
         }
     }
-    fn get_expected(&self) -> Option<&Vec<String>> {
+    fn get_expected(&self) -> Option<Vec<String>> {
         match self {
             ParseError::InvalidToken { .. } => None,
-            ParseError::UnrecognizedEof { expected, .. } => Some(expected),
-            ParseError::UnrecognizedToken { expected, .. } => Some(expected),
+            ParseError::UnrecognizedEof { expected, .. } => {
+                Some(expected.to_owned())
+            }
+            ParseError::UnrecognizedToken { expected, .. } => {
+                Some(expected.to_owned())
+            }
             ParseError::ExtraToken { .. } => None,
             ParseError::User { error } => error.get_expected(),
         }

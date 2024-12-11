@@ -3,9 +3,13 @@ use octizys_common::{
     logic_path::LogicPath,
     span::{Position, Span},
 };
-use octizys_cst::base::{TokenInfo, TokenInfoWithPhantom};
 use octizys_cst::comments::{
-    Comment, CommentBlock, CommentBraceKind, CommentLine, CommentsInfo,
+    Comment, CommentBlock, CommentBraceKind, CommentLine, CommentLineContent,
+    CommentsInfo, LineCommentStart,
+};
+use octizys_cst::{
+    base::{TokenInfo, TokenInfoWithPhantom},
+    comments::CommentKind,
 };
 use octizys_pretty::{
     combinators::{concat, empty, external_text, hard_break, nest, repeat},
@@ -115,6 +119,24 @@ pub enum LexerError {
     /// Punctuation match matched a non know character
     /// This is a bug.
     UnexpectedPunctuationMatch(String, Span),
+    /// Comment match matched a non know character
+    /// This is a bug.
+    UnexpectedCommentMatch(String, Span),
+    /// A line comment pattern match failed.
+    /// This is a bug.
+    NonFinishedLineComment(String, Span),
+    /// A line comment with empty body is fine but
+    /// the regex should still return a empty match.
+    /// This is a bug.
+    NonContentInLineComment(String, Span),
+    /// The internalization of comments failed!
+    /// this is a bug.
+    CantCreateCommentLine(String, Span),
+    /// We found the begining of a block comment
+    /// but the input didn't match the regex,
+    /// in the user side a unbalanced bracket is what
+    /// is expected.
+    CouldntMatchBlockComment(String, CommentBraceKind, Span),
     Notu64NamedHole(String, Span),
     CantCreateIdentifier(String, Span),
     CantTranslateToToken(Token),
@@ -260,6 +282,105 @@ pub struct BaseLexerContext<'store, 'source> {
     store: &'store mut Store,
 }
 
+fn make_block_comment(
+    re: &Regex,
+    context: &mut BaseLexerContext,
+    m: Match,
+    brace_kind: CommentBraceKind,
+) -> Option<Result<(Span, BaseToken), LexerError>> {
+    let matched = m.as_str();
+    match re.captures(&context.index) {
+        Some(c) => {
+            let kind = match c.name("doc") {
+                Some(_) => CommentKind::Documentation,
+                None => CommentKind::NonDocumentation,
+            };
+            let span =
+                context.advance_with_line_breaks(c.get(0).unwrap().as_str());
+            match c.name("content") {
+                Some(content) => {
+                    let comment = CommentBlock::make(
+                        kind,
+                        brace_kind,
+                        content.as_str(),
+                        span.start,
+                        span.end,
+                        &mut context.store,
+                    );
+                    Some(Ok((span, BaseToken::BlockComment(comment))))
+                }
+                //TODO: This is most likely for a non closed comment, we may look for possible
+                //closings of the comment, store that in the info?
+                None => Some(Err(LexerError::NonFinishedLineComment(
+                    matched.to_string(),
+                    span,
+                ))),
+            }
+        }
+        None => {
+            let span = context.advance_non_line_breaks(matched);
+            Some(Err(LexerError::CouldntMatchBlockComment(
+                matched.to_string(),
+                brace_kind,
+                span,
+            )))
+        }
+    }
+}
+
+fn make_line_comment(
+    re: &Regex,
+    context: &mut BaseLexerContext,
+    m: Match,
+    line_start: LineCommentStart,
+) -> Option<Result<(Span, BaseToken), LexerError>> {
+    let matched = m.as_str();
+    match SLASH_COMMENT.captures(&context.index) {
+        Some(c) => {
+            let kind = match c.name("doc") {
+                Some(_) => CommentKind::Documentation,
+                None => CommentKind::NonDocumentation,
+            };
+            let span =
+                context.advance_with_line_breaks(c.get(0).unwrap().as_str());
+            match c.name("content") {
+                Some(content) => {
+                    let maybe_content = CommentLineContent::make_register(
+                        content.as_str(),
+                        &mut context.store,
+                    );
+                    match maybe_content {
+                        Some(internalized_content) => Some(Ok((
+                            span,
+                            BaseToken::LineComment(CommentLine {
+                                kind,
+                                start: line_start,
+                                content: internalized_content,
+                                span,
+                            }),
+                        ))),
+                        None => Some(Err(LexerError::CantCreateCommentLine(
+                            matched.to_string(),
+                            span,
+                        ))),
+                    }
+                }
+                None => Some(Err(LexerError::NonFinishedLineComment(
+                    matched.to_string(),
+                    span,
+                ))),
+            }
+        }
+        None => {
+            let span = context.advance_non_line_breaks(matched);
+            Some(Err(LexerError::NonFinishedLineComment(
+                matched.to_string(),
+                span,
+            )))
+        }
+    }
+}
+
 impl<'store, 'source> BaseLexerContext<'store, 'source> {
     //TODO: make this function capable to start everywere in the source
     pub fn new(source: &'source str, store: &'store mut Store) -> Self {
@@ -317,7 +438,52 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
         &mut self,
         m: Match,
     ) -> Option<Result<(Span, BaseToken), LexerError>> {
-        todo!()
+        let matched = m.as_str();
+        match matched {
+            "--" => make_line_comment(
+                &*HYPEN_COMMENT,
+                self,
+                m,
+                octizys_cst::comments::LineCommentStart::DoubleHypen,
+            ),
+            "//" => make_line_comment(
+                &*SLASH_COMMENT,
+                self,
+                m,
+                octizys_cst::comments::LineCommentStart::DoubleSlash,
+            ),
+            "{-" => make_block_comment(
+                &*COMMENT_BLOCK0,
+                self,
+                m,
+                CommentBraceKind::Brace0,
+            ),
+            "{--" => make_block_comment(
+                &*COMMENT_BLOCK1,
+                self,
+                m,
+                CommentBraceKind::Brace1,
+            ),
+            "{---" => make_block_comment(
+                &*COMMENT_BLOCK2,
+                self,
+                m,
+                CommentBraceKind::Brace2,
+            ),
+            "{----" => make_block_comment(
+                &*COMMENT_BLOCK3,
+                self,
+                m,
+                CommentBraceKind::Brace3,
+            ),
+            _ => {
+                let span = self.advance_non_line_breaks(matched);
+                Some(Err(LexerError::UnexpectedCommentMatch(
+                    matched.to_string(),
+                    span,
+                )))
+            }
+        }
     }
 
     fn punctuation_or_operator(
@@ -548,6 +714,41 @@ const MAIN_REGEX: LazyLock<Regex> =
 const SPACES_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"^\s+"#).unwrap());
 
+// We need to match at the end for the EOF, otherwise the
+// repl or test may fail the parse!
+static HYPEN_COMMENT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^-- *(?<doc>\|)?(?<content>.*)(\n|$)").unwrap()
+});
+
+static SLASH_COMMENT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^// *(?<doc>\|)?(?<content>.*)(\n|$)").unwrap()
+});
+
+// Remember, for the concatenation the complement of
+// `ab`
+// is
+// `[^a]|a[^b]`
+// In blocks we want to find complements of `--}`.
+static COMMENT_BLOCK0: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\{- *(?<doc>\|)?(?<content>([^-]|-[^\}])*)-\}").unwrap()
+});
+static COMMENT_BLOCK1: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\{-- *(?<doc>\|)?(?<content>([^-]|-([^-]|-[^\}]))*)--\}")
+        .unwrap()
+});
+static COMMENT_BLOCK2: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"\{--- *(?<doc>\|)?(?<content>([^-]|-([^-]|-([^-]|-[^\}])))*)---\}",
+    )
+    .unwrap()
+});
+static COMMENT_BLOCK3: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"\{---- *(?<doc>\|)?(?<content>([^-]|-([^-]|-([^-]|-([^-]|-[^\}]))))*)----\}",
+    )
+    .unwrap()
+});
+
 fn find_match_group<'source, 'store, 'context>(
     c: Captures,
     blc: &'context mut BaseLexerContext<'store, 'source>,
@@ -583,7 +784,7 @@ impl<'store, 'source> Iterator for BaseLexerContext<'store, 'source> {
                 captures,
                 self,
                 vec![
-                    ("comment", BaseLexerContext::comment),
+                    ("comment_start", BaseLexerContext::comment),
                     (
                         "punctuation_or_operator",
                         BaseLexerContext::punctuation_or_operator,

@@ -8,6 +8,7 @@ use octizys_parser::lexer;
 use octizys_parser::lexer::{
     BaseLexerContext, BaseToken, LexerContext, LexerError, Token,
 };
+use octizys_pretty::highlight::EmptyRender;
 use octizys_pretty::{
     combinators::{
         concat, empty, external_text, group, hard_break, intersperse, nest,
@@ -75,13 +76,13 @@ fn main() {
             Ok(item) => {
                 //println!("{:#?}", item);
                 let as_doc = group(item.to_document(&configuration));
-                //println!("{:?}", as_doc);
+                //println!("DOC:{:#?}", as_doc);
                 // TODO: make color configurable
                 println!(
                     "{}",
                     as_doc.render_to_string(
                         80,
-                        TerminalRender24::render_highlight,
+                        EmptyRender::render_highlight,
                         &store
                     )
                 )
