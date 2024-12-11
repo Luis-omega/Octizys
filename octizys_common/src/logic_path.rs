@@ -31,8 +31,7 @@ impl From<Identifier> for LogicPath {
     }
 }
 
-/// The abstract representation of a importation path inside the language,
-/// usually called `logic path`.
+/// The abstract representation of a logic path inside the language.
 ///
 /// Example:
 ///
@@ -40,7 +39,6 @@ impl From<Identifier> for LogicPath {
 /// a::b::cder::
 /// ```
 ///
-// TODO: maybe abbreviate  the name to just `LogicPath` ?
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LogicPath(Vec<Identifier>);
 
