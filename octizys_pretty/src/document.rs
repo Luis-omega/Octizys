@@ -5,6 +5,8 @@ use octizys_text_store::store::{
     StoreSymbol,
 };
 
+use crate::highlight::Highlight;
+
 /// Adapted from the paper Strictly Pretty, Christian Lindig.
 /// Is specialized to handle the source files, that's why
 /// we use internalization of strings.
@@ -35,10 +37,12 @@ enum DocumentInternal {
         index: usize,
         len: usize,
     },
-    // set the Indentation level for the document that it contains
+    /// Set the Indentation level for the document that it contains
     Nest(u16, Box<DocumentInternal>),
-    // Enable the option to be in flat or break mode
+    /// Enable the option to be in flat or break mode
     Group(Box<DocumentInternal>),
+    /// Use the given Highlight for the given document.
+    Highlight(Highlight, Box<DocumentInternal>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -52,6 +56,7 @@ struct FitsParam<'doc> {
     ident: u16,
     mode: Mode,
     doc: &'doc DocumentInternal,
+    highlight: Highlight,
 }
 
 impl<'doc> FitsParam<'doc> {
@@ -78,6 +83,10 @@ impl<'doc> FitsParam<'doc> {
 
     fn with_document(&self, doc: &'doc DocumentInternal) -> Self {
         FitsParam { doc, ..*self }
+    }
+
+    fn with_highlight(&self, highlight: Highlight) -> Self {
+        FitsParam { highlight, ..*self }
     }
 }
 
@@ -206,16 +215,26 @@ impl Document {
         Document(DocumentInternal::Group(Box::new(doc.0)))
     }
 
+    pub fn highlight(highlight: Highlight, doc: Document) -> Document {
+        Document(DocumentInternal::Highlight(highlight, Box::new(doc.0)))
+    }
+
     pub fn into_iter<'doc>(
         &'doc self,
         width: usize,
         store: &'doc Store,
-    ) -> DocumentIterator {
-        DocumentIterator::new(self, width, store).into_iter()
+        highlight: fn(&Highlight) -> (String, String),
+    ) -> DocumentIterator<'doc> {
+        DocumentIterator::new(self, width, highlight, store).into_iter()
     }
 
-    pub fn render_to_string(self, width: usize, store: &Store) -> String {
-        self.into_iter(width, store).collect()
+    pub fn render_to_string<'doc>(
+        &'doc self,
+        width: usize,
+        highlight: fn(&Highlight) -> (String, String),
+        store: &'doc Store,
+    ) -> String {
+        self.into_iter(width, store, highlight).collect()
     }
 }
 
@@ -238,20 +257,29 @@ pub struct DocumentIterator<'doc> {
     line_width: usize,
     stack: Vec<FitsParam<'doc>>,
     store: &'doc Store,
+    /// A function that returns a previous text and after text for a Highlight.
+    highlight_renderer: fn(&Highlight) -> (String, String),
 }
 
 impl<'doc> DocumentIterator<'doc> {
-    fn new(doc: &'doc Document, width: usize, store: &'doc Store) -> Self {
+    fn new(
+        doc: &'doc Document,
+        width: usize,
+        highlight_renderer: fn(&Highlight) -> (String, String),
+        store: &'doc Store,
+    ) -> Self {
         let params = FitsParam {
             ident: 0,
             mode: Mode::Flat,
             doc: &doc.0,
+            highlight: Default::default(),
         };
         DocumentIterator {
             consumed_width: 0,
             line_width: width,
             stack: vec![params],
             store,
+            highlight_renderer,
         }
     }
 
@@ -340,9 +368,21 @@ impl<'doc> DocumentIterator<'doc> {
                 DocumentInternal::Group(doc) => {
                     stack.push(current.with_document(doc).as_flat())
                 }
+                DocumentInternal::Highlight(_, doc) => {
+                    stack.push(current.with_document(doc))
+                }
             }
         }
     }
+}
+
+pub fn add_highlight<'doc>(
+    highlight: &'doc Highlight,
+    s: &'doc str,
+    render: fn(&'doc Highlight) -> (String, String),
+) -> String {
+    let (start, end) = render(highlight);
+    format!("{start}{s}{end}")
 }
 
 impl<'doc> Iterator for DocumentIterator<'doc> {
@@ -352,15 +392,29 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
         match current.doc {
             DocumentInternal::Empty => Some(String::new()),
             DocumentInternal::SoftBreak => match current.mode {
-                Mode::Break => Some(self.gen_line_break(current.ident)),
-                Mode::Flat => Some(self.advance_width_with(String::from(" "))),
+                Mode::Break => Some(add_highlight(
+                    &current.highlight,
+                    &self.gen_line_break(current.ident),
+                    self.highlight_renderer,
+                )),
+                Mode::Flat => Some(add_highlight(
+                    &current.highlight,
+                    &self.advance_width_with(String::from(" ")),
+                    self.highlight_renderer,
+                )),
             },
-            DocumentInternal::HardBreak => {
-                Some(self.gen_line_break(current.ident))
-            }
+            DocumentInternal::HardBreak => Some(add_highlight(
+                &current.highlight,
+                &self.gen_line_break(current.ident),
+                self.highlight_renderer,
+            )),
             DocumentInternal::EmptyBreak => match current.mode {
                 Mode::Flat => Some(String::new()),
-                Mode::Break => Some(self.gen_line_break(current.ident)),
+                Mode::Break => Some(add_highlight(
+                    &current.highlight,
+                    &self.gen_line_break(current.ident),
+                    self.highlight_renderer,
+                )),
             },
             DocumentInternal::Concat(v) => {
                 for doc in v.into_iter().rev() {
@@ -373,24 +427,37 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
                 //maybe we should instead produce a blank and continue?
                 let new_str =
                     self.store.regular.resolve(*s).map(String::from)?;
-                Some(self.advance_width_with(new_str))
+                Some(add_highlight(
+                    &current.highlight,
+                    &self.advance_width_with(new_str),
+                    self.highlight_renderer,
+                ))
             }
             // What to do here? we can put s behind a Rc but
             // we want the resulting string to be fully owned by the user.
-            DocumentInternal::ExternalText(s, _) => {
-                Some(self.advance_width_with((*s).clone().into()))
-            }
-            DocumentInternal::StaticText(s, _) => {
-                Some(self.advance_width_with(String::from((*s).as_str())))
-            }
+            DocumentInternal::ExternalText(s, _) => Some(add_highlight(
+                &current.highlight,
+                &self.advance_width_with((*s).clone().into()),
+                self.highlight_renderer,
+            )),
+            DocumentInternal::StaticText(s, _) => Some(add_highlight(
+                &current.highlight,
+                &self.advance_width_with(String::from((*s).as_str())),
+                self.highlight_renderer,
+            )),
             DocumentInternal::StoredCommentText { index, .. } => {
                 let new_str = self
                     .store
                     .comments
                     .resolve(*index)
                     .map(|x| (*x).clone().into())?;
-                Some(self.advance_width_with(new_str))
+                Some(add_highlight(
+                    &current.highlight,
+                    &self.advance_width_with(new_str),
+                    self.highlight_renderer,
+                ))
             }
+
             //TODO: move this function to a one that can handle this
             // without returning a empty string.
             // This is acceptable for now as a new empty string is low cost.
@@ -407,6 +474,10 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
                 }
                 Some(String::new())
             }
+            DocumentInternal::Highlight(h, d) => {
+                self.stack.push(current.with_document(d).with_highlight(*h));
+                Some(String::new())
+            }
         }
     }
 }
@@ -414,10 +485,14 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
 #[cfg(test)]
 mod render_tests {
     use crate::document::*;
+    use crate::highlight::{EmptyRender, HighlightRenderer};
 
     fn make_test(target_string: &str, doc: Document, width: usize) {
         let store = Store::default();
-        assert_eq!(target_string, doc.render_to_string(width, &store))
+        assert_eq!(
+            target_string,
+            doc.render_to_string(width, EmptyRender::render_highlight, &store)
+        )
     }
 
     #[test]
