@@ -273,7 +273,7 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
     }
 
     fn advance_with_line_breaks(&mut self, s: &str) -> Span {
-        println!("Advancing spaces! {s},size={:}", s.len());
+        //println!("Advancing spaces! {s},size={:}", s.len());
         let start = self.position;
         let len = s.len();
         self.position.source_index = self.position.source_index + len;
@@ -294,7 +294,7 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
     }
 
     fn advance_non_line_breaks(&mut self, s: &str) -> Span {
-        println!("Advancing! {:}", s);
+        //println!("Advancing! {:}", s);
         let start = self.position;
         let len = s.len();
         self.position.column = self.position.column + len;
@@ -574,7 +574,7 @@ impl<'store, 'source> Iterator for BaseLexerContext<'store, 'source> {
     type Item = Result<(Span, BaseToken), LexerError>;
     fn next(&mut self) -> Option<Self::Item> {
         self.consume_spaces();
-        println!("BASE_CONTEXT:{:?}", self);
+        //println!("BASE_CONTEXT:{:?}", self);
         if self.index.len() == 0 {
             return None;
         }

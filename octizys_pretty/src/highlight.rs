@@ -138,11 +138,29 @@ impl Emphasis {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Default)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Highlight {
     pub background: Color,
     pub foreground: Color,
     pub emphasis: Emphasis,
+}
+
+impl Default for Highlight {
+    fn default() -> Self {
+        Highlight {
+            background: Default::default(),
+            foreground: Color {
+                color4: Color4Bits::White,
+                color8: Color8Bits { color: 15 },
+                color24: Color24Bits {
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                },
+            },
+            emphasis: Default::default(),
+        }
+    }
 }
 
 /// A way to translate a color to some markup.
@@ -164,13 +182,13 @@ pub trait EmphasisRender {
 /// [`ColorRender`] and [`EmphasisRender`].
 pub trait HighlightRenderer: ColorRender + EmphasisRender {
     fn render_highlight(highlight: &Highlight) -> (String, String) {
-        let (mut color_start, color_end) =
+        let (color_start, mut color_end) =
             Self::render_color(highlight.background, highlight.foreground);
-        let (emphasis_start, mut emphasis_end) =
+        let (mut emphasis_start, emphasis_end) =
             Self::render_emphasis(highlight.emphasis);
-        color_start.push_str(&emphasis_start);
-        emphasis_end.push_str(&color_end);
-        (color_start, emphasis_end)
+        emphasis_start.push_str(&color_start);
+        color_end.push_str(&emphasis_end);
+        (emphasis_start, color_end)
     }
 }
 
@@ -282,11 +300,11 @@ pub mod base_colors {
 
     pub const WHITE: Color = Color {
         color4: Color4Bits::White,
-        color8: Color8Bits { color: 231 },
+        color8: Color8Bits { color: 15 },
         color24: Color24Bits {
             r: 255,
-            g: 255,
-            b: 255,
+            g: 250,
+            b: 250,
         },
     };
 

@@ -14,6 +14,7 @@ use octizys_pretty::{
         repeat,
     },
     document::Document,
+    highlight::{HighlightRenderer, TerminalRender24},
 };
 use octizys_text_store::store::{aproximate_string_width, Store};
 use std::cell::RefCell;
@@ -75,14 +76,26 @@ fn main() {
                 //println!("{:#?}", item);
                 let as_doc = group(item.to_document(&configuration));
                 //println!("{:?}", as_doc);
-                println!("{}", as_doc.render_to_string(2, &store))
+                // TODO: make color configurable
+                println!(
+                    "{}",
+                    as_doc.render_to_string(
+                        80,
+                        TerminalRender24::render_highlight,
+                        &store
+                    )
+                )
             }
             Err(t) => {
                 let mut error_context = ParserErrorContext::default();
                 let input_clone = input.clone();
                 error_context.src = &input_clone;
                 let report = create_error_report(&t, &error_context);
-                let as_str = report.render_to_string(2, &store);
+                let as_str = report.render_to_string(
+                    80,
+                    TerminalRender24::render_highlight,
+                    &store,
+                );
                 println!("{}", as_str);
             }
         }

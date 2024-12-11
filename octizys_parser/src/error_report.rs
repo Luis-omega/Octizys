@@ -4,10 +4,11 @@ use crate::lexer::{
 use octizys_common::span::{Position, Span};
 use octizys_pretty::{
     combinators::{
-        concat, empty, external_text, group, hard_break, intersperse, nest,
-        repeat,
+        concat, empty, external_text, foreground, group, hard_break,
+        intersperse, nest, repeat,
     },
     document::Document,
+    highlight::base_colors::{BLUE, RED},
 };
 use octizys_text_store::store::{aproximate_string_width, Store};
 
@@ -86,14 +87,19 @@ pub fn make_error_info_start<E: ParserErrorReport>(
     let error_name = error.get_error_name();
     let short_description = error.get_short_description();
     let location_doc = concat(vec![
-        external_text("-->"),
+        foreground(BLUE, external_text("-->")),
         external_text(context.src_name),
         location.to_document(),
     ]);
     concat(vec![
-        external_text("Error!["),
-        external_text(error_name),
-        external_text("]: "),
+        foreground(
+            RED,
+            concat(vec![
+                external_text("Error!["),
+                external_text(error_name),
+                external_text("]: "),
+            ]),
+        ),
         external_text(short_description),
         nest(1, hard_break() + location_doc),
     ])

@@ -51,7 +51,7 @@ impl<T> ToDocument<T> for LogicPath {
                 .iter()
                 .map(|x| x.to_document(_configuration)),
             MODULE_LOGIC_PATH_SEPARATOR,
-        )
+        ) + combinators::external_text(MODULE_LOGIC_PATH_SEPARATOR)
     }
 }
 

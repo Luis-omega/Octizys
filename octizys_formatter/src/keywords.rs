@@ -2,7 +2,7 @@ use octizys_pretty::store::NonLineBreakStr;
 
 macro_rules! make_keywords {
     ($($name:ident : $name_string:literal),+) => {
-       $(pub const $name : NonLineBreakStr = NonLineBreakStr::new(stringify!($name_string));)+
+       $(pub const $name : NonLineBreakStr = NonLineBreakStr::new($name_string);)+
     };
 }
 

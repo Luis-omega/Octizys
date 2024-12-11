@@ -4,6 +4,7 @@ use std::fmt::{Debug, Display};
 use octizys_pretty::{
     combinators::external_text,
     document::Document,
+    highlight::{EmptyRender, HighlightRenderer},
     store::{NonLineBreakStr, Store},
 };
 
@@ -168,7 +169,7 @@ impl<T> Tree<T> {
     pub fn to_string_with(&self, to_document: fn(&T) -> Document) -> String {
         let store = Store::default();
         let doc = self.to_document_with(to_document);
-        doc.render_to_string(2, &store)
+        doc.render_to_string(2, EmptyRender::render_highlight, &store)
     }
 }
 

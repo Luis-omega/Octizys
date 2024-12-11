@@ -29,3 +29,6 @@ lalrpop = "0.21.0"
 [lints.rust]
 unused = "allow"
 unsafe_code = "forbid"
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"
