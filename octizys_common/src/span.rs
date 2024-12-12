@@ -1,5 +1,7 @@
 use std::{fmt::Display, ops::Add};
 
+use crate::equivalence::Equivalence;
+
 /// Represents a Position on a file.
 /// The Eq and Ord instances are based only on the index, is
 /// user responsibility to be congruent with this.
@@ -14,6 +16,12 @@ impl PartialEq for Position {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.source_index == other.source_index
+    }
+}
+
+impl Equivalence for Position {
+    fn equivalent(self, other: Self) -> bool {
+        self == other
     }
 }
 
@@ -126,6 +134,12 @@ impl From<(usize, usize, usize)> for Position {
 pub struct Span {
     pub start: Position,
     pub end: Position,
+}
+
+impl Equivalence for Span {
+    fn equivalent(self, other: Self) -> bool {
+        self == other
+    }
 }
 
 impl Display for Span {

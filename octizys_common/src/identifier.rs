@@ -4,12 +4,22 @@ use regex::Regex;
 use std::{fmt::Display, sync::LazyLock};
 use string_interner::DefaultSymbol;
 
+use crate::equivalence::Equivalence;
+
 // TODO: Document it!
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
 pub struct Identifier {
     symbol: DefaultSymbol,
     len: usize,
+}
+
+/// Equivalence use is to compare trees without positional information.
+/// As such Identifiers are opaque!
+impl Equivalence for Identifier {
+    fn equivalent(self, _other: Self) -> bool {
+        true
+    }
 }
 
 impl Identifier {
@@ -34,6 +44,12 @@ impl From<Identifier> for DefaultSymbol {
 pub enum IdentifierError {
     ContainsInvalidCodePoint(String),
     EmptyIdentifier,
+}
+
+impl Equivalence for IdentifierError {
+    fn equivalent(self, other: Self) -> bool {
+        self == other
+    }
 }
 
 impl Display for IdentifierError {

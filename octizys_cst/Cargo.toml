@@ -10,6 +10,7 @@ octizys_text_store={path="../octizys_text_store"}
 octizys_pretty={path="../octizys_pretty", optional=true}
 octizys_common={path="../octizys_common"}
 derivative = "2.2.0"
+octizys_macros = { version = "0.1.0", path = "../octizys_macros" }
 
 
 [feature]

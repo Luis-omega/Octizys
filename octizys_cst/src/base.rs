@@ -1,10 +1,11 @@
 use std::marker::PhantomData;
 
 use crate::comments::CommentsInfo;
-use derivative::Derivative;
+use octizys_common::equivalence::Equivalence;
 use octizys_common::identifier::Identifier;
 use octizys_common::logic_path::LogicPath;
 use octizys_common::span::{Position, Span};
+use octizys_macros::Equivalence;
 use octizys_text_store::store::NonLineBreakStr;
 
 mod private {
@@ -139,11 +140,10 @@ impl<P> From<TokenInfo> for TokenInfoWithPhantom<P> {
 /// We never build a [`Token`] for punctuation elements or keywords,
 /// instead we build a [`TokenInfoWithPhantom`] with the appropriate
 /// phantom type.
-#[derive(Debug, Clone, Derivative)]
-#[derivative(PartialEq, Eq)]
+#[derive(Debug, Clone, Equivalence, PartialEq, Eq)]
 pub struct Token<T> {
     pub value: T,
-    #[derivative(PartialEq = "ignore")]
+    #[equivalence(ignore)]
     pub info: TokenInfo,
 }
 
@@ -165,7 +165,7 @@ impl<T> Token<T> {
 
 /// Any set of symbols that aren't identifiers, keywords or brackets, allowed
 /// inside a expression (and maybe in the future to types).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Equivalence)]
 pub enum OperatorName {
     Interrogation,
     Exclamation,
@@ -219,24 +219,25 @@ pub enum OperatorName {
 /// ```txt
 /// core::main::path
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Equivalence)]
 pub struct ImportedVariable {
     pub path: LogicPath,
     pub name: Identifier,
 }
 
 /// Some structure surrounded by delimiters like `()` and `{}`
-#[derive(Debug, Derivative, Clone)]
-#[derivative(PartialEq, Eq)]
+#[derive(Debug, Clone, Equivalence, PartialEq, Eq)]
+#[equivalence(ignore=Enclosure)]
 pub struct Between<T, Enclosure>
 where
     Enclosure: Delimiters,
 {
-    #[derivative(PartialEq = "ignore")]
+    #[equivalence(ignore)]
     pub left: TokenInfo,
-    #[derivative(PartialEq = "ignore")]
+    #[equivalence(ignore)]
     pub right: TokenInfo,
     pub value: T,
+    #[equivalence(ignore)]
     pub _enclosure_phantom: PhantomData<Enclosure>,
 }
 
@@ -249,15 +250,16 @@ where
 /// ```txt
 /// ,b
 /// ```
-#[derive(Debug, Derivative, Clone)]
-#[derivative(PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Equivalence)]
+#[equivalence(ignore=SeparatorPhantom)]
 pub struct TrailingListItem<T, SeparatorPhantom>
 where
     SeparatorPhantom: Separator,
 {
-    #[derivative(PartialEq = "ignore")]
+    #[equivalence(ignore)]
     pub separator: TokenInfo,
     pub item: T,
+    #[equivalence(ignore)]
     pub _phantom_separator: PhantomData<SeparatorPhantom>,
 }
 
@@ -271,15 +273,15 @@ where
 /// ```
 ///
 /// The last `,` is optional.
-#[derive(Debug, Derivative, Clone)]
-#[derivative(PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Equivalence)]
+#[equivalence(ignore=SeparatorPhantom)]
 pub struct TrailingList<T, SeparatorPhantom>
 where
     SeparatorPhantom: Separator,
 {
     pub first: T,
     pub items: Vec<TrailingListItem<T, SeparatorPhantom>>,
-    #[derivative(PartialEq = "ignore")]
+    #[equivalence(ignore)]
     pub trailing_sep: Option<TokenInfo>,
 }
 

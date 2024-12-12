@@ -2,7 +2,7 @@ use std::str::FromStr;
 use octizys_cst::{
   base::{Between,Token,TrailingList,TokenInfo,ImportedVariable,OperatorName,TrailingListItem,Comma,Colon,Braces,Parens,LogicPathSeparator},
   comments::{CommentKind,LineCommentStart,Comment},
-  imports::{Import},
+  imports::{AsPath,Import},
   types::{Type,TypeRecordItem,TypeBase},
   patterns::{PatternMatch,PatternMatchRecordItem, PatternMatchBind},
   expressions::{Expression,CaseItem,Case,ExpressionSelector,ExpressionRecordItem}};
@@ -279,9 +279,9 @@ import_item : Token<Identifier> ={
 import_list : TrailingList<Token<Identifier>,Comma> =
   trailing_list<import_item,",",Comma> => <>;
 
-import_as : (TokenInfo,Token<LogicPath>) =
-  <a:"as"> <p:logic_path>
-  => (a.into(),p);
+import_as : AsPath =
+  <a:"as"> <path:logic_path>
+  => AsPath{_as:a.into(),path};
 
 pub import_declaration : Import =
   <import:"import"> <unqualified:"unqualified"?> <logic_path:logic_path>

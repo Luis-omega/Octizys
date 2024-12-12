@@ -1,4 +1,4 @@
-workspace = { members = [ "octizys_common", "octizys_compiler", "octizys_core", "octizys_cst", "octizys_doc", "octizys_formatter","octizys_parser", "octizys_pretty", "octizys_sast", "octizys_text_store"] }
+workspace = { members = [ "octizys_common", "octizys_compiler", "octizys_core", "octizys_cst", "octizys_doc", "octizys_formatter", "octizys_macros","octizys_parser", "octizys_pretty", "octizys_sast", "octizys_text_store"] }
 [package]
 name = "octizys"
 version = "0.1.0"

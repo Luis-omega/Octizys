@@ -1,0 +1,16 @@
+[package]
+name = "octizys_macros"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+darling = "0.20.10"
+octizys_common = { version = "0.1.0", path = "../octizys_common" }
+proc-macro2 = "1.0.92"
+quote = "1.0.37"
+syn = "2.0.90"
+
+[lib]
+name = "octizys_macros"
+path = "src/lib.rs"
+proc-macro = true

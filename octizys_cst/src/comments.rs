@@ -1,4 +1,6 @@
+use octizys_common::equivalence::Equivalence;
 use octizys_common::span::{Position, Span};
+use octizys_macros::Equivalence;
 use octizys_text_store::store::{NonLineBreakString, Store};
 
 /// Represents a single line of a comment without line breaks.
@@ -8,7 +10,7 @@ use octizys_text_store::store::{NonLineBreakString, Store};
 /// together with the length of the comment (as understated by the
 /// notion of length on the store).
 /// Storing the length here, allow us to avoid access to the store.
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Equivalence)]
 pub struct CommentLineContent {
     // TODO: a newtype around the index type.:
     index: usize,
@@ -56,7 +58,7 @@ impl CommentLineContent {
 /// A documentation includes a space and a pipe ` |` after the
 /// start of the comment.
 /// In the future we may allow for any amount of spaces.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Equivalence)]
 pub enum CommentKind {
     Documentation,
     NonDocumentation,

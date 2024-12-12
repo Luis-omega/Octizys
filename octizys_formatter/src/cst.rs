@@ -12,7 +12,7 @@ use octizys_cst::{
         ExpressionRecordItem, ExpressionSelector, LambdaExpression, Let,
         LetBinding,
     },
-    imports::Import,
+    imports::{AsPath, Import},
     patterns::{PatternMatch, PatternMatchBind, PatternMatchRecordItem},
     types::{Type, TypeBase, TypeRecordItem},
 };
@@ -358,6 +358,23 @@ where
     }
 }
 
+impl ToDocument<PrettyCSTConfiguration> for AsPath {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        soft_break()
+            + concat(vec![
+                token_info_to_document(
+                    &self._as,
+                    configuration,
+                    Document::static_str(keywords::AS),
+                ),
+                indent(
+                    configuration,
+                    soft_break() + self.path.to_document(configuration),
+                ),
+            ])
+    }
+}
+
 impl ToDocument<PrettyCSTConfiguration> for Import {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
         let import = token_info_to_document(
@@ -382,23 +399,10 @@ impl ToDocument<PrettyCSTConfiguration> for Import {
             Some(x) => x.to_document(configuration),
             None => empty(),
         };
-        let _as = match &self.qualified_path {
-            Some((ti, tm)) => {
-                soft_break()
-                    + concat(vec![
-                        token_info_to_document(
-                            ti,
-                            configuration,
-                            Document::static_str(keywords::AS),
-                        ),
-                        indent(
-                            configuration,
-                            soft_break() + tm.to_document(configuration),
-                        ),
-                    ])
-            }
-            None => empty(),
-        };
+        let _as = self
+            .qualified_path
+            .as_ref()
+            .map_or_else(empty, |x| x.to_document(configuration));
         import
             + indent(
                 configuration,

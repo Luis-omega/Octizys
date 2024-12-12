@@ -1,3 +1,5 @@
+use octizys_common::assert_equivalent;
+use octizys_common::equivalence::Equivalence;
 use octizys_common::span::{Position, Span};
 use octizys_cst::imports::Import;
 use octizys_formatter::cst::PrettyCSTConfiguration;
@@ -49,7 +51,9 @@ fn parse<T: ToDocument<PrettyCSTConfiguration> + Clone>(
     }
 }
 
-fn roundtrip<T: ToDocument<PrettyCSTConfiguration> + Eq + Clone + Debug>(
+fn roundtrip<
+    T: ToDocument<PrettyCSTConfiguration> + Equivalence + Clone + Debug,
+>(
     source: &str,
     parser: fn(
         LexerContext,
@@ -60,8 +64,8 @@ fn roundtrip<T: ToDocument<PrettyCSTConfiguration> + Eq + Clone + Debug>(
     println!("RESULT1 :{}", source2);
     let (result2, source3) = parse(&source2, parser);
     println!("RESULT2 :{}", source3);
-    assert_eq!(result1, result2);
-    assert_eq!(source2, source3);
+    assert_equivalent!(result1.clone(), result2.clone());
+    assert_equivalent!(source2.clone(), source3.clone());
 }
 
 fn parse_import(

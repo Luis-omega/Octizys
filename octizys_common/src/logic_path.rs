@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use crate::identifier::{Identifier, IdentifierError};
+use crate::{
+    equivalence::Equivalence,
+    identifier::{Identifier, IdentifierError},
+};
 use octizys_text_store::store::Store;
 
 pub const MODULE_LOGIC_PATH_SEPARATOR: &str = "::";
@@ -10,6 +13,12 @@ pub enum LogicPathError {
     NotIdentifier,
     //To be used by the TryFrom, not by the make smart constructor
     EmptyString,
+}
+
+impl Equivalence for LogicPathError {
+    fn equivalent(self, other: Self) -> bool {
+        self == other
+    }
 }
 
 impl Display for LogicPathError {
@@ -63,6 +72,14 @@ impl LogicPath {
 
     pub fn push(&mut self, i: Identifier) {
         self.0.push(i)
+    }
+}
+
+/// Equivalence use is to compare trees without positional information.
+/// As such Identifiers are opaque!
+impl Equivalence for LogicPath {
+    fn equivalent(self, other: Self) -> bool {
+        self.0.equivalent(other.0)
     }
 }
 
