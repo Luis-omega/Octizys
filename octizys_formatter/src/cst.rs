@@ -18,8 +18,8 @@ use octizys_cst::{
 };
 use octizys_pretty::{
     combinators::{
-        concat, concat_iter, empty, empty_break, group, hard_break,
-        intersperse, nest, repeat, soft_break,
+        concat, concat_iter, empty, empty_break, external_text, group,
+        hard_break, intersperse, nest, repeat, soft_break,
     },
     document::Document,
 };
@@ -180,7 +180,10 @@ pub fn comments_info_to_document(
             repeat(hard_break(), separe_by),
         ),
         doc,
-        out.after.map_or(empty(), |x| x.to_document(configuration)),
+        intersperse(
+            out.after.into_iter().map(|x| x.to_document(configuration)),
+            external_text(" "),
+        ),
     ])
 }
 
@@ -248,6 +251,9 @@ impl ToDocument<PrettyCSTConfiguration> for OperatorName {
             OperatorName::RightArrow => keywords::RIGHT_ARROW,
             OperatorName::LeftArrow => keywords::LEFT_ARROW,
             OperatorName::LambdaStart => keywords::LAMBDA_START,
+            OperatorName::Alternative => keywords::ALTERNATIVE,
+            OperatorName::FlippedMap => keywords::FLIPPEDMAP,
+            OperatorName::Annotate => keywords::ANNOTATE,
         };
         Document::static_str(x)
     }

@@ -76,4 +76,7 @@ make_keywords!(
     ,F64 :  "F64"
     ,CHAR : "Char"
     ,STRING : "String"
+    ,ALTERNATIVE : "<|>"
+    ,FLIPPEDMAP : "<&>"
+    ,ANNOTATE : "<?>"
 );

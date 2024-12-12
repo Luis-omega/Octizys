@@ -864,57 +864,6 @@ impl<'store, 'source> Iterator for BaseLexerContext<'store, 'source> {
     }
 }
 
-#[derive(Debug)]
-pub struct LexerContext<'src, 'store> {
-    previous_token: Option<Result<(Span, BaseToken), LexerError>>,
-    lexer: &'src mut BaseLexerContext<'store, 'src>,
-}
-
-impl<'src, 'store> LexerContext<'src, 'store> {
-    pub fn new(
-        previous_token: Option<Result<(Span, BaseToken), LexerError>>,
-        lexer: &'src mut BaseLexerContext<'store, 'src>,
-    ) -> Self {
-        LexerContext {
-            previous_token,
-            lexer,
-        }
-    }
-}
-
-pub fn accumulate_comments<
-    I: Iterator<Item = Result<(Span, BaseToken), LexerError>>,
->(
-    lexer: &mut I,
-    acc: &mut Vec<Comment>,
-) -> Option<Result<(Span, BaseToken), LexerError>> {
-    let mut out: Option<Result<(Span, BaseToken), LexerError>> = None;
-    loop {
-        match lexer.next() {
-            Some(maybe_token) => match maybe_token {
-                Ok((span, token)) => match token {
-                    BaseToken::LineComment(l) => {
-                        acc.push(Comment::Line(l));
-                    }
-                    BaseToken::BlockComment(b) => {
-                        acc.push(Comment::Block(b));
-                    }
-                    _ => {
-                        out = Some(Ok((span, token)));
-                        break;
-                    }
-                },
-                Err(e) => {
-                    out = Some(Err(e));
-                    break;
-                }
-            },
-            None => break,
-        }
-    }
-    out
-}
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
     Interrogation(TokenInfo),
@@ -1320,65 +1269,136 @@ pub fn aux_base_token_to_token(
     }
 }
 
+#[derive(Debug)]
+pub enum BaseOrComments {
+    Base(BaseToken, TokenInfo),
+    Comments(Vec<Comment>),
+}
+
+#[derive(Debug)]
+pub struct LexerContext<'src, 'store> {
+    previous_token:
+        Option<Result<(Span, BaseOrComments), (Vec<Comment>, LexerError)>>,
+    lexer: &'src mut BaseLexerContext<'store, 'src>,
+}
+
+impl<'src, 'store> LexerContext<'src, 'store> {
+    pub fn new(
+        previous_token: Option<
+            Result<(Span, BaseOrComments), (Vec<Comment>, LexerError)>,
+        >,
+        lexer: &'src mut BaseLexerContext<'store, 'src>,
+    ) -> Self {
+        LexerContext {
+            previous_token,
+            lexer,
+        }
+    }
+}
+
+// TODO: make this an iterator to consume lazily if needed
+pub fn accumulate_comments<
+    I: Iterator<Item = Result<(Span, BaseToken), LexerError>>,
+>(
+    lexer: &mut I,
+    acc: &mut Vec<Comment>,
+) -> Option<Result<(Span, BaseToken), LexerError>> {
+    let mut out: Option<Result<(Span, BaseToken), LexerError>> = None;
+    loop {
+        match lexer.next() {
+            Some(maybe_token) => match maybe_token {
+                Ok((span, token)) => match token {
+                    BaseToken::LineComment(l) => {
+                        acc.push(Comment::Line(l));
+                    }
+                    BaseToken::BlockComment(b) => {
+                        acc.push(Comment::Block(b));
+                    }
+                    _ => {
+                        out = Some(Ok((span, token)));
+                        break;
+                    }
+                },
+                Err(e) => {
+                    out = Some(Err(e));
+                    break;
+                }
+            },
+            None => break,
+        }
+    }
+    out
+}
+
+/// Takes a vector of comments and split them according if they are
+/// in the same line or not.
+pub fn split_comments_by_line(
+    line: usize,
+    acc: Vec<Comment>,
+) -> (Vec<Comment>, Vec<Comment>) {
+    let mut same_line = vec![];
+    let mut not_same_line = vec![];
+    for i in acc.into_iter() {
+        if i.get_span().start.line == line {
+            same_line.push(i)
+        } else {
+            not_same_line.push(i)
+        }
+    }
+    (same_line, not_same_line)
+}
+
 //TODO: In case we have multiple block comments in a line
 // this algorithm will store the second, third, ..., comments to the
 // next token. Is this what we want? is a uncommon case but still need to be handled.
 /// We already consumed all the comments before a token, and we
 /// want to complete the given [`current_token`].
 /// If the next token is a comment in the same line as the [`current_token`] we set the after comments.
-/// If the next token is another kind of token we store it in the proviuos and emit the [`current_token`].
+/// If the next token is another kind of token we store it in the previous and emit the [`current_token`].
 pub fn complete_token_or_save(
     current_token: BaseToken,
     context: &mut LexerContext,
     mut info: TokenInfo,
-) -> Option<Result<(Position, Token, Position), LexerError>> {
-    match context.lexer.next() {
-        Some(maybe_next_base_token) => match maybe_next_base_token {
-            Ok((span, next_base_token)) => match next_base_token.clone() {
-                //TODO: FIXME: fix the spans
-                BaseToken::LineComment(l) => {
-                    let span = info.span.clone();
-                    if info.span.end.line == l.span.start.line {
-                        info.comments.after = Some(Comment::Line(l));
-                        context.previous_token = None;
-                    } else {
-                        context.previous_token =
-                            Some(Ok((span, next_base_token)));
-                    }
-                    let mut token =
-                        aux_base_token_to_token(current_token, info);
-                    Some(Ok((span.start, token, span.end)))
-                }
-                BaseToken::BlockComment(c) => {
-                    let span = info.span.clone();
-                    if info.span.end.line == c.span.start.line {
-                        info.comments.after = Some(Comment::Block(c));
-                        context.previous_token = None;
-                    } else {
-                        context.previous_token =
-                            Some(Ok((span, next_base_token)));
-                    }
-                    let mut token =
-                        aux_base_token_to_token(current_token, info);
-                    Some(Ok((span.start, token, span.end)))
-                }
-                _ => {
-                    context.previous_token = Some(Ok((span, next_base_token)));
-                    let mut token =
-                        aux_base_token_to_token(current_token, info);
-                    Some(Ok((span.start, token, span.end)))
-                }
-            },
-            Err(e) => {
-                context.previous_token = Some(Err(e));
-                let span = info.span;
-                let mut token = aux_base_token_to_token(current_token, info);
-                Some(Ok((span.start, token, span.end)))
-            }
-        },
+) -> Option<Result<(Position, Token, Position), (Vec<Comment>, LexerError)>> {
+    let mut acc = vec![];
+    let next_token = accumulate_comments(context.lexer, &mut acc);
+    let (to_attach, remain) = split_comments_by_line(info.span.end.line, acc);
+    info.comments.after = to_attach;
+    let span = info.span;
+    match next_token {
+        Some(Ok((next_span, next_base_token))) => {
+            let mut comments_info_pre = CommentsInfo {
+                before: remain,
+                after: vec![],
+            };
+            let next_info = TokenInfo::make(
+                comments_info_pre,
+                next_span.start,
+                next_span.end,
+            );
+            context.previous_token = Some(Ok((
+                span,
+                BaseOrComments::Base(next_base_token, next_info),
+            )));
+            let mut token = aux_base_token_to_token(current_token, info);
+            Some(Ok((span.start, token, span.end)))
+        }
+        Some(Err(err)) => {
+            context.previous_token = Some(Err((remain, err)));
+            let mut token = aux_base_token_to_token(current_token, info);
+            Some(Ok((span.start, token, span.end)))
+        }
         None => {
-            context.previous_token = None;
-            let span = info.span;
+            if remain.len() > 0 {
+                let mut span = remain[0].get_span();
+                for s in remain.iter() {
+                    span = span + s.get_span();
+                }
+                context.previous_token =
+                    Some(Ok((span, BaseOrComments::Comments(remain))));
+            } else {
+                context.previous_token = None;
+            }
             let mut token = aux_base_token_to_token(current_token, info);
             Some(Ok((span.start, token, span.end)))
         }
@@ -1387,100 +1407,79 @@ pub fn complete_token_or_save(
 
 /// Given an array of comments at the end of the stream, we build a comment
 /// token (if the array is empty we return None)j
-fn compact_comments_info(
-    comments: Vec<Comment>,
-) -> Option<Result<(Position, Token, Position), LexerError>> {
-    if comments.len() > 0 {
-        todo!()
-        //let token_info: TokenInfo = todo!();
-        //Some(Ok(Token::LastComments(token_info, acc)))
-    } else {
-        None
+fn make_last_comment_token(
+    mut comments: Vec<Comment>,
+) -> Option<(Position, Token, Position)> {
+    let last_comment = comments.pop()?;
+    let empty_comments_info = CommentsInfo::empty();
+    let mut span = last_comment.get_span();
+    for comment in comments.iter() {
+        span = span + comment.get_span();
     }
+    let info = TokenInfo::make(empty_comments_info, span.start, span.end);
+    comments.push(last_comment);
+    Some((span.start, Token::LastComments(info, comments), span.end))
 }
 
-/// Take a vector of previously accumulated comments, lookup for the
-/// rest of the comments before a token.
-/// We either complete a token, emit the last comment token or have a failure.
-fn accumulate_advance_with(
+/// To call at the beginning of lexing.
+fn parse_token(
     context: &mut LexerContext,
-    mut acc: Vec<Comment>,
-) -> Option<Result<(Position, Token, Position), LexerError>> {
+) -> Option<Result<(Position, Token, Position), (Vec<Comment>, LexerError)>> {
+    let mut acc = vec![];
     let current_value = accumulate_comments(&mut context.lexer, &mut acc);
     match current_value {
         Some(Ok((span, current_token))) => {
             let mut comments_info_pre = CommentsInfo {
                 before: acc,
-                after: None,
+                after: vec![],
             };
             let mut info =
                 TokenInfo::make(comments_info_pre, span.start, span.end);
             complete_token_or_save(current_token, context, info)
         }
         //Reached eof in the lexer
-        None => compact_comments_info(acc),
-        Some(Err(e)) => Some(Err(e)),
+        None => make_last_comment_token(acc).map(|x| Ok(x)),
+        Some(Err(e)) => Some(Err((vec![], e))),
     }
 }
 
 impl<'store, 'src> Iterator for LexerContext<'store, 'src> {
     type Item = Result<(Position, Token, Position), LexerError>;
     fn next(&mut self) -> Option<Self::Item> {
-        // First iter:
-        // get_comments
-        // get next token
-        // get next token
-        // if comment return a token,
-        // else save new token to context and return a token
-        // continue
-        // Intermediate iter:
-        // if saved token :
-        //   get next token, if comment, return a token and clear context
-        //                      else return a token and put the new token in the context
-        // else :
-        //  get comments
-        //  get next token
-        //  get next token
         //println!("{:?}", self);
         match &self.previous_token {
             Some(previous) => match previous {
-                Err(e) => Some(Err(e.to_owned())),
-                // We had a previous token that may be a comment
-                // that isn't attached or any other token.
-                // We Handle the comment case and delegate to complete_token_or_save
-                Ok((span, BaseToken::LineComment(l))) => {
-                    let mut acc = vec![Comment::Line(l.to_owned())];
-                    accumulate_advance_with(self, acc)
+                /// An error happened while looking for the after comments
+                // TODO: We are ignoring the comments associated with a erroneous token!
+                Err((_, e)) => {
+                    let e2 = e.clone();
+                    self.previous_token = None;
+                    Some(Err(e2))
                 }
-                Ok((span, BaseToken::BlockComment(c))) => {
-                    let mut acc = vec![Comment::Block(c.to_owned())];
-                    accumulate_advance_with(self, acc)
+                // We reached the end of the stream with remain comments
+                Ok((span, BaseOrComments::Comments(comments))) => {
+                    let comments2 = comments.clone();
+                    self.previous_token = None;
+                    make_last_comment_token(comments2).map(|x| Ok(x))
                 }
                 // We stored previously a non comment token
                 // and we are going to emit it after looking up
                 // for the after comment.
-                Ok((span, current_base_token)) => {
-                    let mut comments_info_pre = CommentsInfo {
-                        before: vec![],
-                        after: None,
-                    };
-                    let mut info = TokenInfo::make(
-                        comments_info_pre,
-                        span.start,
-                        span.end,
-                    );
+                Ok((span, BaseOrComments::Base(base_token, info))) => {
                     complete_token_or_save(
-                        current_base_token.to_owned(),
+                        base_token.clone(),
                         self,
-                        info,
+                        info.clone(),
                     )
+                    // TODO: We are ignoring the comments associated with a erroneous token!
+                    .map(|x| x.map_err(|(_, z)| z))
                 }
             },
             None => {
-                // Didn't have previous value, either we got to the
-                // end of the stream or we completed a token.
-                let mut acc = vec![];
-                accumulate_advance_with(self, acc)
+                // Didn't have previous value, either we are at the beginning
+                // of the process or we reached the end of the stream
+                // TODO: We are ignoring the comments associated with a erroneous token!
+                parse_token(self).map(|x| x.map_err(|(_, z)| z))
             }
         }
     }

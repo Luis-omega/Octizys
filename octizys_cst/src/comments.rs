@@ -63,8 +63,8 @@ pub enum CommentKind {
 }
 
 /// The delimiters for a [`CommentBlock`].
-/// Currently they are four kinds of block delimiters.
-/// All of the are a `{` followed by between 1 and 4
+/// Currently, they are four kinds of block delimiters.
+/// All of them are a `{` followed by between 1 and 4
 /// `-`, then the comment of the block and
 /// finish with the same amount of `-` followed
 /// by a `}`.
@@ -84,7 +84,7 @@ pub enum CommentKind {
 /// ```
 ///
 /// Causing a syntax error at `--}`.
-/// To nest comments is recommended to begin using a singe hypen
+/// To nest comments is recommended to begin using a singe hyphen
 /// and continue incrementing them as needed.
 ///
 /// </div>
@@ -104,7 +104,7 @@ pub enum CommentBraceKind {
     Brace3,
 }
 impl CommentBraceKind {
-    /// Returns the total lenght in bytes of the start of a block
+    /// Returns the total length in bytes of the start of a block
     /// with the given kind, this means that it has the length of
     /// the full `{--`.
     pub fn len(self) -> usize {
@@ -117,7 +117,7 @@ impl CommentBraceKind {
     }
 }
 
-/// Represents the begin of a [`CommentLine`], they
+/// Represents the beginning of a [`CommentLine`], they
 /// can be any of :
 ///
 /// - `//`
@@ -194,7 +194,7 @@ impl CommentBlock {
 /// Every line comment has the following components:
 /// - A [`CommentLine::kind`] to distinguish between documentation and
 ///   regular comments.
-/// - A [`CommentLine::start`], we support two ways to began a comment
+/// - A [`CommentLine::start`], we support two ways to begin a comment
 ///   in a line, by using either `//` or `--`.
 /// - A [`CommentLine::content`] it has all the content of a line
 ///   comment after the start delimiter except from the line break.
@@ -205,7 +205,7 @@ impl CommentBlock {
 /// -- some regular line comment.
 /// // another line comment comment.
 /// // | a documentation line comment.
-/// -- | another  documentation line comment.
+/// -- | another documentation line comment.
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct CommentLine {
@@ -215,13 +215,13 @@ pub struct CommentLine {
     pub span: Span,
 }
 
-/// We can categorize the  comments in two types:
+/// We can categorize the comments in two types:
 /// - [`Comment::Line`] comments that began in a line and ends
 ///   at the end of line.
 /// - [`Comment::Block`] multi-line commentaries.
 ///
 /// <div class="warning">Documentation comments can be in any format, but the
-/// official documentation generator is going to use common markdown
+/// official documentation generator is going to use common Markdown
 /// or some other dialect of it.</div>
 ///
 /// We may represent in the future additional kind of comments like:
@@ -238,10 +238,11 @@ pub enum Comment {
 }
 
 impl Comment {
-    pub fn get_span(self) -> Span {
+    pub fn get_span(&self) -> Span {
         match self {
-            Self::Line(CommentLine { span, .. }) => span,
-            Self::Block(CommentBlock { span, .. }) => span,
+            // Cloning spans is cheap!
+            Self::Line(CommentLine { span, .. }) => span.to_owned(),
+            Self::Block(CommentBlock { span, .. }) => span.to_owned(),
         }
     }
 }
@@ -274,27 +275,27 @@ impl From<CommentBlock> for Comment {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentsInfo {
     pub before: Vec<Comment>,
-    pub after: Option<Comment>,
+    pub after: Vec<Comment>,
 }
 
 impl Default for CommentsInfo {
     fn default() -> Self {
         CommentsInfo {
             before: vec![],
-            after: None,
+            after: vec![],
         }
     }
 }
 
 impl CommentsInfo {
-    /// A commentaries information that doesn't have any information inside.:
+    /// A commentaries' information that doesn't have any information inside.:
     /// This is useful if we need to attach information to a node before
     /// we have the information available.
     pub fn empty() -> Self {
         Self::default()
     }
 
-    /// Add the elements of a iterator of comments to the comments
+    /// Add the elements of an iterator of comments to the comments
     /// in the before field.
     /// The comments are added after all the original comments in
     /// the before field.
@@ -310,51 +311,45 @@ impl CommentsInfo {
         self.before.push(new)
     }
 
-    ///
+    /// Move the comments after a token to before it.
     pub fn move_after_to_before(&mut self) -> () {
-        match &self.after {
-            Some(c) => {
-                self.before.push(c.to_owned());
-                self.after = None;
-                return ();
-            }
-            None => return (),
-        }
+        // We made sure that cloning comments is acceptable
+        // by storing the comments in a separate place.
+        self.before
+            .extend(self.after.iter().rev().map(|x| x.clone()));
+        self.after = vec![];
     }
 
     /// Takes another comment info (maybe from another token)
     /// and combines it with the current one.
     /// Not every comment before or after a token can made sense,
-    /// and we may choose to move some comments from it's original place
-    /// to another one were it made more sense.
+    /// and we may choose to move some comments from its original place
+    /// to another one where it made more sense.
     ///
     /// # Examples
     ///
     /// In the following block:
     ///
     /// ```txt
-    ///  -- | Some comment  about `a`
+    ///  -- | Some comment about `a`
     /// let a =
     ///   (
     ///     -- | The first before comment of `1`
     ///     1, -- | The before comment of `,`, going to be moved to the before comments of `1`
     ///     2,
-    ///     ,3, 4,
-    ///     )
+    ///     3, 4
+    ///   )
     /// ```
     ///
     /// The third comment is attached to the comma as an after comment.
     /// The comment can be referring to the second item of the tuple
-    /// or the third. If we choose to move it to the second item
+    /// or the third. If we decide to move it to the second item
     /// the end structure is the one described in the comments.
     pub fn consume_info(&mut self, other: CommentsInfo) -> () {
         self.move_after_to_before();
         let CommentsInfo { before, after } = other;
         self.extend(before.into_iter());
-        match after {
-            Some(c) => self.push(c),
-            None => (),
-        }
+        self.extend(after.into_iter());
     }
 
     /// Take a CommentsInfo and transform all the contiguous occurrences

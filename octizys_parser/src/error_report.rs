@@ -1,11 +1,13 @@
+use std::io::repeat;
+
 use crate::lexer::{
     BaseLexerContext, BaseToken, LexerContext, LexerError, Token,
 };
 use octizys_common::span::{Position, Span};
 use octizys_pretty::{
     combinators::{
-        concat, emphasis, empty, external_text, foreground, group, hard_break,
-        intersperse, nest, repeat,
+        self, concat, emphasis, empty, external_text, foreground, group,
+        hard_break, intersperse, nest, soft_break,
     },
     document::Document,
     highlight::{
@@ -23,6 +25,7 @@ use lalrpop_util::ParseError;
 pub struct ParserErrorContext<'source> {
     pub src: &'source str,
     pub src_name: &'source str,
+    pub max_line_width: u16,
 }
 
 impl<'a> Default for ParserErrorContext<'a> {
@@ -30,6 +33,7 @@ impl<'a> Default for ParserErrorContext<'a> {
         ParserErrorContext {
             src: &"",
             src_name: &"octizys_repl",
+            max_line_width: 80,
         }
     }
 }
@@ -131,7 +135,7 @@ fn expected_to_document(expected: Option<Vec<String>>) -> Document {
                             foreground(CYAN, external_text(&x)),
                         )
                     }),
-                    external_text(", "),
+                    external_text(",") + soft_break(),
                 )
         }
     }
@@ -144,25 +148,56 @@ fn make_source_error<E: ParserErrorReport>(
     let location = e.get_location();
     match location {
         ErrorLocation::Span(span) => {
-            let (before, content, after) =
-                span.get_text_at(context.src, Some(40));
-            let pre_spaces = aproximate_string_width(before);
-            let spaces = " ".repeat(pre_spaces) + "^";
-            //TODO:FIXME: multi line spans won't render right!
-            concat(vec![
-                external_text(before),
-                emphasis(
-                    Emphasis::Underline(RED),
-                    foreground(MAGENTA, external_text(content)),
-                ),
-                external_text(after),
-                hard_break(),
-                foreground(RED, external_text(&spaces)),
-                foreground(RED, expected_to_document(e.get_expected())),
-            ])
+            //We need to get this first
+            let (_, content, _) = span.get_text_at(context.src, None);
+            if span.start.line == span.end.line {
+                let remain_width =
+                    match u16::try_from(aproximate_string_width(content)) {
+                        Ok(width) => {
+                            context.max_line_width.saturating_sub(width)
+                        }
+                        Err(_) => 0,
+                    };
+                let (before, _, after) = span
+                    .get_text_at(context.src, Some(usize::from(remain_width)));
+                let pre_spaces = aproximate_string_width(before);
+                let pointer = "^".repeat(aproximate_string_width(content));
+                concat(vec![
+                    external_text(before),
+                    emphasis(
+                        Emphasis::Underline(RED),
+                        foreground(MAGENTA, external_text(content)),
+                    ),
+                    external_text(after),
+                    nest(
+                        // This may be safe as [`before`] has to be smaller
+                        // than [`remain_width`].
+                        u16::try_from(pre_spaces).unwrap(),
+                        concat(vec![
+                            hard_break(),
+                            //TODO: if the span is too large, this may be over the line width!
+                            //but only the "^Expected" part!
+                            foreground(RED, external_text(&pointer)),
+                            foreground(
+                                RED,
+                                expected_to_document(e.get_expected()),
+                            ),
+                        ]),
+                    ),
+                ])
+            } else {
+                concat(vec![
+                    emphasis(
+                        Emphasis::Underline(RED),
+                        foreground(MAGENTA, external_text(content)),
+                    ),
+                    hard_break(),
+                    foreground(RED, expected_to_document(e.get_expected())),
+                ])
+            }
         }
         ErrorLocation::Position(position) => {
-            let (before, after) = position.get_text_at(context.src, Some(40));
+            let (before, after) = position.get_text_at(context.src, Some(80));
             let pre_spaces = aproximate_string_width(before);
             let spaces = " ".repeat(pre_spaces) + "^";
             let mut after_iter = after.chars();

@@ -66,6 +66,9 @@ extern {
       ,"=" => lexer::Token::Asignation(TokenInfo)
       ,"@" => lexer::Token::At(TokenInfo)
       ,"|" => lexer::Token::Pipe(TokenInfo)
+      ,"<|>" => lexer::Token::Alternative(TokenInfo)
+      ,"<&>" => lexer::Token::FlippedMap(TokenInfo)
+      ,"<?>" => lexer::Token::Annotate(TokenInfo)
       ,"(" => lexer::Token::LParen(TokenInfo)
       ,")" => lexer::Token::RParen(TokenInfo)
       ,"{" => lexer::Token::LBrace(TokenInfo)
@@ -158,8 +161,6 @@ uint : Token<String> = UintLiteral =>? lexer::uint_token_to_token(<>);
 ufloat : Token<String> = UFloatLiteral =>? lexer::ufloat_token_to_token(<>);
 
 logic_path: Token<LogicPath>  ={
-  //<l:terminated_list<identifier,"::",LogicPathSeparator>> => l.into() ,
-  //TODO:handle_comments
   <l:identifier> <s:"::"> => {
     let mut info = l.info;
     info.consume_info(s.into());
@@ -184,7 +185,6 @@ operator_name : Token<OperatorName> = {
       ,":" => base::Token{value: OperatorName::Colon,info:<>.into()}
       ,";" => base::Token{value: OperatorName::StatementEnd,info:<>.into()}
       ,"." => base::Token{value: OperatorName::Dot,info:<>.into()}
-      //,"::" => base::Token{value: OperatorName::ModuleSeparator,info:<>.into()}
       ,"-" => base::Token{value: OperatorName::Minus,info:<>.into()}
       ,"|>" => base::Token{value: OperatorName::CompositionLeft,info:<>.into()}
       ,"<|" => base::Token{value: OperatorName::CompositionRight,info:<>.into()}
@@ -195,11 +195,9 @@ operator_name : Token<OperatorName> = {
       ,"%" => base::Token{value: OperatorName::Module,info:<>.into()}
       ,"<<" => base::Token{value: OperatorName::ShiftLeft,info:<>.into()}
       ,">>" => base::Token{value: OperatorName::ShiftRigth,info:<>.into()}
-      //TODO: Add "<&>" = \ x y -> y $ x
       ,"<$>" => base::Token{value: OperatorName::Map,info:<>.into()}
       ,"$>" => base::Token{value: OperatorName::MapConstRigth,info:<>.into()}
       ,"<$" => base::Token{value: OperatorName::MapConstLeft,info:<>.into()}
-      //TODO: add <|> and <?>
       ,"<*>" => base::Token{value: OperatorName::Appliative,info:<>.into()}
       ,"*>" => base::Token{value: OperatorName::ApplicativeRight,info:<>.into()}
       ,"<*" => base::Token{value: OperatorName::ApplicativeLeft,info:<>.into()}
@@ -216,6 +214,9 @@ operator_name : Token<OperatorName> = {
       ,"=" => base::Token{value: OperatorName::Asignation,info:<>.into()}
       ,"@" => base::Token{value: OperatorName::At,info:<>.into()}
       ,"|" => base::Token{value: OperatorName::Pipe,info:<>.into()}
+      ,"<|>" => base::Token{value: OperatorName::Alternative,info:<>.into()}
+      ,"<&>" => base::Token{value: OperatorName::FlippedMap,info:<>.into()}
+      ,"<?>" => base::Token{value: OperatorName::Annotate,info:<>.into()}
       ,"->" => base::Token{value: OperatorName::RightArrow,info:<>.into()}
       ,"<-" => base::Token{value: OperatorName::LeftArrow,info:<>.into()}
       ,"\\" => base::Token{value: OperatorName::LambdaStart,info:<>.into()}

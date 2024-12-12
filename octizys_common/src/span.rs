@@ -162,31 +162,52 @@ impl Add for Span {
 }
 
 impl Span {
-    /// Returns the span content including line breaks.
+    /// Returns the span content including line breaks plus some surrounding text. Always return
+    /// all the span content.
+    /// The max_len is the maximal length of the surrounding text.
+    /// The surrounding text is cut to avoid containing line breaks.
+    /// This doesn't take in account graphemes, only char boundaries!.
     pub fn get_text_at<'source>(
         &self,
         src: &'source str,
         max_len: Option<usize>,
     ) -> (&'source str, &'source str, &'source str) {
-        let size_range: usize =
-            max_len.map(|x| if x < 2 { 2 } else { x }).unwrap_or(20) / 2;
-        let (_, start_index) = split_string_before(
-            src,
-            self.start.source_index.saturating_sub(size_range),
-        );
-        let (_, end_index) = split_string_after(
-            src,
-            self.end.source_index.saturating_add(size_range),
-        );
-        let before_pre = &src[start_index..self.start.source_index];
-        let after_pre = &src[self.end.source_index..end_index];
-        let before =
-            before_pre.split("\n").collect::<Vec<&str>>().pop().unwrap();
-        let after = after_pre.split("\n").collect::<Vec<&str>>()[0];
-        (
-            before,
-            &src[self.start.source_index..self.end.source_index],
-            after,
-        )
+        match max_len {
+            Some(max_len) => {
+                let size_range = max_len / 2;
+                if size_range == 0 {
+                    (
+                        "",
+                        &src[self.start.source_index..self.end.source_index],
+                        "",
+                    )
+                } else {
+                    let (_, start_index) = split_string_before(
+                        src,
+                        self.start.source_index.saturating_sub(size_range),
+                    );
+                    let (_, end_index) = split_string_after(
+                        src,
+                        self.end.source_index.saturating_add(size_range),
+                    );
+                    let before_pre = &src[start_index..self.start.source_index];
+                    let after_pre = &src[self.end.source_index..end_index];
+                    let before = before_pre
+                        .split("\n")
+                        .collect::<Vec<&str>>()
+                        .pop()
+                        .unwrap();
+                    let after = after_pre.split("\n").collect::<Vec<&str>>()[0];
+                    (
+                        before,
+                        &src[self.start.source_index..self.end.source_index],
+                        after,
+                    )
+                }
+            }
+            None => {
+                ("", &src[self.start.source_index..self.end.source_index], "")
+            }
+        }
     }
 }
