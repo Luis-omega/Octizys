@@ -2,7 +2,7 @@ use std::iter;
 
 use crate::document::*;
 use crate::highlight::{Color, Emphasis};
-use octizys_text_store::store::Store;
+use octizys_text_store::store::{NonLineBreakStr, Store};
 
 pub fn empty() -> Document {
     Document::empty()
@@ -58,6 +58,12 @@ pub fn try_internalize(
 /// the text.
 pub fn external_text(words: &str) -> Document {
     Document::external_text(words)
+}
+
+/// Takes a static str reference that is guaranteed at compile
+/// time to not have `\n` inside and build a document.
+pub fn static_str(word: NonLineBreakStr) -> Document {
+    Document::static_str(word)
 }
 
 /// Stores a given string as a comment in the [`Store`] and returns a
@@ -120,6 +126,43 @@ pub fn foreground(color: Color, doc: Document) -> Document {
 
 pub fn emphasis(emphasis: Emphasis, doc: Document) -> Document {
     Document::emphasis(emphasis, doc)
+}
+
+pub fn between_static<Doc: Into<Document>>(
+    start: NonLineBreakStr,
+    value: Doc,
+    end: NonLineBreakStr,
+) -> Document {
+    concat(vec![static_str(start), value.into(), static_str(end)])
+}
+
+pub fn between<Doc: Into<Document>>(
+    start: Document,
+    value: Doc,
+    end: Document,
+) -> Document {
+    concat(vec![start, value.into(), end])
+}
+
+pub fn parens<Doc: Into<Document>>(inner: Doc) -> Document {
+    between_static(NonLineBreakStr::new("("), inner, NonLineBreakStr::new(")"))
+}
+
+pub fn brackets<Doc: Into<Document>>(inner: Doc) -> Document {
+    between_static(NonLineBreakStr::new("["), inner, NonLineBreakStr::new("]"))
+}
+
+pub fn braces<Doc: Into<Document>>(inner: Doc) -> Document {
+    between_static(NonLineBreakStr::new("{"), inner, NonLineBreakStr::new("}"))
+}
+
+#[macro_export]
+macro_rules! concat_documents{
+    [$($doc:expr),+ ] => {
+        concat(
+            vec![$($doc,)+]
+            )
+    };
 }
 
 /*

@@ -1,3 +1,4 @@
+use octizys_pretty::{combinators::static_str, store::NonLineBreakStr};
 use octizys_text_store::store::{aproximate_string_width, Store};
 
 use regex::Regex;
@@ -17,8 +18,20 @@ pub struct Identifier {
 /// Equivalence use is to compare trees without positional information.
 /// As such Identifiers are opaque!
 impl Equivalence for Identifier {
-    fn equivalent(self, _other: Self) -> bool {
+    fn equivalent(&self, _other: &Self) -> bool {
         true
+    }
+
+    fn represent(&self) -> octizys_pretty::document::Document {
+        const IDENT: NonLineBreakStr = NonLineBreakStr::new("Identifier");
+        static_str(IDENT)
+    }
+
+    fn equivalence_or_diff(
+        &self,
+        _other: &Self,
+    ) -> Result<(), octizys_pretty::document::Document> {
+        Ok(())
     }
 }
 
@@ -44,12 +57,6 @@ impl From<Identifier> for DefaultSymbol {
 pub enum IdentifierError {
     ContainsInvalidCodePoint(String),
     EmptyIdentifier,
-}
-
-impl Equivalence for IdentifierError {
-    fn equivalent(self, other: Self) -> bool {
-        self == other
-    }
 }
 
 impl Display for IdentifierError {

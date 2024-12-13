@@ -1,8 +1,12 @@
 use std::fmt::Display;
 
 use crate::{
-    equivalence::Equivalence,
+    equivalence::{make_report, Equivalence},
     identifier::{Identifier, IdentifierError},
+};
+use octizys_pretty::{
+    combinators::{external_text, static_str},
+    store::NonLineBreakStr,
 };
 use octizys_text_store::store::Store;
 
@@ -13,12 +17,6 @@ pub enum LogicPathError {
     NotIdentifier,
     //To be used by the TryFrom, not by the make smart constructor
     EmptyString,
-}
-
-impl Equivalence for LogicPathError {
-    fn equivalent(self, other: Self) -> bool {
-        self == other
-    }
 }
 
 impl Display for LogicPathError {
@@ -78,8 +76,24 @@ impl LogicPath {
 /// Equivalence use is to compare trees without positional information.
 /// As such Identifiers are opaque!
 impl Equivalence for LogicPath {
-    fn equivalent(self, other: Self) -> bool {
-        self.0.equivalent(other.0)
+    fn equivalent(&self, other: &Self) -> bool {
+        self.0.len() == other.0.len()
+    }
+
+    fn equivalence_or_diff(
+        &self,
+        other: &Self,
+    ) -> Result<(), octizys_pretty::document::Document> {
+        if self.0.len() == other.0.len() {
+            Ok(())
+        } else {
+            Err(make_report(self, other))
+        }
+    }
+
+    fn represent(&self) -> octizys_pretty::document::Document {
+        const PATH: NonLineBreakStr = NonLineBreakStr::new("LogicPath::");
+        static_str(PATH) + external_text(&(self.0.len().to_string()))
     }
 }
 
