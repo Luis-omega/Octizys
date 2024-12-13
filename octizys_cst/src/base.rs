@@ -134,7 +134,6 @@ impl<P> From<TokenInfo> for TokenInfoWithPhantom<P> {
         }
     }
 }
-
 /// A Token has two pieces, a value (the content) and information
 /// like the comments around it and the source position.
 /// We never build a [`Token`] for punctuation elements or keywords,

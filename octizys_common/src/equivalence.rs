@@ -21,8 +21,6 @@ pub const ERROR_BACKGROUND_COLOR: Color = Color {
     color4: Color4Bits::Magenta,
 };
 
-//TODO: correct the formmatting, its very wrong, we need to add more nest and hard_break
-//in some places, rename the parens to something else
 pub fn parens<Doc: Into<Document>>(inner: Doc) -> Document {
     between_static(
         NonLineBreakStr::new("("),

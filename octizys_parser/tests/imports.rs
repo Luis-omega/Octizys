@@ -1,4 +1,4 @@
-use octizys_common::assert_equivalent;
+use octizys_common::equivalence::assert_equivalent;
 use octizys_common::equivalence::Equivalence;
 use octizys_common::span::{Position, Span};
 use octizys_cst::imports::Import;
@@ -64,8 +64,8 @@ fn roundtrip<
     println!("RESULT1 :{}", source2);
     let (result2, source3) = parse(&source2, parser);
     println!("RESULT2 :{}", source3);
-    assert_equivalent!(result1.clone(), result2.clone());
-    assert_equivalent!(source2.clone(), source3.clone());
+    assert_equivalent(&result1, &result2, TerminalRender24::render_highlight);
+    assert_equivalent(&source2, &source3, TerminalRender24::render_highlight);
 }
 
 fn parse_import(
