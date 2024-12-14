@@ -82,7 +82,9 @@ macro_rules! implement_from_eq {
                 }
             }
             fn represent(&self) -> Document {
-                combinators::static_str(NonLineBreakStr::new(stringify!($name)))
+                const NAME: NonLineBreakStr =
+                    NonLineBreakStr::new(stringify!($name));
+                combinators::static_str(NAME)
                     + combinators::external_text(&format!(" {}", self))
             }
         }

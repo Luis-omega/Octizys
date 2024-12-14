@@ -1,12 +1,11 @@
-// my-app-macros/src/lib.rs
 extern crate proc_macro;
 
-use core::panic;
-
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{parse::Parse, punctuated::Punctuated, token, FieldsNamed, Token};
 
+mod equivalence_arguments;
+use crate::equivalence_arguments::derive_equivalence_impl;
+
+/*
 fn find_ignore_attribute(attributes: &Vec<syn::Attribute>) -> bool {
     for attribute in attributes {
         if attribute.path().is_ident("equivalence") {
@@ -85,13 +84,15 @@ fn parse_input_ignores(attributes: &Vec<syn::Attribute>) -> Vec<syn::Ident> {
     acc
 }
 
-fn generate_structure_equivalent_body(
-    fields: Vec<syn::Ident>,
+fn generate_equivalent_body(
+    names: &Vec<(SelfFieldName, OtherFieldName)>,
 ) -> proc_macro2::TokenStream {
-    let mut results: Vec<proc_macro2::TokenStream> = fields
+    let mut results: Vec<proc_macro2::TokenStream> = names
         .into_iter()
-        .map(|field_name| {
-            quote! {self.#field_name.equivalent(&other.#field_name)}
+        .map(|(self_encapsulate, other_encapsulate)| {
+            let self_name = self_encapsulate.access_name();
+            let other_name = other_encapsulate.access_name();
+            quote! {#self_name.equivalent(&#other_name)}
         })
         .collect();
 
@@ -106,26 +107,28 @@ fn generate_structure_equivalent_body(
     }
 }
 
-fn generate_structure_equivalence_or_diff_body(
-    struct_name: syn::Ident,
-    fields: Vec<syn::Ident>,
+fn generate_equivalence_or_diff_body(
+    struct_name: StructCaseName,
+    fields: &Vec<(SelfFieldName, OtherFieldName)>,
 ) -> proc_macro2::TokenStream {
     let params = fields
         .into_iter()
-        .map(|field_name| {
-            let field_result_name = format_ident!("result_{}",field_name);
-            let field_doc_name = format_ident!("doc_{}",field_name);
+        .map(|(self_name,other_name)| {
+            let self_access = self_name.access_name();
+            let other_access = other_name.access_name();
+            let field_result_name = self_name.prefixed("result");
+            let field_doc_name = self_name.prefixed("doc");
             (quote! {
-                let #field_result_name = self.#field_name.equivalence_or_diff(&other.#field_name);
+                let #field_result_name = #self_access.equivalence_or_diff(&#other_access);
             },
             quote! {
                 #field_result_name.is_ok() &
             },
             quote! {
-                let #field_doc_name  = #field_result_name.map_or_else(|x| x, |_| self.#field_name.represent());
+                let #field_doc_name  = #field_result_name.map_or_else(|x| x, |_| parens(#self_access.represent()));
             },
             quote! {
-                #field_doc_name ,
+                hard_break(), #field_doc_name ,
             }
             )
         });
@@ -143,21 +146,18 @@ fn generate_structure_equivalence_or_diff_body(
     }
 
     results_check.extend(quote! {true});
-
+    let name_value = struct_name.as_string();
+    let name_ref = &name_value;
     quote! {
         #results_lets
 
         if #results_check {
             Ok(())
         } else {
-            const NAME: NonLineBreakStr = NonLineBreakStr::new(stringify!(#struct_name));
+            const NAME: NonLineBreakStr = NonLineBreakStr::new(stringify!(#name_ref));
             #documents_let
             let children =
-                        hard_break() +
-                        intersperse( [#document_final_build]
-                            ,
-                            hard_break()
-                        )
+                        concat(vec![#document_final_build])
                     ;
             Err(
                 static_str(NAME)
@@ -167,6 +167,51 @@ fn generate_structure_equivalence_or_diff_body(
                     children
                 )
             )
+        }
+    }
+}
+
+fn generate_represent_body(
+    struct_name: StructCaseName,
+    mut identifiers: Vec<SelfFieldName>,
+) -> proc_macro2::TokenStream {
+    if identifiers.len() == 0 {
+        quote! { empty() }
+    } else if identifiers.len() == 1 {
+        let one = identifiers.pop().unwrap().access_name();
+        let name_str = struct_name.as_string();
+        let a = &name_str;
+        quote! {
+            const NAME: NonLineBreakStr = NonLineBreakStr::new(stringify!(#a));
+            static_str(NAME)
+                + nest(2, hard_break() +
+                        parens(#one.represent())
+                )
+        }
+    } else {
+        let last = identifiers.pop().unwrap().access_name();
+        let children: proc_macro2::TokenStream = identifiers
+            .into_iter()
+            .map(|iden| {
+                let name_access = iden.access_name();
+                quote! {
+                    #name_access.represent(), hard_break(), sep.clone(),
+                }
+            })
+            .chain(vec![quote! {#last.represent()}])
+            .collect();
+        let name_str = struct_name.as_string();
+        let a = &name_str;
+        quote! {
+            const NAME: NonLineBreakStr = NonLineBreakStr::new(stringify!(#a));
+            const SEP : NonLineBreakStr = NonLineBreakStr::new(",");
+            let sep = static_str(SEP);
+            let children_representation = concat(vec![#children]);
+
+            static_str(NAME)
+                + nest(2, hard_break() +
+                    children_representation
+                )
         }
     }
 }
@@ -212,6 +257,13 @@ fn generate_structure_represent_body(
     }
 }
 
+*/
+
+#[proc_macro_derive(Equivalence, attributes(equivalence))]
+pub fn derive_equivalence(item: TokenStream) -> TokenStream {
+    derive_equivalence_impl(item)
+}
+/*
 #[proc_macro_derive(Equivalence, attributes(equivalence))]
 pub fn derive_equivalence(item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::DeriveInput);
@@ -237,23 +289,35 @@ pub fn derive_equivalence(item: TokenStream) -> TokenStream {
             syn::Fields::Named(named_fields) => {
 
             let local_fields = named_fields.named.clone();
-            let fields : Vec<syn::Ident> = local_fields.into_iter().filter(|f| !find_ignore_attribute(&f.attrs)).map(|f| f.ident.unwrap()).collect();
-            let equivalent = generate_structure_equivalent_body(fields.clone());
-            let equivalence_or_diff = generate_structure_equivalence_or_diff_body(struct_name.to_owned(),fields.clone());
-            let represent = generate_structure_represent_body(struct_name.to_owned(),fields.clone());
+            let fields : Vec<syn::Ident> = local_fields
+                .into_iter()
+                .filter(|f| !find_ignore_attribute(&f.attrs))
+                .map(|f| f.ident.unwrap()).collect();
+            let encapsulated : Vec<(SelfFieldName,OtherFieldName)> = fields
+                .iter()
+                .map(|x| (
+                    SelfFieldName{field:DataFieldName::StructNamed(x.clone())}
+                    ,OtherFieldName{field:DataFieldName::StructNamed(x.clone())})
+                )
+                .collect();
+            let equivalent = generate_equivalent_body(&encapsulated);
+            let equivalence_or_diff = generate_equivalence_or_diff_body(StructCaseName::Struct(struct_name.to_owned()),&encapsulated);
+            let represent = generate_represent_body(StructCaseName::Struct(struct_name.to_owned()),encapsulated.into_iter().map(|(x,_)| x).collect());
             (equivalent,equivalence_or_diff,represent)
             },
-            syn::Fields::Unnamed(_) => {
-                let mut equivalent_acc: proc_macro2::TokenStream =
-                    quote! {true & };
-                for (field_number, field) in fields.iter().enumerate() {
-                    if find_ignore_attribute(&field.attrs) {
-                        continue;
-                    }
-                    equivalent_acc.extend(quote! { Equivalence::equivalent(self.#field_number, other.#field_number) & })
-                }
-                equivalent_acc.extend(quote!(true));
-                (equivalent_acc,quote! {todo!()},quote!{todo!()})
+            syn::Fields::Unnamed(unnamed_fields) => {
+                let local_fields = unnamed_fields.unnamed.clone();
+                let fields : Vec<usize> = local_fields.into_iter().enumerate().filter(|(_,field)| !find_ignore_attribute(&field.attrs)).map(|(name,_)| name).collect();
+            let encapsulated : Vec<(SelfFieldName,OtherFieldName)> = fields
+                .iter()
+                .map(|x| (
+                    SelfFieldName{field:DataFieldName::StructIndex(*x)}
+                    ,OtherFieldName{field:DataFieldName::StructIndex(*x)})
+                ).collect();
+                let equivalent = generate_equivalent_body(&encapsulated);
+                let equivalence_or_diff = generate_equivalence_or_diff_body(StructCaseName::Struct(struct_name.to_owned()),&encapsulated);
+                let represent = generate_represent_body(StructCaseName::Struct(struct_name.to_owned()),encapsulated.into_iter().map(|(x,_)| x).collect());
+                (equivalent,equivalence_or_diff,represent)
             }
             syn::Fields::Unit => {
                 let equivalence = quote! { self.0.equivalent(other.0) };
@@ -286,31 +350,54 @@ pub fn derive_equivalence(item: TokenStream) -> TokenStream {
                     continue;
                 }
                 let variant_name = &variant.ident;
-                let mut branch_case = quote! {};
-                let mut branch_result = quote! {};
-                match variant.fields {
-                    syn::Fields::Named(_) => {
-                        let mut branch_pattern_match_inner_self = quote! {};
-                        let mut branch_pattern_match_inner_other = quote! {};
-                        for field in variant.fields.iter() {
-                            let name_field = field.ident.as_ref().unwrap();
-                            let name_self =
-                                format_ident!("selfItem{}", name_field);
-                            let name_other =
-                                format_ident!("otherItem{}", name_field);
-                            branch_pattern_match_inner_self
-                                .extend(quote! { #name_field : #name_self , });
-                            branch_pattern_match_inner_other
-                                .extend(quote! { #name_field: #name_other , });
-                            if find_ignore_attribute(&field.attrs) {
-                                ()
-                            } else {
-                                branch_result.extend( quote! { Equivalence::equivalent(#name_self,#name_other) & } );
-                            }
+                let mut branch_equivalent_case = quote! {};
+                let mut branch_equivalence_or_diff_case = quote! {};
+                let mut branch_represent_case = quote! {};
+                match &variant.fields {
+                    syn::Fields::Named(named_fields) => {
+                        let local_fields = named_fields.named.clone();
+                        let locals_len = local_fields.len();
+                        let fields : Vec<syn::Ident> = local_fields
+                            .into_iter()
+                            .filter(|f| !find_ignore_attribute(&f.attrs))
+                            .map(|f| f.ident.unwrap()).collect();
+                        let encapsulated : Vec<(syn::Ident,SelfFieldName,OtherFieldName)> = fields
+                            .iter()
+                            .map(|x| (
+                                x.clone(),
+                                SelfFieldName{field:DataFieldName::Enum(format_ident!("seflItem{}",x))}
+                                ,
+                                OtherFieldName{field: DataFieldName::Enum(format_ident!("otherItem{}",x))}
+                                )
+                            )
+                            .collect();
+                        let (mut pattern_match_self, mut pattern_match_other) : (proc_macro2::TokenStream,proc_macro2::TokenStream) = encapsulated
+                            .iter()
+                            .map(|(field_name,self_name,other_name)|
+                                {
+
+                                    let name_self = self_name.access_name();
+                                    let name_other = other_name.access_name();
+                                    (quote! {  #field_name : #name_self , }, quote! { #field_name : #name_other , })
+                                }
+                            ).collect();
+                        if encapsulated.len() != locals_len {
+                            pattern_match_self.extend(quote! { ... });
+                            pattern_match_other.extend(quote! { ... })
                         }
-                        branch_case.extend(quote! { (Self::#variant_name(#branch_pattern_match_inner_self), Self::#variant_name(#branch_pattern_match_inner_other)) => #branch_result true })
+                        let arg_names : Vec<(SelfFieldName,OtherFieldName)> = encapsulated
+                            .into_iter().map(|(_,x,y)| (x,y)).collect();
+                        let equivalent_result = generate_equivalent_body(&arg_names);
+                        let name = StructCaseName::Enum { struct_name:struct_name.to_owned(), variant_name: variant.ident.to_owned() };
+                        let equivalence_or_diff_result = generate_equivalence_or_diff_body(
+                            name.to_owned(),&arg_names);
+                        let represent_result = generate_represent_body(name,arg_names.into_iter().map(|(x,_)| x ).collect());
+
+                        branch_equivalent_case.extend(quote! { (Self::#variant_name{#pattern_match_self}, Self::#variant_name(#pattern_match_other)) => #equivalent_result true });
+                        branch_equivalence_or_diff_case.extend(quote! { (Self::#variant_name(#pattern_match_self), Self::#variant_name(#pattern_match_other)) => #equivalence_or_diff_result });
+                        branch_represent_case.extend(quote! { (Self::#variant_name(#pattern_match_self), Self::#variant_name(#pattern_match_other)) => #represent_result });
                     }
-                    syn::Fields::Unnamed(_) => {
+                    syn::Fields::Unnamed(_) => { /*
                         let mut branch_pattern_match_inner_self = quote! {};
                         let mut branch_pattern_match_inner_other = quote! {};
                         for (field_number, field) in
@@ -340,19 +427,26 @@ pub fn derive_equivalence(item: TokenStream) -> TokenStream {
                                 branch_result.extend( quote! { Equivalence::equivalent(#name_self,#name_other) & } );
                             }
                         }
-                        branch_case.extend(quote! { (Self::#variant_name(#branch_pattern_match_inner_self), Self::#variant_name(#branch_pattern_match_inner_other)) => #branch_result true })
+                        branch_equivalent_case.extend(quote! { (Self::#variant_name(#branch_pattern_match_inner_self), Self::#variant_name(#branch_pattern_match_inner_other)) => #branch_result true })
+                                                 */
+                        todo!()
                     }
                     syn::Fields::Unit => {
-                        branch_case.extend(quote! { _ => true });
+                        branch_equivalent_case.extend(quote! { _ => true });
                     }
                 }
-                equivalent_branches_acc.extend(quote! {#branch_case,});
+                equivalent_branches_acc.extend(quote! { { #branch_equivalent_case },});
             }
             (quote! {
                 match (self,other) {
                     #equivalent_branches_acc
                 }
-            },quote! {todo!()}, quote! {todo!()})
+            },quote! {
+                match (self,other) {
+                    #equivalent_branches_acc
+                }
+
+            }, quote! {todo!()})
         }
         _ => panic!("Union types are not supported!"),
     };
@@ -428,3 +522,4 @@ pub fn derive_equivalence(item: TokenStream) -> TokenStream {
 
     out.into()
 }
+*/
