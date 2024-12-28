@@ -1,9 +1,11 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
+use syn::parse_macro_input;
 
-mod equivalence_arguments;
-use crate::equivalence_arguments::derive_equivalence_impl;
+mod equivalence_impl;
+mod equivalence_parser;
+use crate::equivalence_impl::derive_equivalence_impl;
 
 /*
 fn find_ignore_attribute(attributes: &Vec<syn::Attribute>) -> bool {
@@ -84,28 +86,6 @@ fn parse_input_ignores(attributes: &Vec<syn::Attribute>) -> Vec<syn::Ident> {
     acc
 }
 
-fn generate_equivalent_body(
-    names: &Vec<(SelfFieldName, OtherFieldName)>,
-) -> proc_macro2::TokenStream {
-    let mut results: Vec<proc_macro2::TokenStream> = names
-        .into_iter()
-        .map(|(self_encapsulate, other_encapsulate)| {
-            let self_name = self_encapsulate.access_name();
-            let other_name = other_encapsulate.access_name();
-            quote! {#self_name.equivalent(&#other_name)}
-        })
-        .collect();
-
-    if results.len() == 0 {
-        quote! {true}
-    } else {
-        let last = results.pop().unwrap();
-        let code = results.into_iter().map(|x| {
-            quote! { #x & }
-        });
-        code.chain(vec![last]).collect()
-    }
-}
 
 fn generate_equivalence_or_diff_body(
     struct_name: StructCaseName,
@@ -261,7 +241,8 @@ fn generate_structure_represent_body(
 
 #[proc_macro_derive(Equivalence, attributes(equivalence))]
 pub fn derive_equivalence(item: TokenStream) -> TokenStream {
-    derive_equivalence_impl(item)
+    let input = parse_macro_input!(item as syn::DeriveInput);
+    derive_equivalence_impl(input)
 }
 /*
 #[proc_macro_derive(Equivalence, attributes(equivalence))]
