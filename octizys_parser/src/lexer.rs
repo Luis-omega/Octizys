@@ -1655,14 +1655,6 @@ mod test_regex {
     }
 
     #[test]
-    fn character() {
-        main_regex_with("'\\''", "char");
-        main_regex_with("'\\\\'", "char");
-        main_regex_with("'a'", "char");
-        main_regex_with("'à'", "char");
-    }
-
-    #[test]
     fn ownership_literal() {
         main_regex_with("'0", "ownership_literal");
         main_regex_with("'1", "ownership_literal");
@@ -1696,6 +1688,15 @@ mod test_regex {
         main_regex_with("0x1", "hex");
         main_regex_with("0x2_3_4", "hex");
         main_regex_with("0x1234", "hex");
+    }
+
+    #[test]
+    fn binary() {
+        main_regex_with("0b0", "binary");
+        main_regex_with("0b00", "binary");
+        main_regex_with("0b1", "binary");
+        main_regex_with("0b101", "binary");
+        main_regex_with("0b001010_1_0100_001", "binary");
     }
 
     #[test]

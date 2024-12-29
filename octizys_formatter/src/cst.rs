@@ -14,7 +14,7 @@ use octizys_cst::{
     },
     imports::{AsPath, Import},
     patterns::{PatternMatch, PatternMatchBind, PatternMatchRecordItem},
-    types::{Type, TypeBase, TypeRecordItem},
+    types::{Type, TypeRecordItem},
 };
 use octizys_pretty::{
     combinators::{
@@ -474,24 +474,6 @@ fn to_document_pattern_application_argument(
     }
 }
 
-impl ToDocument<PrettyCSTConfiguration> for TypeBase {
-    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        Document::static_str(match self {
-            TypeBase::U8 => keywords::U8,
-            TypeBase::U16 => keywords::U16,
-            TypeBase::U32 => keywords::U32,
-            TypeBase::U64 => keywords::U16,
-            TypeBase::I8 => keywords::I8,
-            TypeBase::I16 => keywords::I16,
-            TypeBase::I32 => keywords::I32,
-            TypeBase::I64 => keywords::I64,
-            TypeBase::F32 => keywords::F32,
-            TypeBase::F64 => keywords::F64,
-            TypeBase::Char => keywords::CHAR,
-            TypeBase::String => keywords::STRING,
-        })
-    }
-}
 impl ToDocument<PrettyCSTConfiguration> for PatternMatch {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
         match self {
@@ -502,9 +484,12 @@ impl ToDocument<PrettyCSTConfiguration> for PatternMatch {
             PatternMatch::String(_tok) => {
                 todo!("Strings are delayed for now in the pretty printer")
             } //tok.to_document(configuration),
-            PatternMatch::Char(_tok) => {
-                todo!("No support for character pretty print right now")
-            } // tok.to_document(configuration),
+            PatternMatch::UFloat(_tok) => {
+                todo!("Strings are delayed for now in the pretty printer")
+            } //tok.to_document(configuration),
+            PatternMatch::Uint(_tok) => {
+                todo!("Strings are delayed for now in the pretty printer")
+            } //tok.to_document(configuration),
             PatternMatch::AnonHole(info) => token_info_to_document(
                 info,
                 configuration,
@@ -580,7 +565,6 @@ fn to_document_type_arrow_arguments(
 impl ToDocument<PrettyCSTConfiguration> for Type {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
         match &self {
-            Type::Base(token) => token.to_document(configuration),
             Type::LocalVariable(token) => token.to_document(configuration),
             Type::ImportedVariable(token) => token.to_document(configuration),
             Type::Tuple(between) => between.to_document(configuration),
