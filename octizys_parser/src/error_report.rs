@@ -273,6 +273,7 @@ impl ParserErrorReport for LexerError {
             LexerError::UnexpectedOwnershipLiteralMatch(_, _) => {
                 "Internal:UnexpectedOwnershipLiteralMatch"
             }
+            LexerError::CantParseU64(_, _, _) => "Internal:CantParseU64",
         }
     }
     fn get_short_description(&self) -> &str {
@@ -293,6 +294,7 @@ impl ParserErrorReport for LexerError {
             LexerError::CantCreateIdentifier(_, _) => common,
             LexerError::CantTranslateToToken(_) => common,
             LexerError::UnexpectedOwnershipLiteralMatch(_, _) => common,
+            LexerError::CantParseU64(_, _,_) => common,
         }
     }
     fn get_long_description(&self) -> Option<&str> {
@@ -308,6 +310,7 @@ impl ParserErrorReport for LexerError {
             LexerError::CantCreateIdentifier(_, _) => "Internally we expected something to follow the same rules as an identifier, but it didn't follow those rules",
             LexerError::CantTranslateToToken(_) => "The internal translation between simple Tokens and the CST::Tokens failed!",
             LexerError::UnexpectedOwnershipLiteralMatch(_, _) => "We find what seems to look like a ownership literal, but something unexpected passed while working with it!",
+            LexerError::CantParseU64(_, _,_) => "We find what seems to look like a u64 literal, but something unexpected passed while working with it!",
         })
     }
     fn get_expected(&self) -> Option<Vec<String>> {
@@ -352,6 +355,9 @@ impl ParserErrorReport for LexerError {
                 <&Token as Into<&TokenInfo>>::into(token).span,
             ),
             LexerError::UnexpectedOwnershipLiteralMatch(_, span) => {
+                ErrorLocation::Span(span.clone())
+            }
+            LexerError::CantParseU64(_, _, span) => {
                 ErrorLocation::Span(span.clone())
             }
         }

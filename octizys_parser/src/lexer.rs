@@ -27,7 +27,7 @@ use octizys_text_store::store::{aproximate_string_width, Store};
 use lalrpop_util::ParseError;
 use paste::paste;
 use regex::{Captures, Match, Regex};
-use std::sync::LazyLock;
+use std::{num::ParseIntError, sync::LazyLock};
 
 /// We lex the stream in two phases, the first one retrieve a
 /// iterator of this type.
@@ -151,6 +151,9 @@ pub enum LexerError {
     /// regex was update without updating the handler!
     /// this is a bug.
     UnexpectedOwnershipLiteralMatch(String, Span),
+    /// Can't parse a u64 but we already know that the string
+    /// is a valid rust u64, this signals a bug!
+    CantParseU64(String, ParseIntError, Span),
 }
 
 /*
@@ -662,13 +665,6 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
         Some(Ok((span, BaseToken::AnonHole)))
     }
 
-    fn character(
-        &mut self,
-        m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
-        todo!()
-    }
-
     fn ownership_literal(
         &mut self,
         m: Match,
@@ -732,7 +728,11 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
                     value,
                 }),
             ))),
-            Err(_) => todo!(),
+            Err(e) => Some(Err(LexerError::CantParseU64(
+                String::from(matched),
+                e,
+                span,
+            ))),
         }
     }
 
@@ -750,7 +750,11 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
                     value,
                 }),
             ))),
-            Err(_) => todo!(),
+            Err(e) => Some(Err(LexerError::CantParseU64(
+                String::from(matched),
+                e,
+                span,
+            ))),
         }
     }
 
@@ -768,7 +772,11 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
                     value,
                 }),
             ))),
-            Err(_) => todo!(),
+            Err(e) => Some(Err(LexerError::CantParseU64(
+                String::from(matched),
+                e,
+                span,
+            ))),
         }
     }
 
@@ -790,13 +798,17 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
                         value,
                     }),
                 ))),
-                Err(_) => todo!(),
+                Err(e) => Some(Err(LexerError::CantParseU64(
+                    String::from(matched),
+                    e,
+                    span,
+                ))),
             },
         }
     }
 }
 
-const MAIN_REGEX_STR: &'static str = r#"^((?<comment_start>//|--|\{----|\{---|\{--|\{-)|(?<punctuation_or_operator>\\|/|#|,|;|\?|\+|\^|%|\.|::|:|->|-|\|\||\|>|\||<\?>|<&>|<<|<\*>|<\*|<\$>|<\$|<-|<=|<\|>|<\||<|\*>|\*|==|=|!=|!|>=|>>|>|&&|&|\$>|\$|@)|(?<bracket_start>\(|\[|\{)|(?<bracket_end>\)|\]|\})|(?<string_start>f#"|r####"|r###"|r##"|r#"|")|(?<named_hole>_[0-9][0-9_]*)|(?<identifier>_*\p{XID_START}\p{XID_CONTINUE}*)|(?<infix_identifier>`_*\p{XID_START}\p{XID_CONTINUE}*`)|(?<anon_hole>_)|(?<character>'([^'\\]|\\'|\\\\)')|(?<ownership_literal>'(0|1|inf))|(?<ownership_variable>'_*\p{XID_START}\p{XID_CONTINUE}*)|(?<octal>0o[0-7][0-7_]*)|(?<hex>0x[0-9a-fA-F][0-9a-fA-F_]*)|(?<binary>0b[01][01_]*)|(?<numeric>[0-9][0-9_]*(?<decimal_part>\.[0-9][0-9_]*(?<exponential_part>(e|E)(?<sign>\+|-)?[0-9][0-9_]*)?)?))"#;
+const MAIN_REGEX_STR: &'static str = r#"^((?<comment_start>//|--|\{----|\{---|\{--|\{-)|(?<punctuation_or_operator>\\|/|#|,|;|\?|\+|\^|%|\.|::|:|->|-|\|\||\|>|\||<\?>|<&>|<<|<\*>|<\*|<\$>|<\$|<-|<=|<\|>|<\||<|\*>|\*|==|=|!=|!|>=|>>|>|&&|&|\$>|\$|@)|(?<bracket_start>\(|\[|\{)|(?<bracket_end>\)|\]|\})|(?<string_start>f#"|r####"|r###"|r##"|r#"|")|(?<named_hole>_[0-9][0-9_]*)|(?<identifier>_*\p{XID_START}\p{XID_CONTINUE}*)|(?<infix_identifier>`_*\p{XID_START}\p{XID_CONTINUE}*`)|(?<anon_hole>_)|(?<ownership_literal>'(0|1|inf))|(?<ownership_variable>'_*\p{XID_START}\p{XID_CONTINUE}*)|(?<octal>0o[0-7][0-7_]*)|(?<hex>0x[0-9a-fA-F][0-9a-fA-F_]*)|(?<binary>0b[01][01_]*)|(?<numeric>[0-9][0-9_]*(?<decimal_part>\.[0-9][0-9_]*(?<exponential_part>(e|E)(?<sign>\+|-)?[0-9][0-9_]*)?)?))"#;
 
 const MAIN_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(MAIN_REGEX_STR).unwrap());
@@ -894,7 +906,6 @@ impl<'store, 'source> Iterator for BaseLexerContext<'store, 'source> {
                     ("identifier", BaseLexerContext::identifier),
                     ("infix_identifier", BaseLexerContext::infix_identifier),
                     ("anon_hole", BaseLexerContext::anon_hole),
-                    ("character", BaseLexerContext::character),
                     ("ownership_literal", BaseLexerContext::ownership_literal),
                     (
                         "ownership_variable",
