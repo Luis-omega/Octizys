@@ -2,7 +2,6 @@ use crate::base::{
     Between, Braces, Comma, ImportedVariable, Parens, RightArrow, Token,
     TokenInfo, TrailingList, TrailingListItem,
 };
-use derivative::Derivative;
 use octizys_common::identifier::Identifier;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Clone, Copy)]
@@ -18,7 +17,7 @@ pub struct OwnershipVariable {
     pub variable: Identifier,
 }
 
-#[derive(Debug, Derivative)]
+#[derive(Debug)]
 pub struct TypeRecordItem {
     pub variable: Token<Identifier>,
     pub separator: TokenInfo,

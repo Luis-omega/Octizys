@@ -13,7 +13,6 @@ use octizys_pretty::highlight::{
     EmptyRender, HighlightRenderer, TerminalRender24,
 };
 use octizys_text_store::store::Store;
-use pretty_assertions::{assert_eq, assert_ne};
 use std::fmt::Debug;
 
 use lalrpop_util::ParseError;

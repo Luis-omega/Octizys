@@ -9,7 +9,6 @@ edition = "2021"
 octizys_common={path="../octizys_common"}
 octizys_pretty={path="../octizys_pretty"}
 octizys_text_store={path="../octizys_text_store"}
-
 octizys_cst={path="../octizys_cst",optional=true}
 
 [features]

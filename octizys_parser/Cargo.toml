@@ -4,11 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[[bin]]
-name = "parser-repl"
-test = false
-bench = false
-path = "src/repl.rs"
 
 [dependencies]
 octizys_text_store = {path = "../octizys_text_store"}
@@ -16,19 +11,15 @@ octizys_common = {path = "../octizys_common"}
 octizys_cst = {path = "../octizys_cst"}
 octizys_pretty = {path = "../octizys_pretty"}
 octizys_formatter = {path = "../octizys_formatter",features=["cst"]}
-
-lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
-paste = "1.0.15"
-regex = "1.10.6"
+lalrpop-util = {workspace=true}
+paste = {workspace=true}
+regex = {workspace=true}
 
 
 
 [build-dependencies]
-lalrpop = "0.21.0"
+lalrpop = {workspace=true}
 
 [lints.rust]
 unused = "allow"
 unsafe_code = "forbid"
-
-[dev-dependencies]
-pretty_assertions = "1.4.1"
