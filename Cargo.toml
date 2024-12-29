@@ -1,5 +1,5 @@
 [workspace]
-members = [ "octizys_common", "octizys_compiler", "octizys_core", "octizys_cst", "octizys_doc", "octizys_formatter", "octizys_macros","octizys_parser", "octizys_pretty", "octizys_sast", "octizys_text_store", "repl"]
+members = [ "octizys_common", "octizys_compiler", "octizys_core", "octizys_cst", "octizys_doc", "octizys_formatter", "octizys_macros","octizys_parser", "octizys_pretty", "octizys_sast", "octizys_text_store", "octizys_repl"]
 
 [package]
 name = "octizys"

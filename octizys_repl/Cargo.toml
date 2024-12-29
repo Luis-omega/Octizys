@@ -1,0 +1,23 @@
+[package]
+name = "repl"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "octizys_repl"
+test = false
+bench = false
+path = "src/main.rs"
+
+[dependencies]
+lalrpop-util = {workspace=true}
+octizys_common = { version = "0.1.0", path = "../octizys_common" }
+octizys_cst = { version = "0.1.0", path = "../octizys_cst" }
+octizys_formatter = { version = "0.1.0", path = "../octizys_formatter" }
+octizys_parser = { version = "0.1.0", path = "../octizys_parser" }
+octizys_pretty = { version = "0.1.0", path = "../octizys_pretty" }
+octizys_text_store = { version = "0.1.0", path = "../octizys_text_store" }
+
+[lints.rust]
+unused = "allow"
+unsafe_code = "forbid"
