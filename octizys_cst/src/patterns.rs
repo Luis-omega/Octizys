@@ -1,6 +1,9 @@
-use crate::base::{
-    Between, Braces, Comma, ImportedVariable, Parens, Token, TokenInfo,
-    TrailingList,
+use crate::{
+    base::{
+        Between, Braces, Comma, ImportedVariable, Parens, Token, TokenInfo,
+        TrailingList,
+    },
+    literals::{StringLiteral, UFloatingPointLiteral, UintLiteral},
 };
 use octizys_common::identifier::Identifier;
 
@@ -27,8 +30,9 @@ pub struct PatternMatchBind {
 pub enum PatternMatch {
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
-    String(Token<String>),
-    Char(Token<String>),
+    String(Token<StringLiteral>),
+    Uint(Token<UintLiteral>),
+    UFloat(Token<UFloatingPointLiteral>),
     AnonHole(TokenInfo),
     Tuple(Between<TrailingList<Box<PatternMatch>, Comma>, Parens>),
     Record(Between<TrailingList<PatternMatchRecordItem, Comma>, Braces>),

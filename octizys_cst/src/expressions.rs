@@ -2,6 +2,9 @@ use crate::base::{
     Between, Braces, Comma, ImportedVariable, OperatorName, Parens, Token,
     TokenInfo, TrailingList,
 };
+use crate::literals::{
+    InterpolationString, StringLiteral, UFloatingPointLiteral, UintLiteral,
+};
 use crate::patterns::PatternMatch;
 use crate::types::Type;
 use octizys_common::identifier::Identifier;
@@ -76,14 +79,14 @@ pub struct ExpressionSelector {
 
 #[derive(Debug)]
 pub enum Expression {
-    String(Token<String>),
-    Character(Token<String>),
+    String(Token<StringLiteral>),
+    InterpolationString(Token<InterpolationString>),
     //TODO: make the lexer return the right type instead of string?
     //The main problem is with floats and uints, they must be in
     //the range or we should issue a warning or error about
     //maximum literal
-    Uint(Token<String>),
-    UFloat(Token<String>),
+    Uint(Token<UintLiteral>),
+    UFloat(Token<UFloatingPointLiteral>),
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
     NamedHole(Token<u64>),

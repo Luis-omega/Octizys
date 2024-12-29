@@ -5,22 +5,6 @@ use crate::base::{
 use derivative::Derivative;
 use octizys_common::identifier::Identifier;
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum TypeBase {
-    U8,
-    U16,
-    U32,
-    U64,
-    I8,
-    I16,
-    I32,
-    I64,
-    F32,
-    F64,
-    Char,
-    String,
-}
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Clone, Copy)]
 pub enum OwnershipLiteral {
     #[default]
@@ -46,7 +30,6 @@ pub struct TypeRecordItem {
 
 #[derive(Debug)]
 pub enum Type {
-    Base(Token<TypeBase>),
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
     Tuple(Between<TrailingList<Box<Type>, Comma>, Parens>),
@@ -76,7 +59,6 @@ impl Type {
     ///application.
     pub fn need_parens_application(&self) -> bool {
         match self {
-            Type::Base(_) => false,
             Type::LocalVariable(_) => false,
             Type::ImportedVariable(_) => false,
             Type::Tuple(_) => false,
@@ -93,7 +75,6 @@ impl Type {
     ///arrow.
     pub fn need_parens_arrow(&self) -> bool {
         match self {
-            Type::Base(_) => false,
             Type::LocalVariable(_) => false,
             Type::ImportedVariable(_) => false,
             Type::Tuple(_) => false,

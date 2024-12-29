@@ -3,7 +3,7 @@ use octizys_cst::{
   base::{Between,Token,TrailingList,TokenInfo,ImportedVariable,OperatorName,TrailingListItem,Comma,Colon,Braces,Parens,LogicPathSeparator},
   comments::{CommentKind,LineCommentStart,Comment},
   imports::{AsPath,Import},
-  types::{Type,TypeRecordItem,TypeBase},
+  types::{Type,TypeRecordItem},
   patterns::{PatternMatch,PatternMatchRecordItem, PatternMatchBind},
   expressions::{Expression,CaseItem,Case,ExpressionSelector,ExpressionRecordItem},
   literals::{UintLiteral,UFloatingPointLiteral,InterpolationString,StringLiteral},
@@ -96,18 +96,6 @@ extern {
       ,"unqualified" => lexer::Token::Unqualified(TokenInfo)
       ,"forall" => lexer::Token::Forall(TokenInfo)
       ,"type" => lexer::Token::Type(TokenInfo)
-      ,U8 => lexer::Token::U8(TokenInfo)
-      ,U16 => lexer::Token::U16(TokenInfo)
-      ,U32 => lexer::Token::U32(TokenInfo)
-      ,U64 => lexer::Token::U64(TokenInfo)
-      ,I8 => lexer::Token::I8(TokenInfo)
-      ,I16 => lexer::Token::I16(TokenInfo)
-      ,I32 => lexer::Token::I32(TokenInfo)
-      ,I64 => lexer::Token::I64(TokenInfo)
-      ,F32 => lexer::Token::F32(TokenInfo)
-      ,F64 => lexer::Token::F64(TokenInfo)
-      ,CharType => lexer::Token::CharType(TokenInfo)
-      ,StringType => lexer::Token::StringType(TokenInfo)
       ,LastComments=> lexer::Token::LastComments(TokenInfo,Comment)
       ,StringLiteral => lexer::Token::StringLiteral(TokenInfo,String)
       ,InterpolationString => lexer::Token::StringInterpolation(TokenInfo,String)
@@ -303,58 +291,6 @@ pub import_declaration : Import =
 
 //Types
 
-
-type_base : Token<TypeBase> = {
-  U8 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::U8,info}
-    },
-  U16 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::U16,info}
-    },
-  U32 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::U32,info}
-    },
-  U64 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::U64,info}
-    },
-  I8 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::I8,info}
-    },
-  I16 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::I16,info}
-    },
-  I32 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::I32,info}
-    },
-  I64 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::I64,info}
-    },
-  F32 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::F32,info}
-    },
-  F64 => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::F64,info}
-    },
-  CharType => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::Char,info}
-    },
-  StringType => {
-    let info :TokenInfo = <>.into();
-    base::Token{value:TypeBase::String,info}
-    },
-};
-
 type_variable : Type = {
   local_variable => Type::LocalVariable(<>),
   imported_variable =>Type::ImportedVariable(<>),
@@ -379,7 +315,6 @@ type_record : Between<TrailingList<TypeRecordItem,Comma>,Braces> = {
 };
 
 type_atom : Type = {
-  type_base => Type::Base(<>),
   type_variable => <>,
   type_tuple => <>,
   type_record => Type::Record(<>),
