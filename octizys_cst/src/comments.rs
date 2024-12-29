@@ -1,4 +1,3 @@
-use octizys_common::equivalence::Equivalence;
 use octizys_common::span::{Position, Span};
 use octizys_macros::Equivalence;
 use octizys_text_store::store::{NonLineBreakString, Store};

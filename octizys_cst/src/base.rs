@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 
 use crate::comments::CommentsInfo;
-use octizys_common::equivalence::Equivalence;
 use octizys_common::identifier::Identifier;
 use octizys_common::logic_path::LogicPath;
 use octizys_common::span::{Position, Span};

@@ -14,3 +14,8 @@ syn = "2.0.90"
 name = "octizys_macros"
 path = "src/lib.rs"
 proc-macro = true
+
+[dev-dependencies]
+octizys_pretty = { path = "../octizys_pretty" }
+octizys_text_store = { path = "../octizys_text_store" }
+

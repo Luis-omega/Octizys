@@ -35,7 +35,12 @@ fn generate_represent_body(
     mut identifiers: Vec<SelfFieldName>,
 ) -> proc_macro2::TokenStream {
     if identifiers.len() == 0 {
-        quote! { empty() }
+        let name_str = struct_name.as_string();
+        let a = &name_str;
+        quote! {
+            const NAME: NonLineBreakStr = NonLineBreakStr::new(#a);
+            static_str(NAME)
+        }
     } else if identifiers.len() == 1 {
         let one = identifiers.pop().unwrap().access_name();
         let name_str = struct_name.as_string();
@@ -54,7 +59,7 @@ fn generate_represent_body(
             .map(|iden| {
                 let name_access = iden.access_name();
                 quote! {
-                    #name_access.represent(), hard_break(), sep.clone(),
+                    #name_access.represent(), hard_break(),
                 }
             })
             .chain(vec![quote! {#last.represent()}])
@@ -63,8 +68,6 @@ fn generate_represent_body(
         let a = &name_str;
         quote! {
             const NAME: NonLineBreakStr = NonLineBreakStr::new(#a);
-            const SEP : NonLineBreakStr = NonLineBreakStr::new(",");
-            let sep = static_str(SEP);
             let children_representation = concat(vec![#children]);
 
             static_str(NAME)
@@ -229,7 +232,7 @@ fn generate_represent(
     quote! {
             fn represent(&self)->octizys_pretty::document::Document{
                 use ::octizys_text_store::store::NonLineBreakStr;
-                use ::octizys_pretty::combinators::{concat,nest,hard_break,static_str};
+                use ::octizys_pretty::combinators::{concat,nest,hard_break,static_str,empty};
                 use ::octizys_common::equivalence::parens;
                 #body
             }
@@ -318,15 +321,8 @@ fn generate_equivalence_or_diff(
             }
             quote! {match (self,other) {#branches_acc
                 (_,_) =>{
-                        let branches = concat(vec![
-                            self.represent(),
-                            other.represent()
-                        ]);
                         ::core::result::Result::Err(
-                            nest(
-                                2,
-                                branches
-                            )
+                            make_report(self,other)
                         )
                     }
                 }
@@ -337,7 +333,7 @@ fn generate_equivalence_or_diff(
             fn equivalence_or_diff(&self, other:&Self)->::core::result::Result<(),::octizys_pretty::document::Document>{
                 use ::octizys_text_store::store::NonLineBreakStr;
                 use ::octizys_pretty::combinators::{concat,nest,hard_break,static_str};
-                use ::octizys_common::equivalence::parens;
+                use ::octizys_common::equivalence::{make_report,parens};
                 #body
             }
     }

@@ -441,6 +441,8 @@ version = "0.1.0"
 dependencies = [
  "darling",
  "octizys_common",
+ "octizys_pretty",
+ "octizys_text_store",
  "proc-macro2",
  "quote",
  "syn 2.0.90",

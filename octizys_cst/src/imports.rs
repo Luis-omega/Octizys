@@ -1,5 +1,4 @@
 use crate::base::{Between, Comma, Parens, Token, TokenInfo, TrailingList};
-use octizys_common::equivalence::Equivalence;
 use octizys_common::{identifier::Identifier, logic_path::LogicPath};
 use octizys_macros::Equivalence;
 

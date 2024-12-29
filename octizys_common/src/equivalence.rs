@@ -49,6 +49,8 @@ pub fn make_report<E: Equivalence>(left: &E, right: &E) -> Document {
     report
 }
 
+/// ##Panics!
+/// This function panics if the given element are different!
 pub fn assert_equivalent<E: Equivalence>(
     l: &E,
     r: &E,
