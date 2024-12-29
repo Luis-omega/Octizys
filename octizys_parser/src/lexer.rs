@@ -6,6 +6,10 @@ use octizys_common::{
 use octizys_cst::{
     base::{TokenInfo, TokenInfoWithPhantom},
     comments::CommentKind,
+    literals::{
+        InterpolationString, StringLiteral, UFloatingPointLiteral, UintKind,
+        UintLiteral,
+    },
 };
 use octizys_cst::{
     comments::{
@@ -93,6 +97,7 @@ pub enum BaseToken {
     Unqualified,
     Forall,
     Type,
+    //TODO: remove those
     U8,
     U16,
     U32,
@@ -107,8 +112,10 @@ pub enum BaseToken {
     StringType,
     LineComment(CommentLine),
     BlockComment(CommentBlock),
-    UintLiteral(String),
-    UFloatLiteral(String),
+    UintLiteral(UintLiteral),
+    UFloatLiteral(UFloatingPointLiteral),
+    StringLiteral(StringLiteral),
+    StringInterpolation(InterpolationString),
     Identifier(Identifier),
     InfixIdentifier(Identifier),
     Selector(Identifier),
@@ -740,25 +747,81 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
         &mut self,
         m: Match,
     ) -> Option<Result<(Span, BaseToken), LexerError>> {
-        todo!()
+        let matched = m.as_str();
+        let span = self.advance_non_line_breaks(matched);
+        match u64::from_str_radix(&matched[2..], 8) {
+            Ok(value) => Some(Ok((
+                span,
+                BaseToken::UintLiteral(UintLiteral {
+                    kind: UintKind::Octal,
+                    value,
+                }),
+            ))),
+            Err(_) => todo!(),
+        }
     }
 
     fn hex(
         &mut self,
         m: Match,
     ) -> Option<Result<(Span, BaseToken), LexerError>> {
-        todo!()
+        let matched = m.as_str();
+        let span = self.advance_non_line_breaks(matched);
+        match u64::from_str_radix(&matched[2..], 16) {
+            Ok(value) => Some(Ok((
+                span,
+                BaseToken::UintLiteral(UintLiteral {
+                    kind: UintKind::Hex,
+                    value,
+                }),
+            ))),
+            Err(_) => todo!(),
+        }
     }
 
+    fn binary(
+        &mut self,
+        m: Match,
+    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+        let matched = m.as_str();
+        let span = self.advance_non_line_breaks(matched);
+        match u64::from_str_radix(&matched[2..], 2) {
+            Ok(value) => Some(Ok((
+                span,
+                BaseToken::UintLiteral(UintLiteral {
+                    kind: UintKind::Binary,
+                    value,
+                }),
+            ))),
+            Err(_) => todo!(),
+        }
+    }
+
+    //TODO: add type signatures to uint literals like `27_u8`
     fn numeric(
         &mut self,
         m: Match,
     ) -> Option<Result<(Span, BaseToken), LexerError>> {
-        todo!()
+        let matched = m.as_str();
+        let span = self.advance_non_line_breaks(matched);
+        let re_parsed = NUMBER.captures(matched).unwrap();
+        match re_parsed.name("decimal_part") {
+            Some(_) => Some(Ok((span, BaseToken::UFloatLiteral(todo!())))),
+            None => match matched.parse::<u64>() {
+                Ok(value) => Some(Ok((
+                    span,
+                    BaseToken::UintLiteral(UintLiteral {
+                        kind: UintKind::Unspecified,
+                        value,
+                    }),
+                ))),
+                Err(_) => todo!(),
+            },
+        }
     }
 }
 
-const MAIN_REGEX_STR: &'static str = r#"^((?<comment_start>//|--|\{----|\{---|\{--|\{-)|(?<punctuation_or_operator>\\|/|#|,|;|\?|\+|\^|%|\.|::|:|->|-|\|\||\|>|\||<\?>|<&>|<<|<\*>|<\*|<\$>|<\$|<-|<=|<\|>|<\||<|\*>|\*|==|=|!=|!|>=|>>|>|&&|&|\$>|\$|@)|(?<bracket_start>\(|\[|\{)|(?<bracket_end>\)|\]|\})|(?<string_start>f#"|r####"|r###"|r##"|r#"|")|(?<named_hole>_[0-9][0-9_]*)|(?<identifier>_*\p{XID_START}\p{XID_CONTINUE}*)|(?<infix_identifier>`_*\p{XID_START}\p{XID_CONTINUE}*`)|(?<anon_hole>_)|(?<char>'([^'\\]|\\'|\\\\)')|(?<ownership_literal>'(0|1|inf))|(?<ownership_variable>'_*\p{XID_START}\p{XID_CONTINUE}*)|(?<octal>0o[0-7][0-7_]*)|(?<hex>0x[0-9a-fA-F][0-9a-fA-F_]*)|(?<numeric>[0-9][0-9_]*(?<decimal_part>\.[0-9][0-9_]*(?<exponential_part>(e|E)(?<sign>\+|-)?[0-9][0-9_]*)?)?))"#;
+const MAIN_REGEX_STR: &'static str = r#"^((?<comment_start>//|--|\{----|\{---|\{--|\{-)|(?<punctuation_or_operator>\\|/|#|,|;|\?|\+|\^|%|\.|::|:|->|-|\|\||\|>|\||<\?>|<&>|<<|<\*>|<\*|<\$>|<\$|<-|<=|<\|>|<\||<|\*>|\*|==|=|!=|!|>=|>>|>|&&|&|\$>|\$|@)|(?<bracket_start>\(|\[|\{)|(?<bracket_end>\)|\]|\})|(?<string_start>f#"|r####"|r###"|r##"|r#"|")|(?<named_hole>_[0-9][0-9_]*)|(?<identifier>_*\p{XID_START}\p{XID_CONTINUE}*)|(?<infix_identifier>`_*\p{XID_START}\p{XID_CONTINUE}*`)|(?<anon_hole>_)|(?<character>'([^'\\]|\\'|\\\\)')|(?<ownership_literal>'(0|1|inf))|(?<ownership_variable>'_*\p{XID_START}\p{XID_CONTINUE}*)|(?<octal>0o[0-7][0-7_]*)|(?<hex>0x[0-9a-fA-F][0-9a-fA-F_]*)|(?<binary>0b[01][01_]*)|(?<numeric>[0-9][0-9_]*(?<decimal_part>\.[0-9][0-9_]*(?<exponential_part>(e|E)(?<sign>\+|-)?[0-9][0-9_]*)?)?))"#;
 
 const MAIN_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(MAIN_REGEX_STR).unwrap());
@@ -800,6 +863,14 @@ static COMMENT_BLOCK3: LazyLock<Regex> = LazyLock::new(|| {
     )
     .unwrap()
 });
+static NUMBER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+    r"(?<numeric>[0-9][0-9_]*(?<decimal_part>\.[0-9][0-9_]*(?<exponential_part>(e|E)(?<sign>\+|-)?[0-9][0-9_]*)?)?)"
+    )
+    .unwrap()
+});
+static SIMPLE_STRING: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#""([^"]|[^\\](\\\\)*\\")*""#).unwrap());
 
 fn find_match_group<'source, 'store, 'context>(
     c: Captures,
@@ -856,6 +927,7 @@ impl<'store, 'source> Iterator for BaseLexerContext<'store, 'source> {
                     ),
                     ("octal", BaseLexerContext::octal),
                     ("hex", BaseLexerContext::hex),
+                    ("binary", BaseLexerContext::binary),
                     ("numeric", BaseLexerContext::numeric),
                 ],
             ),
@@ -943,10 +1015,10 @@ pub enum Token {
     CharType(TokenInfo),
     StringType(TokenInfo),
     Comment(TokenInfo, Comment),
-    StringLiteral(TokenInfo, String),
-    CharacterLiteral(TokenInfo, String),
-    UintLiteral(TokenInfo, String),
-    UFloatLiteral(TokenInfo, String),
+    StringLiteral(TokenInfo, StringLiteral),
+    StringInterpolation(TokenInfo, InterpolationString),
+    UintLiteral(TokenInfo, UintLiteral),
+    UFloatLiteral(TokenInfo, UFloatingPointLiteral),
     Identifier(TokenInfo, Identifier),
     InfixIdentifier(TokenInfo, Identifier),
     Selector(TokenInfo, Identifier),
@@ -1038,7 +1110,7 @@ impl From<Token> for TokenInfo {
             Token::StringType(info) => (info),
             Token::Comment(info, _) => info,
             Token::StringLiteral(info, _) => info,
-            Token::CharacterLiteral(info, _) => info,
+            Token::StringInterpolation(info, _) => info,
             Token::UintLiteral(info, _) => info,
             Token::UFloatLiteral(info, _) => info,
             Token::Identifier(info, _) => info,
@@ -1134,7 +1206,7 @@ impl<'a> From<&'a Token> for &'a TokenInfo {
             Token::StringType(info) => (info),
             Token::Comment(info, _) => info,
             Token::StringLiteral(info, _) => info,
-            Token::CharacterLiteral(info, _) => info,
+            Token::StringInterpolation(info, _) => info,
             Token::UintLiteral(info, _) => info,
             Token::UFloatLiteral(info, _) => info,
             Token::Identifier(info, _) => info,
@@ -1167,10 +1239,14 @@ macro_rules! make_lexer_token_to_token {
     };
 }
 make_lexer_token_to_token!(identifier, Identifier, Identifier);
-make_lexer_token_to_token!(string, StringLiteral, String);
-make_lexer_token_to_token!(char, CharacterLiteral, String);
-make_lexer_token_to_token!(uint, UintLiteral, String);
-make_lexer_token_to_token!(ufloat, UFloatLiteral, String);
+make_lexer_token_to_token!(string, StringLiteral, StringLiteral);
+make_lexer_token_to_token!(uint, UintLiteral, UintLiteral);
+make_lexer_token_to_token!(
+    interpolation,
+    StringInterpolation,
+    InterpolationString
+);
+make_lexer_token_to_token!(ufloat, UFloatLiteral, UFloatingPointLiteral);
 make_lexer_token_to_token!(selector, Selector, Identifier);
 make_lexer_token_to_token!(named_hole, NamedHole, u64);
 
@@ -1257,6 +1333,10 @@ pub fn aux_base_token_to_token(
         BaseToken::StringType => Token::StringType(info),
         BaseToken::LineComment(c) => Token::Comment(info, Comment::Line(c)),
         BaseToken::BlockComment(c) => Token::Comment(info, Comment::Block(c)),
+        BaseToken::StringLiteral(s) => Token::StringLiteral(info, s),
+        BaseToken::StringInterpolation(s) => {
+            Token::StringInterpolation(info, s)
+        }
         BaseToken::UintLiteral(s) => Token::UintLiteral(info, s),
         BaseToken::UFloatLiteral(s) => Token::UFloatLiteral(info, s),
         BaseToken::Identifier(s) => Token::Identifier(info, s),

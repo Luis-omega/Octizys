@@ -3,7 +3,9 @@ use octizys_cst::base::TokenInfo;
 use octizys_formatter::cst::PrettyCSTConfiguration;
 use octizys_formatter::to_document::ToDocument;
 use octizys_parser::error_report::{create_error_report, ParserErrorContext};
-use octizys_parser::grammar::import_declarationParser;
+use octizys_parser::grammar::{
+    import_declarationParser, type_expressionParser,
+};
 use octizys_parser::lexer;
 use octizys_parser::lexer::{
     BaseLexerContext, BaseToken, LexerContext, LexerError, Token,
@@ -45,10 +47,6 @@ use std::rc::Rc;
 //```
 //Or something better...
 //
-//
-//
-//
-//
 
 fn main() {
     let mut store = Store::default();
@@ -56,6 +54,7 @@ fn main() {
     let mut stdin = io::stdin();
     let input = &mut String::new();
     let p = import_declarationParser::new();
+    let p2 = type_expressionParser::new();
     loop {
         input.clear();
         stdin.read_line(input);
@@ -65,7 +64,7 @@ fn main() {
         }
         let mut base_context = BaseLexerContext::new(input, &mut store);
         let iterator = LexerContext::new(None, &mut base_context);
-        let parsed = p.parse(iterator.map(|x| {
+        let parsed = p2.parse(iterator.map(|x| {
             match x.clone() {
                 Ok((_, tok, _)) => println!("Ok({:?})", tok),
                 Err(e) => println!("Err({:?})", e),

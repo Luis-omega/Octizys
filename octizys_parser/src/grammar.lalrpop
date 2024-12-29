@@ -5,7 +5,9 @@ use octizys_cst::{
   imports::{AsPath,Import},
   types::{Type,TypeRecordItem,TypeBase},
   patterns::{PatternMatch,PatternMatchRecordItem, PatternMatchBind},
-  expressions::{Expression,CaseItem,Case,ExpressionSelector,ExpressionRecordItem}};
+  expressions::{Expression,CaseItem,Case,ExpressionSelector,ExpressionRecordItem},
+  literals::{UintLiteral,UFloatingPointLiteral,InterpolationString,StringLiteral},
+  };
 use octizys_cst::base;
 use octizys_common::logic_path::LogicPath;
 use octizys_common::identifier::Identifier;
@@ -108,7 +110,7 @@ extern {
       ,StringType => lexer::Token::StringType(TokenInfo)
       ,LastComments=> lexer::Token::LastComments(TokenInfo,Comment)
       ,StringLiteral => lexer::Token::StringLiteral(TokenInfo,String)
-      ,CharacterLiteral => lexer::Token::CharacterLiteral(TokenInfo,String)
+      ,InterpolationString => lexer::Token::StringInterpolation(TokenInfo,String)
       ,UintLiteral => lexer::Token::UintLiteral(TokenInfo,String)
       ,UFloatLiteral=> lexer::Token::UFloatLiteral(TokenInfo,String)
       ,Identifier=> lexer::Token::Identifier(TokenInfo,String)
@@ -152,13 +154,13 @@ boxed<T> : Box<T> = T => Box::new(<>);
 
 // --------------------- Terminal translation ---------------------
 
-pub string :Token<String> = StringLiteral =>? lexer::string_token_to_token(<>);
+pub string :Token<StringLiteral> = StringLiteral =>? lexer::string_token_to_token(<>);
 
-character : Token<String> = CharacterLiteral =>? lexer::char_token_to_token(<>);
+pub interpolation_string :Token<InterpolationString> = InterpolationString =>? lexer::interpolation_token_to_token(<>);
 
-uint : Token<String> = UintLiteral =>? lexer::uint_token_to_token(<>);
+uint : Token<UintLiteral> = UintLiteral =>? lexer::uint_token_to_token(<>);
 
-ufloat : Token<String> = UFloatLiteral =>? lexer::ufloat_token_to_token(<>);
+ufloat : Token<UFloatingPointLiteral> = UFloatLiteral =>? lexer::ufloat_token_to_token(<>);
 
 logic_path: Token<LogicPath>  ={
   <l:identifier> <s:"::"> => {
@@ -450,7 +452,6 @@ pattern_variable : PatternMatch = {
 //TODO: add support for negative integers?
 pattern_literal : PatternMatch  = {
   string => PatternMatch::String(<>),
-  character => PatternMatch::Char(<>),
 };
 
 pattern_hole : PatternMatch = {
@@ -524,7 +525,6 @@ pub pattern : PatternMatch = {
 
 expression_literal : Expression ={
   string => Expression::String(<>),
-  character => Expression::Character(<>),
   uint =>Expression::Uint(<>),
   ufloat => Expression::UFloat(<>),
 };
