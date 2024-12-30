@@ -1,4 +1,5 @@
 use octizys_common::{
+    equivalence::Equivalence,
     identifier::Identifier,
     logic_path::LogicPath,
     span::{Position, Span},
@@ -18,6 +19,7 @@ use octizys_cst::{
     },
     types::{OwnershipLiteral, OwnershipVariable},
 };
+use octizys_macros::Equivalence;
 use octizys_pretty::{
     combinators::{concat, empty, external_text, hard_break, nest, repeat},
     document::Document,
@@ -27,7 +29,10 @@ use octizys_text_store::store::{aproximate_string_width, Store};
 use lalrpop_util::ParseError;
 use paste::paste;
 use regex::{Captures, Match, Regex};
-use std::{num::ParseIntError, sync::LazyLock};
+use std::{
+    borrow::BorrowMut, cell::RefCell, num::ParseIntError, rc::Rc,
+    sync::LazyLock,
+};
 
 /// We lex the stream in two phases, the first one retrieve a
 /// iterator of this type.
@@ -112,35 +117,39 @@ pub enum BaseToken {
     OwnershipVariable(OwnershipVariable),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Equivalence)]
 pub enum LexerError {
-    UnexpectedCharacter(Position),
+    UnexpectedCharacter(#[equivalence(ignore)] Position),
     /// Punctuation match matched a non know character
     /// This is a bug.
-    UnexpectedPunctuationMatch(String, Span),
+    UnexpectedPunctuationMatch(String, #[equivalence(ignore)] Span),
     /// Comment match matched a non know character
     /// This is a bug.
-    UnexpectedCommentMatch(String, Span),
+    UnexpectedCommentMatch(String, #[equivalence(ignore)] Span),
     /// A line comment pattern match failed.
     /// This is a bug.
-    NonFinishedLineComment(String, Span),
+    NonFinishedLineComment(String, #[equivalence(ignore)] Span),
     /// A line comment with empty body is fine but
     /// the regex should still return a empty match.
     /// This is a bug.
-    NonContentInLineComment(String, Span),
+    NonContentInLineComment(String, #[equivalence(ignore)] Span),
     /// The internalization of comments failed!
     /// this is a bug.
-    CantCreateCommentLine(String, Span),
+    CantCreateCommentLine(String, #[equivalence(ignore)] Span),
     /// We found the begining of a block comment
     /// but the input didn't match the regex,
     /// in the user side a unbalanced bracket is what
     /// is expected.
-    CouldntMatchBlockComment(String, CommentBraceKind, Span),
-    Notu64NamedHole(String, Span),
+    CouldntMatchBlockComment(
+        String,
+        CommentBraceKind,
+        #[equivalence(ignore)] Span,
+    ),
+    Notu64NamedHole(String, #[equivalence(ignore)] Span),
     /// We expected a identifier and the regex should guarantee it!
     /// but if not...
     /// this is a bug.
-    CantCreateIdentifier(String, Span),
+    CantCreateIdentifier(String, #[equivalence(ignore)] Span),
     /// We have some unsafe functions that translate a
     /// [`Token`] in this file to a [`octizys_cst::base::Token`],
     /// they are mainly used in the parser and shouldn't fail!
@@ -150,10 +159,15 @@ pub enum LexerError {
     /// then it wasn't a match! most probably the
     /// regex was update without updating the handler!
     /// this is a bug.
-    UnexpectedOwnershipLiteralMatch(String, Span),
+    UnexpectedOwnershipLiteralMatch(String, #[equivalence(ignore)] Span),
     /// Can't parse a u64 but we already know that the string
     /// is a valid rust u64, this signals a bug!
-    CantParseU64(String, ParseIntError, Span),
+    CantParseU64(
+        String,
+        //TODO: Implement Equivalence for ParseIntError
+        #[equivalence(ignore)] ParseIntError,
+        #[equivalence(ignore)] Span,
+    ),
 }
 
 /*
@@ -280,7 +294,7 @@ pub enum LexerError {
 
 /// An abstraction for a [`Stream`] of characters over a [`str`].
 #[derive(Debug)]
-pub struct BaseLexerContext<'store, 'source> {
+pub struct BaseLexerContext<'source> {
     /// A pointer to the original source
     source: &'source str,
     /// A pointer to the remain of the source
@@ -293,7 +307,7 @@ pub struct BaseLexerContext<'store, 'source> {
     /// Saves the line of the last token
     last_line: usize,
     /// A storage for internalization of strings.
-    store: &'store mut Store,
+    store: Rc<RefCell<Store>>,
 }
 
 fn make_block_comment(
@@ -319,7 +333,7 @@ fn make_block_comment(
                         content.as_str(),
                         span.start,
                         span.end,
-                        &mut context.store,
+                        &mut *(*context.store).borrow_mut(),
                     );
                     Some(Ok((span, BaseToken::BlockComment(comment))))
                 }
@@ -361,7 +375,7 @@ fn make_line_comment(
                 Some(content) => {
                     let maybe_content = CommentLineContent::make_register(
                         content.as_str(),
-                        &mut context.store,
+                        &mut *(*context.store).borrow_mut(),
                     );
                     match maybe_content {
                         Some(internalized_content) => Some(Ok((
@@ -395,9 +409,9 @@ fn make_line_comment(
     }
 }
 
-impl<'store, 'source> BaseLexerContext<'store, 'source> {
+impl<'store, 'source> BaseLexerContext<'source> {
     //TODO: make this function capable to start everywhere in the source
-    pub fn new(source: &'source str, store: &'store mut Store) -> Self {
+    pub fn new(source: &'source str, store: Rc<RefCell<Store>>) -> Self {
         BaseLexerContext {
             source,
             index: source,
@@ -631,7 +645,10 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
             "unqualified" => Some(Ok((span, BaseToken::Unqualified))),
             "forall" => Some(Ok((span, BaseToken::Forall))),
             "type" => Some(Ok((span, BaseToken::Type))),
-            _ => match Identifier::make(matched, self.store) {
+            _ => match Identifier::make(
+                matched,
+                &mut *(*self.store).borrow_mut(),
+            ) {
                 Ok(iden) => Some(Ok((span, BaseToken::Identifier(iden)))),
                 _ => Some(Err(LexerError::CantCreateIdentifier(
                     matched.to_string(),
@@ -647,7 +664,10 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
     ) -> Option<Result<(Span, BaseToken), LexerError>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
-        match Identifier::make(&matched[1..(matched.len() - 1)], self.store) {
+        match Identifier::make(
+            &matched[1..(matched.len() - 1)],
+            &mut *(*self.store).borrow_mut(),
+        ) {
             Ok(iden) => Some(Ok((span, BaseToken::InfixIdentifier(iden)))),
             _ => Some(Err(LexerError::CantCreateIdentifier(
                 matched.to_string(),
@@ -700,7 +720,10 @@ impl<'store, 'source> BaseLexerContext<'store, 'source> {
         //This is safe since ownership_variables start with `'`, an ascii
         //character.
         let maybe_identifier = &matched[1..];
-        match Identifier::make(maybe_identifier, &mut self.store) {
+        match Identifier::make(
+            maybe_identifier,
+            &mut *(*self.store).borrow_mut(),
+        ) {
             Ok(idn) => Some(Ok((
                 span,
                 BaseToken::OwnershipVariable(OwnershipVariable {
@@ -861,11 +884,11 @@ static SIMPLE_STRING: LazyLock<Regex> =
 
 fn find_match_group<'source, 'store, 'context>(
     c: Captures,
-    blc: &'context mut BaseLexerContext<'store, 'source>,
+    blc: &'context mut BaseLexerContext<'source>,
     v: Vec<(
         &'static str,
         fn(
-            &'context mut BaseLexerContext<'store, 'source>,
+            &'context mut BaseLexerContext<'source>,
             m: Match,
         ) -> Option<Result<(Span, BaseToken), LexerError>>,
     )>,
@@ -881,7 +904,7 @@ fn find_match_group<'source, 'store, 'context>(
     out
 }
 
-impl<'store, 'source> Iterator for BaseLexerContext<'store, 'source> {
+impl<'store, 'source> Iterator for BaseLexerContext<'source> {
     type Item = Result<(Span, BaseToken), LexerError>;
     fn next(&mut self) -> Option<Self::Item> {
         self.consume_spaces();
@@ -922,97 +945,97 @@ impl<'store, 'source> Iterator for BaseLexerContext<'store, 'source> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Equivalence)]
 pub enum Token {
-    Interrogation(TokenInfo),
-    Exclamation(TokenInfo),
-    Hash(TokenInfo),
-    Comma(TokenInfo),
-    Colon(TokenInfo),
-    StatementEnd(TokenInfo),
-    Dot(TokenInfo),
-    ModuleSeparator(TokenInfo),
-    Minus(TokenInfo),
-    CompositionRight(TokenInfo),
-    CompositionLeft(TokenInfo),
-    Plus(TokenInfo),
-    Power(TokenInfo),
-    Star(TokenInfo),
-    Div(TokenInfo),
-    Module(TokenInfo),
-    ShiftLeft(TokenInfo),
-    ShiftRigth(TokenInfo),
-    Map(TokenInfo),
-    MapConstRigth(TokenInfo),
-    MapConstLeft(TokenInfo),
-    Appliative(TokenInfo),
-    ApplicativeRight(TokenInfo),
-    ApplicativeLeft(TokenInfo),
-    Equality(TokenInfo),
-    NotEqual(TokenInfo),
-    LessOrEqual(TokenInfo),
-    MoreOrEqual(TokenInfo),
-    LessThan(TokenInfo),
-    MoreThan(TokenInfo),
-    And(TokenInfo),
-    Or(TokenInfo),
-    ReverseAppliation(TokenInfo),
-    DollarApplication(TokenInfo),
-    Asignation(TokenInfo),
-    At(TokenInfo),
-    Pipe(TokenInfo),
-    Alternative(TokenInfo),
-    FlippedMap(TokenInfo),
-    Annotate(TokenInfo),
-    LParen(TokenInfo),
-    RParen(TokenInfo),
-    LBracket(TokenInfo),
-    RBracket(TokenInfo),
-    LBrace(TokenInfo),
-    RBrace(TokenInfo),
-    RightArrow(TokenInfo),
-    LeftArrow(TokenInfo),
-    LambdaStart(TokenInfo),
-    Let(TokenInfo),
-    In(TokenInfo),
-    Case(TokenInfo),
-    Of(TokenInfo),
-    Import(TokenInfo),
-    Data(TokenInfo),
-    Newtype(TokenInfo),
-    Class(TokenInfo),
-    Instance(TokenInfo),
-    Public(TokenInfo),
-    Alias(TokenInfo),
-    As(TokenInfo),
-    Unqualified(TokenInfo),
-    Forall(TokenInfo),
-    Type(TokenInfo),
-    U8(TokenInfo),
-    U16(TokenInfo),
-    U32(TokenInfo),
-    U64(TokenInfo),
-    I8(TokenInfo),
-    I16(TokenInfo),
-    I32(TokenInfo),
-    I64(TokenInfo),
-    F32(TokenInfo),
-    F64(TokenInfo),
-    CharType(TokenInfo),
-    StringType(TokenInfo),
-    Comment(TokenInfo, Comment),
-    StringLiteral(TokenInfo, StringLiteral),
-    StringInterpolation(TokenInfo, InterpolationString),
-    UintLiteral(TokenInfo, UintLiteral),
-    UFloatLiteral(TokenInfo, UFloatingPointLiteral),
-    Identifier(TokenInfo, Identifier),
-    InfixIdentifier(TokenInfo, Identifier),
-    Selector(TokenInfo, Identifier),
-    AnonHole(TokenInfo),
-    NamedHole(TokenInfo, u64),
-    LastComments(TokenInfo, Vec<Comment>),
-    OwnershipLiteral(TokenInfo, OwnershipLiteral),
-    OwnershipVariable(TokenInfo, OwnershipVariable),
+    Interrogation(#[equivalence(ignore)] TokenInfo),
+    Exclamation(#[equivalence(ignore)] TokenInfo),
+    Hash(#[equivalence(ignore)] TokenInfo),
+    Comma(#[equivalence(ignore)] TokenInfo),
+    Colon(#[equivalence(ignore)] TokenInfo),
+    StatementEnd(#[equivalence(ignore)] TokenInfo),
+    Dot(#[equivalence(ignore)] TokenInfo),
+    ModuleSeparator(#[equivalence(ignore)] TokenInfo),
+    Minus(#[equivalence(ignore)] TokenInfo),
+    CompositionRight(#[equivalence(ignore)] TokenInfo),
+    CompositionLeft(#[equivalence(ignore)] TokenInfo),
+    Plus(#[equivalence(ignore)] TokenInfo),
+    Power(#[equivalence(ignore)] TokenInfo),
+    Star(#[equivalence(ignore)] TokenInfo),
+    Div(#[equivalence(ignore)] TokenInfo),
+    Module(#[equivalence(ignore)] TokenInfo),
+    ShiftLeft(#[equivalence(ignore)] TokenInfo),
+    ShiftRigth(#[equivalence(ignore)] TokenInfo),
+    Map(#[equivalence(ignore)] TokenInfo),
+    MapConstRigth(#[equivalence(ignore)] TokenInfo),
+    MapConstLeft(#[equivalence(ignore)] TokenInfo),
+    Appliative(#[equivalence(ignore)] TokenInfo),
+    ApplicativeRight(#[equivalence(ignore)] TokenInfo),
+    ApplicativeLeft(#[equivalence(ignore)] TokenInfo),
+    Equality(#[equivalence(ignore)] TokenInfo),
+    NotEqual(#[equivalence(ignore)] TokenInfo),
+    LessOrEqual(#[equivalence(ignore)] TokenInfo),
+    MoreOrEqual(#[equivalence(ignore)] TokenInfo),
+    LessThan(#[equivalence(ignore)] TokenInfo),
+    MoreThan(#[equivalence(ignore)] TokenInfo),
+    And(#[equivalence(ignore)] TokenInfo),
+    Or(#[equivalence(ignore)] TokenInfo),
+    ReverseAppliation(#[equivalence(ignore)] TokenInfo),
+    DollarApplication(#[equivalence(ignore)] TokenInfo),
+    Asignation(#[equivalence(ignore)] TokenInfo),
+    At(#[equivalence(ignore)] TokenInfo),
+    Pipe(#[equivalence(ignore)] TokenInfo),
+    Alternative(#[equivalence(ignore)] TokenInfo),
+    FlippedMap(#[equivalence(ignore)] TokenInfo),
+    Annotate(#[equivalence(ignore)] TokenInfo),
+    LParen(#[equivalence(ignore)] TokenInfo),
+    RParen(#[equivalence(ignore)] TokenInfo),
+    LBracket(#[equivalence(ignore)] TokenInfo),
+    RBracket(#[equivalence(ignore)] TokenInfo),
+    LBrace(#[equivalence(ignore)] TokenInfo),
+    RBrace(#[equivalence(ignore)] TokenInfo),
+    RightArrow(#[equivalence(ignore)] TokenInfo),
+    LeftArrow(#[equivalence(ignore)] TokenInfo),
+    LambdaStart(#[equivalence(ignore)] TokenInfo),
+    Let(#[equivalence(ignore)] TokenInfo),
+    In(#[equivalence(ignore)] TokenInfo),
+    Case(#[equivalence(ignore)] TokenInfo),
+    Of(#[equivalence(ignore)] TokenInfo),
+    Import(#[equivalence(ignore)] TokenInfo),
+    Data(#[equivalence(ignore)] TokenInfo),
+    Newtype(#[equivalence(ignore)] TokenInfo),
+    Class(#[equivalence(ignore)] TokenInfo),
+    Instance(#[equivalence(ignore)] TokenInfo),
+    Public(#[equivalence(ignore)] TokenInfo),
+    Alias(#[equivalence(ignore)] TokenInfo),
+    As(#[equivalence(ignore)] TokenInfo),
+    Unqualified(#[equivalence(ignore)] TokenInfo),
+    Forall(#[equivalence(ignore)] TokenInfo),
+    Type(#[equivalence(ignore)] TokenInfo),
+    U8(#[equivalence(ignore)] TokenInfo),
+    U16(#[equivalence(ignore)] TokenInfo),
+    U32(#[equivalence(ignore)] TokenInfo),
+    U64(#[equivalence(ignore)] TokenInfo),
+    I8(#[equivalence(ignore)] TokenInfo),
+    I16(#[equivalence(ignore)] TokenInfo),
+    I32(#[equivalence(ignore)] TokenInfo),
+    I64(#[equivalence(ignore)] TokenInfo),
+    F32(#[equivalence(ignore)] TokenInfo),
+    F64(#[equivalence(ignore)] TokenInfo),
+    CharType(#[equivalence(ignore)] TokenInfo),
+    StringType(#[equivalence(ignore)] TokenInfo),
+    Comment(#[equivalence(ignore)] TokenInfo, Comment),
+    StringLiteral(#[equivalence(ignore)] TokenInfo, StringLiteral),
+    StringInterpolation(#[equivalence(ignore)] TokenInfo, InterpolationString),
+    UintLiteral(#[equivalence(ignore)] TokenInfo, UintLiteral),
+    UFloatLiteral(#[equivalence(ignore)] TokenInfo, UFloatingPointLiteral),
+    Identifier(#[equivalence(ignore)] TokenInfo, Identifier),
+    InfixIdentifier(#[equivalence(ignore)] TokenInfo, Identifier),
+    Selector(#[equivalence(ignore)] TokenInfo, Identifier),
+    AnonHole(#[equivalence(ignore)] TokenInfo),
+    NamedHole(#[equivalence(ignore)] TokenInfo, u64),
+    LastComments(#[equivalence(ignore)] TokenInfo, Vec<Comment>),
+    OwnershipLiteral(#[equivalence(ignore)] TokenInfo, OwnershipLiteral),
+    OwnershipVariable(#[equivalence(ignore)] TokenInfo, OwnershipVariable),
 }
 
 impl From<Token> for TokenInfo {
@@ -1330,18 +1353,18 @@ pub enum BaseOrComments {
 }
 
 #[derive(Debug)]
-pub struct LexerContext<'src, 'store> {
+pub struct LexerContext<'src> {
     previous_token:
         Option<Result<(Span, BaseOrComments), (Vec<Comment>, LexerError)>>,
-    lexer: &'src mut BaseLexerContext<'store, 'src>,
+    lexer: &'src mut BaseLexerContext<'src>,
 }
 
-impl<'src, 'store> LexerContext<'src, 'store> {
+impl<'src> LexerContext<'src> {
     pub fn new(
         previous_token: Option<
             Result<(Span, BaseOrComments), (Vec<Comment>, LexerError)>,
         >,
-        lexer: &'src mut BaseLexerContext<'store, 'src>,
+        lexer: &'src mut BaseLexerContext<'src>,
     ) -> Self {
         LexerContext {
             previous_token,
@@ -1497,7 +1520,7 @@ fn parse_token(
     }
 }
 
-impl<'store, 'src> Iterator for LexerContext<'store, 'src> {
+impl<'store, 'src> Iterator for LexerContext<'src> {
     type Item = Result<(Position, Token, Position), LexerError>;
     fn next(&mut self) -> Option<Self::Item> {
         //println!("{:?}", self);

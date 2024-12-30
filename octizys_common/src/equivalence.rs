@@ -146,6 +146,18 @@ impl<T: Equivalence> Equivalence for Option<T> {
     }
 }
 
+impl<T: Equivalence> Equivalence for &T {
+    fn equivalent(&self, other: &Self) -> bool {
+        Equivalence::equivalent(*self, *other)
+    }
+    fn equivalence_or_diff(&self, other: &Self) -> Result<(), Document> {
+        Equivalence::equivalence_or_diff(*self, *other)
+    }
+    fn represent(&self) -> Document {
+        Equivalence::represent(*self)
+    }
+}
+
 impl<T: Equivalence> Equivalence for Box<T> {
     fn equivalent(&self, other: &Self) -> bool {
         Equivalence::equivalent(self.as_ref(), other.as_ref())

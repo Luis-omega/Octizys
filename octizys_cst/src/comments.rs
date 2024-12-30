@@ -93,7 +93,7 @@ pub enum CommentKind {
 /// We acknowledge the need for nested block comments but at
 /// the same time we believe that a finite amount of them
 /// is enough for most uses if not all of them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Equivalence)]
 pub enum CommentBraceKind {
     // "{- asdf -}"
     Brace0,
@@ -124,7 +124,7 @@ impl CommentBraceKind {
 /// - `//`
 /// - `--`
 ///
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Equivalence)]
 pub enum LineCommentStart {
     // --
     DoubleHypen,
@@ -162,11 +162,12 @@ pub enum LineCommentStart {
 ///   ---}
 /// ```
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Equivalence)]
 pub struct CommentBlock {
     pub kind: CommentKind,
     pub brace: CommentBraceKind,
     pub content: Vec<CommentLineContent>,
+    #[equivalence(ignore)]
     pub span: Span,
 }
 impl CommentBlock {
@@ -208,11 +209,12 @@ impl CommentBlock {
 /// // | a documentation line comment.
 /// -- | another documentation line comment.
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Equivalence)]
 pub struct CommentLine {
     pub kind: CommentKind,
     pub start: LineCommentStart,
     pub content: CommentLineContent,
+    #[equivalence(ignore)]
     pub span: Span,
 }
 
@@ -232,7 +234,7 @@ pub struct CommentLine {
 /// - `Note:`
 ///
 /// At the current time we don't know if this is going to be useful.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Equivalence)]
 pub enum Comment {
     Line(CommentLine),
     Block(CommentBlock),

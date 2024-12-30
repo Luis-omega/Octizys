@@ -9,6 +9,7 @@ edition = "2021"
 octizys_text_store = {path = "../octizys_text_store"}
 octizys_common = {path = "../octizys_common"}
 octizys_cst = {path = "../octizys_cst"}
+octizys_macros = {path = "../octizys_macros"}
 octizys_pretty = {path = "../octizys_pretty"}
 octizys_formatter = {path = "../octizys_formatter",features=["cst"]}
 lalrpop-util = {workspace=true}

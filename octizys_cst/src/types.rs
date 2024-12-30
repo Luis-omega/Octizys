@@ -3,8 +3,20 @@ use crate::base::{
     TokenInfo, TrailingList, TrailingListItem,
 };
 use octizys_common::identifier::Identifier;
+use octizys_macros::Equivalence;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Clone, Copy)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    Clone,
+    Copy,
+    Equivalence,
+)]
 pub enum OwnershipLiteral {
     #[default]
     Zero,
@@ -12,7 +24,7 @@ pub enum OwnershipLiteral {
     Inf,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Equivalence)]
 pub struct OwnershipVariable {
     pub variable: Identifier,
 }
