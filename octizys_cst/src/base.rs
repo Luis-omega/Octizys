@@ -1,16 +1,37 @@
 use std::marker::PhantomData;
 
 use crate::comments::CommentsInfo;
+use octizys_common::equivalence::Equivalence;
 use octizys_common::identifier::Identifier;
 use octizys_common::logic_path::LogicPath;
 use octizys_common::span::{Position, Span};
 use octizys_macros::Equivalence;
+use octizys_pretty::combinators::static_str;
 use octizys_text_store::store::NonLineBreakStr;
 
 mod private {
     /// We want it to create phantom types internally
     pub trait Sealed {}
 }
+
+pub trait ShowableToken: private::Sealed {
+    fn show() -> NonLineBreakStr;
+}
+
+macro_rules! make_showable_type {
+    ($name:ident, $value:expr ) => {
+        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        pub enum $name {}
+        impl private::Sealed for $name {}
+        impl ShowableToken for $name {
+            fn show() -> NonLineBreakStr {
+                NonLineBreakStr::new($value)
+            }
+        }
+    };
+}
+
+make_showable_type!(UnqualifiedKeyword, "unqualified");
 
 /// Used to statically determine the kind of separator to use
 /// and tell rust how to represent it as string.
@@ -36,6 +57,11 @@ macro_rules! make_separator_type {
         impl Separator for $name {
             fn to_str() -> NonLineBreakStr {
                 NonLineBreakStr::new($value)
+            }
+        }
+        impl ShowableToken for $name {
+            fn show() -> NonLineBreakStr {
+                Self::to_str()
             }
         }
     };
@@ -114,9 +140,10 @@ impl TokenInfo {
 /// A new type around a token Info.
 /// The principal use of this is for the grammar to type check as
 /// separators and brackets.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenInfoWithPhantom<P> {
-    info: TokenInfo,
-    _phantom: PhantomData<P>,
+    pub info: TokenInfo,
+    pub _phantom: PhantomData<P>,
 }
 
 impl<P> From<TokenInfoWithPhantom<P>> for TokenInfo {
@@ -133,6 +160,25 @@ impl<P> From<TokenInfo> for TokenInfoWithPhantom<P> {
         }
     }
 }
+
+impl<P> Equivalence for TokenInfoWithPhantom<P>
+where
+    P: ShowableToken,
+{
+    fn equivalent(&self, _other: &Self) -> bool {
+        true
+    }
+    fn equivalence_or_diff(
+        &self,
+        _other: &Self,
+    ) -> Result<(), octizys_pretty::document::Document> {
+        Ok(())
+    }
+    fn represent(&self) -> octizys_pretty::document::Document {
+        static_str(P::show())
+    }
+}
+
 /// A Token has two pieces, a value (the content) and information
 /// like the comments around it and the source position.
 /// We never build a [`Token`] for punctuation elements or keywords,

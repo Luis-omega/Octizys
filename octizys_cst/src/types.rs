@@ -29,9 +29,10 @@ pub struct OwnershipVariable {
     pub variable: Identifier,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Equivalence)]
 pub struct TypeRecordItem {
     pub variable: Token<Identifier>,
+    #[equivalence(ignore)]
     pub separator: TokenInfo,
     // This is needed as TrailingList stores a T
     // otherwise we can drop the Box, maybe put
@@ -39,7 +40,7 @@ pub struct TypeRecordItem {
     pub expression: Box<Type>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Equivalence)]
 pub enum Type {
     LocalVariable(Token<Identifier>),
     ImportedVariable(Token<ImportedVariable>),
@@ -56,9 +57,11 @@ pub enum Type {
         remain: Vec<TrailingListItem<Type, RightArrow>>,
     },
     Scheme {
+        #[equivalence(ignore)]
         forall: TokenInfo,
         first_variable: Token<Identifier>,
         remain_variables: Vec<Token<Identifier>>,
+        #[equivalence(ignore)]
         dot: TokenInfo,
         expression: Box<Type>,
     },

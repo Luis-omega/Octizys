@@ -59,7 +59,7 @@ fn generate_represent_body(
             .map(|iden| {
                 let name_access = iden.access_name();
                 quote! {
-                    #name_access.represent(), hard_break(),
+                    parens(#name_access.represent()), hard_break(),
                 }
             })
             .chain(vec![quote! {#last.represent()}])

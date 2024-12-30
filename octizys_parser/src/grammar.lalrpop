@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use octizys_cst::{
-  base::{Between,Token,TrailingList,TokenInfo,ImportedVariable,OperatorName,TrailingListItem,Comma,Colon,Braces,Parens,LogicPathSeparator},
+  base::{Between,Token,TrailingList,TokenInfo,TokenInfoWithPhantom,ImportedVariable,OperatorName,TrailingListItem,Comma,Colon,Braces,Parens,LogicPathSeparator},
   comments::{CommentKind,LineCommentStart,Comment},
   imports::{AsPath,Import},
   types::{Type,TypeRecordItem},
@@ -279,7 +279,7 @@ pub import_declaration : Import =
   <qualified_path:import_as?>
   => Import{
     import:import.into(),
-    unqualified:unqualified.map(|x| x.into())
+    unqualified:unqualified.map(|x| TokenInfoWithPhantom{info:x.into(),_phantom: Default::default()})
     ,logic_path,import_list,qualified_path};
 
 

@@ -15,6 +15,7 @@ lalrpop-util = {workspace=true}
 octizys_common = { version = "0.1.0", path = "../octizys_common" }
 octizys_cst = { version = "0.1.0", path = "../octizys_cst" }
 octizys_formatter = { version = "0.1.0", path = "../octizys_formatter" }
+octizys_macros = { version = "0.1.0", path = "../octizys_macros" }
 octizys_parser = { version = "0.1.0", path = "../octizys_parser" }
 octizys_pretty = { version = "0.1.0", path = "../octizys_pretty" }
 octizys_text_store = { version = "0.1.0", path = "../octizys_text_store" }

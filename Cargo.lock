@@ -725,6 +725,7 @@ dependencies = [
  "octizys_common",
  "octizys_cst",
  "octizys_formatter",
+ "octizys_macros",
  "octizys_parser",
  "octizys_pretty",
  "octizys_text_store",

@@ -1,4 +1,7 @@
-use crate::base::{Between, Comma, Parens, Token, TokenInfo, TrailingList};
+use crate::base::{
+    Between, Comma, Parens, Token, TokenInfo, TokenInfoWithPhantom,
+    TrailingList, UnqualifiedKeyword,
+};
 use octizys_common::{identifier::Identifier, logic_path::LogicPath};
 use octizys_macros::Equivalence;
 
@@ -14,8 +17,7 @@ pub struct Import {
     // import unqualified S.O.M.E.Path(a,b,c) as N.A.Me
     #[equivalence(ignore)]
     pub import: TokenInfo,
-    #[equivalence(ignore)]
-    pub unqualified: Option<TokenInfo>,
+    pub unqualified: Option<TokenInfoWithPhantom<UnqualifiedKeyword>>,
     pub logic_path: Token<LogicPath>,
     pub import_list:
         Option<Between<TrailingList<Token<Identifier>, Comma>, Parens>>,

@@ -1,7 +1,8 @@
 use octizys_cst::{
     base::{
-        Between, Delimiters, ImportedVariable, OperatorName, Separator, Token,
-        TokenInfo, TrailingList, TrailingListItem,
+        Between, Delimiters, ImportedVariable, OperatorName, Separator,
+        ShowableToken, Token, TokenInfo, TokenInfoWithPhantom, TrailingList,
+        TrailingListItem,
     },
     comments::{
         Comment, CommentBlock, CommentBraceKind, CommentKind, CommentLine,
@@ -19,7 +20,7 @@ use octizys_cst::{
 use octizys_pretty::{
     combinators::{
         concat, concat_iter, empty, empty_break, external_text, group,
-        hard_break, intersperse, nest, repeat, soft_break,
+        hard_break, intersperse, nest, repeat, soft_break, static_str,
     },
     document::Document,
 };
@@ -193,6 +194,15 @@ pub fn token_info_to_document(
     doc: Document,
 ) -> Document {
     comments_info_to_document(&info.comments, configuration, doc)
+}
+
+impl<P> ToDocument<PrettyCSTConfiguration> for TokenInfoWithPhantom<P>
+where
+    P: ShowableToken,
+{
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        token_info_to_document(&self.info, configuration, static_str(P::show()))
+    }
 }
 
 impl<T> ToDocument<PrettyCSTConfiguration> for Token<T>
@@ -383,14 +393,7 @@ impl ToDocument<PrettyCSTConfiguration> for Import {
             Document::static_str(keywords::IMPORT),
         );
         let unqualified: Document = match &self.unqualified {
-            Some(x) => {
-                soft_break()
-                    + token_info_to_document(
-                        &x,
-                        configuration,
-                        Document::static_str(keywords::UNQUALIFIED),
-                    )
-            }
+            Some(x) => soft_break() + x.to_document(configuration),
             None => empty(),
         };
 

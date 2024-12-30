@@ -44,6 +44,8 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use octizys_macros::Equivalence;
+
 //TODO:
 //TEst the following :
 //```
@@ -68,6 +70,7 @@ use std::rc::Rc;
 //
 //
 
+#[derive(Debug, Equivalence)]
 enum ReplParserOutput {
     Import(Import),
     Type(Type),
@@ -80,45 +83,43 @@ impl ReplParserOutput {
             ReplParserOutput::Type(t) => t.to_document(configuration),
         }
     }
+
+    fn represent(&self) -> Document {
+        match self {
+            ReplParserOutput::Import(i) => i.represent(),
+            ReplParserOutput::Type(t) => t.represent(),
+        }
+    }
 }
 
 #[derive(Clone)]
-struct RenderInfo<Renderer>
-where
-    Renderer: HighlightRenderer,
-{
+struct RenderInfo {
     debug: DebugFormatOption,
     column_width: usize,
-    highlight: PhantomData<Renderer>,
+    highlight: fn(&Highlight) -> (String, String),
 }
 
-fn println_with<'store, T, Renderer>(
+fn println_with<'store, T>(
     value: &T,
     store: &'store Store,
-    options: &RenderInfo<Renderer>,
+    options: &RenderInfo,
 ) -> ()
 where
     T: Debug + Equivalence,
-    Renderer: HighlightRenderer,
 {
     let document = to_document_with(value, options.debug);
     let as_string = render_with(document, store, options);
     println!("{}", as_string)
 }
 
-fn render_with<'store, Renderer>(
+fn render_with<'store>(
     document: Document,
     store: &'store Store,
-    options: &RenderInfo<Renderer>,
+    options: &RenderInfo,
 ) -> String
 where
-    Renderer: HighlightRenderer,
 {
-    document.render_to_string(
-        options.column_width,
-        Renderer::render_highlight,
-        store,
-    )
+    document.render_to_string(options.column_width, options.highlight, store)
 }
 
 fn to_document_with<T>(value: &T, format: DebugFormatOption) -> Document
@@ -134,210 +135,175 @@ where
     }
 }
 
-macro_rules! gen_parser_option_branch {
-    ($name:ident, $type:expr) => {{
-        let mut base_context = BaseLexerContext::new(s, &mut store);
-        let mut iterator = LexerContext::new(None, &mut base_context);
-        match show_token_stream {
-            Some(renderer_info) => {
-                iterator = iterator.map(|x| {
-                    match x.clone() {
-                        Ok((_, tok, _)) => {
-                            println_with(tok, &store, renderer_info)
-                        }
-                        Err(e) => println_with(e, &store, renderer_info),
-                    }
-                    x
-                })
-            }
-            None => (),
-        }
-        $type::new()
-            .parse(iterator)
-            .map(|x| ReplParserOutput::$name(x))
-    }};
-}
-
-fn parse_string_with_renderer<'store, Renderer>(
-    parser_option: AvailableParser,
-    s: &str,
-    store: Rc<RefCell<Store>>,
-    show_token_stream: Option<RenderInfo<Renderer>>,
-) -> Result<
-    ReplParserOutput,
-    ParseError<Position, octizys_parser::lexer::Token, LexerError>,
->
-where
-    Renderer: HighlightRenderer,
-{
-    match parser_option {
-        AvailableParser::Import => {
+macro_rules! gen_parse_function {
+    ($function_name:ident, $name:ident,$parser_name:ident) => {
+        fn $function_name(
+            s: &str,
+            store: Rc<RefCell<Store>>,
+            show_token_stream: Option<RenderInfo>,
+        ) -> Result<ReplParserOutput, ParseError<Position, Token, LexerError>> {
             let mut base_context = BaseLexerContext::new(s, store.clone());
             let iterator = LexerContext::new(None, &mut base_context);
             match show_token_stream {
                 Some(renderer_info) => {
-                    let new_iterator = iterator.map(|x| {
-                        match x.clone() {
-                            Ok((_, tok, _)) => println_with(
-                                &tok,
-                                &*(*store).borrow(),
-                                &renderer_info,
-                            ),
-                            Err(e) => println_with(
-                                &e,
-                                &*(*store).borrow(),
-                                &renderer_info,
-                            ),
-                        }
-                        x
+                    let new_iterator = iterator.inspect(|x| match x.clone() {
+                        Ok((_, tok, _)) => println_with(
+                            &tok,
+                            &*(*store).borrow(),
+                            &renderer_info,
+                        ),
+                        Err(e) => println_with(
+                            &e,
+                            &*(*store).borrow(),
+                            &renderer_info,
+                        ),
                     });
-                    import_declarationParser::new()
+                    $parser_name::new()
                         .parse(new_iterator)
-                        .map(|x| ReplParserOutput::Import(x))
+                        .map(|x| ReplParserOutput::$name(x))
                 }
-                None => import_declarationParser::new()
+                None => $parser_name::new()
                     .parse(iterator)
-                    .map(|x| ReplParserOutput::Import(x)),
+                    .map(|x| ReplParserOutput::$name(x)),
             }
         }
-        AvailableParser::Type => todo!(),
-        //gen_parser_option_branch!(Type,type_expressionParser),
+    };
+}
+
+gen_parse_function!(parse_import, Import, import_declarationParser);
+gen_parse_function!(parse_type, Type, type_expressionParser);
+
+fn parse_string_with_renderer(
+    parser_option: AvailableParser,
+    s: &str,
+    store: Rc<RefCell<Store>>,
+    show_token_stream: Option<RenderInfo>,
+) -> Result<
+    ReplParserOutput,
+    ParseError<Position, octizys_parser::lexer::Token, LexerError>,
+> {
+    match parser_option {
+        AvailableParser::Import => parse_import(s, store, show_token_stream),
+        AvailableParser::Type => parse_type(s, store, show_token_stream),
     }
 }
 
 fn println_result(
     input: &str,
+    file_name: Option<&str>,
     result: Result<ReplParserOutput, ParseError<Position, Token, LexerError>>,
     store: &Store,
-    highlight: fn(&Highlight) -> (String, String),
+    show_cst: bool,
+    renderer_info: &RenderInfo,
 ) -> () {
+    //TODO: pass pretty configuration
     let pretty_configuration = PrettyCSTConfiguration::default();
     match result {
         Ok(item) => {
+            if show_cst {
+                println_with(&item, store, renderer_info);
+            }
             let as_doc = group(item.to_document(&pretty_configuration));
 
-            println!("{}", as_doc.render_to_string(80, highlight, store))
+            let as_string = render_with(as_doc, store, renderer_info);
+            println!("{}", as_string)
         }
         Err(t) => {
             let mut error_context = ParserErrorContext::default();
             error_context.src = &input;
+            match file_name {
+                Some(name) => error_context.src_name = name,
+                None => (),
+            }
             let report = create_error_report(&t, &error_context);
-            let as_str = report.render_to_string(80, highlight, store);
-            println!("{}", as_str);
+            let as_string = render_with(report, store, renderer_info);
+            println!("{}", as_string)
         }
     }
 }
 
 fn parse_string(
     string: &str,
+    file_path: Option<&str>,
     image_path: Option<PathBuf>,
     store: Store,
     configuration: Configuration,
 ) -> () {
-    let new_store = Rc::new(RefCell::new(store));
-    let result = if configuration.show_tokens {
-        match configuration.renderer {
-            arguments::AvailableRenderers::PlainText => {
-                let renderer_info: RenderInfo<EmptyRender> = RenderInfo {
-                    debug: configuration.display_format,
-                    column_width: configuration.column_width,
-                    highlight: Default::default(),
-                };
-                let result = parse_string_with_renderer(
-                    configuration.parser,
-                    string,
-                    new_store.clone(),
-                    Some(renderer_info),
-                );
-                println_result(
-                    string,
-                    result,
-                    &*(*new_store).borrow(),
-                    EmptyRender::render_highlight,
-                )
-            }
-            arguments::AvailableRenderers::AnsiC4 => {
-                let renderer_info: RenderInfo<TerminalRender4> = RenderInfo {
-                    debug: configuration.display_format,
-                    column_width: configuration.column_width,
-                    highlight: Default::default(),
-                };
-                let result = parse_string_with_renderer(
-                    configuration.parser,
-                    string,
-                    new_store.clone(),
-                    Some(renderer_info),
-                );
-                println_result(
-                    string,
-                    result,
-                    &*(*new_store).borrow(),
-                    TerminalRender4::render_highlight,
-                )
-            }
-            arguments::AvailableRenderers::AnsiC8 => {
-                let renderer_info: RenderInfo<TerminalRender8> = RenderInfo {
-                    debug: configuration.display_format,
-                    column_width: configuration.column_width,
-                    highlight: Default::default(),
-                };
-                let result = parse_string_with_renderer(
-                    configuration.parser,
-                    string,
-                    new_store.clone(),
-                    Some(renderer_info),
-                );
-                println_result(
-                    string,
-                    result,
-                    &*(*new_store).borrow(),
-                    TerminalRender8::render_highlight,
-                )
-            }
-            arguments::AvailableRenderers::AnsiC24 => {
-                let renderer_info: RenderInfo<TerminalRender24> = RenderInfo {
-                    debug: configuration.display_format,
-                    column_width: configuration.column_width,
-                    highlight: Default::default(),
-                };
-                let result = parse_string_with_renderer(
-                    configuration.parser,
-                    string,
-                    new_store.clone(),
-                    Some(renderer_info),
-                );
-                println_result(
-                    string,
-                    result,
-                    &*(*new_store).borrow(),
-                    TerminalRender24::render_highlight,
-                )
-            }
+    let highlight = match configuration.renderer {
+        arguments::AvailableRenderers::PlainText => {
+            EmptyRender::render_highlight
         }
-    } else {
-        let renderer: Option<RenderInfo<TerminalRender24>> = None;
+        arguments::AvailableRenderers::AnsiC4 => {
+            TerminalRender4::render_highlight
+        }
+        arguments::AvailableRenderers::AnsiC8 => {
+            TerminalRender8::render_highlight
+        }
+        arguments::AvailableRenderers::AnsiC24 => {
+            TerminalRender24::render_highlight
+        }
+    };
+    let new_store = Rc::new(RefCell::new(store));
+    let renderer_info = RenderInfo {
+        debug: configuration.display_format,
+        column_width: configuration.column_width,
+        highlight: highlight,
+    };
+    if configuration.show_tokens {
         let result = parse_string_with_renderer(
             configuration.parser,
             string,
             new_store.clone(),
-            renderer,
+            Some(renderer_info.clone()),
         );
         println_result(
             string,
+            file_path,
             result,
             &*(*new_store).borrow(),
-            TerminalRender24::render_highlight,
+            configuration.show_cst,
+            &renderer_info,
+        )
+    } else {
+        let result = parse_string_with_renderer(
+            configuration.parser,
+            string,
+            new_store.clone(),
+            None,
+        );
+        println_result(
+            string,
+            file_path,
+            result,
+            &*(*new_store).borrow(),
+            configuration.show_cst,
+            &renderer_info,
         )
     };
 }
 
 fn parse_file(
-    path_name: PathBuf,
+    file_path: PathBuf,
     image_path: Option<PathBuf>,
     store: Store,
     configuration: Configuration,
 ) -> () {
-    todo!()
+    match ::std::fs::read_to_string(file_path.clone()) {
+        Ok(content) => {
+            let path = match std::path::absolute(file_path.clone().as_path()) {
+                Ok(p) => p.to_str().map(String::from),
+                Err(_) => file_path.to_str().map(String::from),
+            };
+            parse_string(
+                &content,
+                path.as_deref(),
+                image_path,
+                store,
+                configuration,
+            )
+        }
+        Err(_) => println!("Can't read file: {file_path:?}"),
+    }
 }
 
 fn repl(store: Store, configuration: Configuration) -> () {
@@ -356,7 +322,7 @@ fn main() {
             if configuration.show_arguments {
                 println!("{:#?}", configuration)
             } else {
-                parse_string(&string, image_path, store, configuration)
+                parse_string(&string, None, image_path, store, configuration)
             }
         }
         arguments::Commands::ParseFile {
@@ -374,57 +340,4 @@ fn main() {
             repl(store, configuration)
         }
     };
-    /*
-    let mut store = Rc::new(RefCell::new(Store::default()));
-    let configuration = PrettyCSTConfiguration::default();
-    let mut stdin = io::stdin();
-    let input = &mut String::new();
-    let p = import_declarationParser::new();
-    let p2 = type_expressionParser::new();
-    loop {
-        input.clear();
-        stdin.read_line(input);
-        input.pop();
-        if input == ":q" {
-            break;
-        }
-        let mut base_context = BaseLexerContext::new(input, store.clone());
-        let iterator = LexerContext::new(None, &mut base_context);
-        let parsed = p2.parse(iterator.map(|x| {
-            match x.clone() {
-                Ok((_, tok, _)) => println!("Ok({:?})", tok),
-                Err(e) => println!("Err({:?})", e),
-            }
-            x
-        }));
-        match parsed {
-            Ok(item) => {
-                //println!("{:#?}", item);
-                let as_doc = group(item.to_document(&configuration));
-                //println!("DOC:{:#?}", as_doc);
-                // TODO: make color configurable
-                println!(
-                    "{}",
-                    as_doc.render_to_string(
-                        80,
-                        EmptyRender::render_highlight,
-                        &*(*store).borrow()
-                    )
-                )
-            }
-            Err(t) => {
-                let mut error_context = ParserErrorContext::default();
-                let input_clone = input.clone();
-                error_context.src = &input_clone;
-                let report = create_error_report(&t, &error_context);
-                let as_str = report.render_to_string(
-                    80,
-                    TerminalRender24::render_highlight,
-                    &*(*store).borrow(),
-                );
-                println!("{}", as_str);
-            }
-        }
-    }
-    */
 }
