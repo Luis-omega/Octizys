@@ -1,11 +1,5 @@
-use clap::{Args, Command, Parser, Subcommand, ValueEnum};
-use std::path::{Path, PathBuf};
-
-use octizys_pretty::highlight::HighlightRenderer;
-
-use octizys_parser::grammar::{
-    import_declarationParser, type_expressionParser,
-};
+use clap::{Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum AvailableParser {

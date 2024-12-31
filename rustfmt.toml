@@ -3,3 +3,7 @@
 #blank_lines_upper_bound=5
 #brace_style="PreferSameLine"
 max_width=80
+#imports_indent="Block"
+#imports_layout="HorizontalVertical"
+#imports_granularity="Crate"
+reorder_imports=true

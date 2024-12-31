@@ -1,21 +1,17 @@
-use std::io::repeat;
-
 use octizys_common::span::{Position, Span};
-use octizys_parser::lexer::{
-    BaseLexerContext, BaseToken, LexerContext, LexerError, Token,
-};
+use octizys_parser::lexer::{LexerError, Token};
 use octizys_pretty::{
     combinators::{
-        self, concat, emphasis, empty, external_text, foreground, group,
-        hard_break, intersperse, nest, soft_break,
+        concat, emphasis, empty, external_text, foreground, hard_break,
+        intersperse, nest, soft_break,
     },
     document::Document,
     highlight::{
-        base_colors::{BLUE, CYAN, MAGENTA, MODERATE_GREEN, RED},
+        base_colors::{CYAN, MAGENTA, MODERATE_GREEN, RED},
         Emphasis,
     },
 };
-use octizys_text_store::store::{aproximate_string_width, Store};
+use octizys_text_store::store::aproximate_string_width;
 
 use octizys_cst::base::TokenInfo;
 

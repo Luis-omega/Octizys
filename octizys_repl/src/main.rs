@@ -1,53 +1,32 @@
 mod arguments;
 mod error_report;
 
+use crate::error_report::{create_error_report, ParserErrorContext};
 use arguments::{AvailableParser, Configuration, DebugFormatOption};
 use clap::Parser;
 use lalrpop_util::ParseError;
-use octizys_common::equivalence::Equivalence;
-use octizys_cst::imports::Import;
-use octizys_cst::top::Top;
-use octizys_cst::types::Type;
-use octizys_parser::grammar::topParser;
-
-use crate::error_report::{
-    create_error_report, ParserErrorContext, ParserErrorReport,
-};
-use octizys_common::span::{Position, Span};
-use octizys_cst::base::TokenInfo;
-use octizys_formatter::cst::PrettyCSTConfiguration;
-use octizys_formatter::to_document::ToDocument;
-use octizys_parser::grammar::{
-    import_declarationParser, type_expressionParser,
-};
-use octizys_parser::lexer;
-use octizys_parser::lexer::{
-    BaseLexerContext, BaseToken, LexerContext, LexerError, Token,
-};
-use octizys_pretty::highlight::{
-    self, EmphasisRender, EmptyRender, Highlight, TerminalRender4,
-    TerminalRender8,
+use octizys_common::{equivalence::Equivalence, span::Position};
+use octizys_cst::{imports::Import, top::Top, types::Type};
+use octizys_formatter::{cst::PrettyCSTConfiguration, to_document::ToDocument};
+use octizys_macros::Equivalence;
+use octizys_parser::{
+    grammar::{import_declarationParser, topParser, type_expressionParser},
+    lexer::{LexerError, Token},
 };
 use octizys_pretty::{
-    combinators::{
-        concat, empty, external_text, hard_break, intersperse, nest, repeat,
-    },
+    combinators::external_text,
     document::Document,
-    highlight::{HighlightRenderer, TerminalRender24},
+    highlight::{
+        EmptyRender, Highlight, HighlightRenderer, TerminalRender24,
+        TerminalRender4, TerminalRender8,
+    },
 };
-use octizys_text_store::store::{aproximate_string_width, Store};
-use std::borrow::{Borrow, BorrowMut};
+use octizys_text_store::store::Store;
+use simplelog;
 use std::cell::RefCell;
-use std::default;
 use std::fmt::Debug;
-use std::io::{self, Read};
-use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::rc::Rc;
-
-use simplelog;
-
-use octizys_macros::Equivalence;
 
 //TODO:
 //TEst the following :

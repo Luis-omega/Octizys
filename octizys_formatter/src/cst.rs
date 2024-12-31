@@ -14,6 +14,7 @@ use octizys_cst::{
         LetBinding,
     },
     imports::{AsPath, Import},
+    literals::{StringLiteral, UFloatingPointLiteral, UintKind, UintLiteral},
     patterns::{PatternMatch, PatternMatchBind, PatternMatchRecordItem},
     top::{Constructor, Data, DataConstructors, Top, TopItem},
     types::{Type, TypeRecordItem},
@@ -371,6 +372,34 @@ where
         ])
     }
 }
+
+// --------------------------------- Literals --------------------------------
+
+impl ToDocument<PrettyCSTConfiguration> for UintKind {
+    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
+        todo!()
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for UintLiteral {
+    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
+        todo!()
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for StringLiteral {
+    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
+        todo!()
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for UFloatingPointLiteral {
+    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
+        todo!()
+    }
+}
+
+// --------------------------------- Imports --------------------------------
 
 impl ToDocument<PrettyCSTConfiguration> for AsPath {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
