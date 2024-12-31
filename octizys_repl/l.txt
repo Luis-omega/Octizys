@@ -1,0 +1,7 @@
+import a::b::c::aaaaaaaaaaaaaaaaaaaaaaa::w::;
+import a::b::c::aaaaaaaaaaaaaaaaaaaaaaa::wwwwwwwwwwwwwwwwwwwwwwwwwwwwww:: as t::w::;
+
+data aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa b c d = b;
+data jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj b ttttttttttttttttttttttttttttt d = b;
+data a jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj b ttttttttttttttttttttttttttttt d = b;
+data a j b t d = b cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc;

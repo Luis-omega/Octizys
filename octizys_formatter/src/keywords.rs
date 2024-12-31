@@ -8,6 +8,8 @@ macro_rules! make_keywords {
 
 make_keywords!(
     IMPORT :"import"
+    ,DATA :"data"
+    ,PUBLIC :"PUBLIC"
     ,UNQUALIFIED : "unqualified"
     ,FORALL : "forall"
     ,CASE:"forall"

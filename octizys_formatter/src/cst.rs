@@ -15,12 +15,14 @@ use octizys_cst::{
     },
     imports::{AsPath, Import},
     patterns::{PatternMatch, PatternMatchBind, PatternMatchRecordItem},
+    top::{Constructor, Data, DataConstructors, Top, TopItem},
     types::{Type, TypeRecordItem},
 };
 use octizys_pretty::{
     combinators::{
         concat, concat_iter, empty, empty_break, external_text, group,
-        hard_break, intersperse, nest, repeat, soft_break, static_str,
+        hard_break, intersperse, nest, no_break_space, repeat, soft_break,
+        static_str,
     },
     document::Document,
 };
@@ -63,7 +65,7 @@ impl Default for PrettyCSTConfiguration {
         PrettyCSTConfiguration {
             indentation_deep: 2,
             leading_commas: true,
-            add_trailing_separator: false,
+            add_trailing_separator: true,
             move_documentantion_before_object: true,
             indent_comment_blocks: true,
             separe_comments_by: 1,
@@ -314,7 +316,9 @@ where
 {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
         let separator_doc = if configuration.leading_commas {
-            soft_break() + Document::static_str(SeparatorPhantom::to_str())
+            empty_break()
+                + Document::static_str(SeparatorPhantom::to_str())
+                + no_break_space()
         } else {
             Document::static_str(SeparatorPhantom::to_str()) + soft_break()
         };
@@ -337,9 +341,9 @@ where
 {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
         let separator_doc = if configuration.leading_commas {
-            soft_break() + Document::static_str(SeparatorPhantom::to_str())
+            empty_break() + Document::static_str(SeparatorPhantom::to_str())
         } else {
-            Document::static_str(SeparatorPhantom::to_str()) + soft_break()
+            Document::static_str(SeparatorPhantom::to_str()) + empty_break()
         };
         let trailing = match &self.trailing_sep {
             Some(separator_info) => token_info_to_document(
@@ -777,5 +781,112 @@ impl ToDocument<PrettyCSTConfiguration> for Expression {
 impl ToDocument<PrettyCSTConfiguration> for ExpressionSelector {
     fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
         todo!()
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for Constructor {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        match &self.type_ {
+            Some(x) => {
+                self.name.to_document(configuration)
+                    + nest(
+                        configuration.indentation_deep,
+                        soft_break() + x.to_document(configuration),
+                    )
+            }
+            None => self.name.to_document(configuration),
+        }
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for DataConstructors {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        token_info_to_document(
+            &self.eq,
+            configuration,
+            static_str(keywords::ASIGNATION),
+        ) + soft_break()
+            + self.constructors.to_document(configuration)
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for Data {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        let public = self
+            .public
+            .as_ref()
+            .map(|_| static_str(keywords::PUBLIC) + soft_break())
+            .unwrap_or_else(empty);
+        let data = token_info_to_document(
+            &self.data,
+            configuration,
+            static_str(keywords::DATA),
+        );
+        let name = self.name.to_document(configuration);
+        let variables = if self.variables.len() > 0 {
+            intersperse(
+                self.variables.iter().map(|x| x.to_document(configuration)),
+                soft_break(),
+            )
+        } else {
+            empty()
+        };
+        let constructors = self
+            .constructors
+            .as_ref()
+            .map(|x| ToDocument::to_document(x, configuration))
+            .unwrap_or_else(empty);
+
+        concat(vec![
+            public,
+            data,
+            soft_break(),
+            nest(
+                configuration.indentation_deep,
+                name + soft_break()
+                    + nest(configuration.indentation_deep, variables)
+                    + soft_break()
+                    + group(constructors),
+            ),
+        ])
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for TopItem {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        match self {
+            TopItem::Data(d) => d.to_document(configuration),
+        }
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for Top {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        let items = self
+            .items
+            .as_ref()
+            .map(|x| x.to_document(configuration))
+            .unwrap_or_else(empty);
+        let separation = repeat(
+            hard_break(),
+            usize::from(1 + configuration.separe_comments_by),
+        );
+        match &self.imports {
+            Some(imports) => match &self.last_comment {
+                Some(last_comment) => {
+                    imports.to_document(configuration)
+                        + separation
+                        + items
+                        + last_comment.to_document(configuration)
+                }
+                None => imports.to_document(configuration) + separation + items,
+            },
+            None => match &self.last_comment {
+                Some(last_comment) => {
+                    items + separation + last_comment.to_document(configuration)
+                }
+                None => items,
+            },
+        }
     }
 }

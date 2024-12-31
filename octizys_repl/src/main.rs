@@ -6,7 +6,9 @@ use clap::Parser;
 use lalrpop_util::ParseError;
 use octizys_common::equivalence::Equivalence;
 use octizys_cst::imports::Import;
+use octizys_cst::top::Top;
 use octizys_cst::types::Type;
+use octizys_parser::grammar::topParser;
 
 use crate::error_report::{
     create_error_report, ParserErrorContext, ParserErrorReport,
@@ -28,8 +30,7 @@ use octizys_pretty::highlight::{
 };
 use octizys_pretty::{
     combinators::{
-        concat, empty, external_text, group, hard_break, intersperse, nest,
-        repeat,
+        concat, empty, external_text, hard_break, intersperse, nest, repeat,
     },
     document::Document,
     highlight::{HighlightRenderer, TerminalRender24},
@@ -43,6 +44,8 @@ use std::io::{self, Read};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::rc::Rc;
+
+use simplelog;
 
 use octizys_macros::Equivalence;
 
@@ -74,6 +77,7 @@ use octizys_macros::Equivalence;
 enum ReplParserOutput {
     Import(Import),
     Type(Type),
+    Top(Top),
 }
 
 impl ReplParserOutput {
@@ -81,6 +85,7 @@ impl ReplParserOutput {
         match self {
             ReplParserOutput::Import(i) => i.to_document(configuration),
             ReplParserOutput::Type(t) => t.to_document(configuration),
+            ReplParserOutput::Top(t) => t.to_document(configuration),
         }
     }
 
@@ -88,6 +93,7 @@ impl ReplParserOutput {
         match self {
             ReplParserOutput::Import(i) => i.represent(),
             ReplParserOutput::Type(t) => t.represent(),
+            ReplParserOutput::Top(t) => t.represent(),
         }
     }
 }
@@ -108,12 +114,12 @@ where
     T: Debug + Equivalence,
 {
     let document = to_document_with(value, options.debug);
-    let as_string = render_with(document, store, options);
+    let as_string = render_with(&document, store, options);
     println!("{}", as_string)
 }
 
 fn render_with<'store>(
-    document: Document,
+    document: &Document,
     store: &'store Store,
     options: &RenderInfo,
 ) -> String
@@ -172,6 +178,7 @@ macro_rules! gen_parse_function {
 
 gen_parse_function!(parse_import, Import, import_declarationParser);
 gen_parse_function!(parse_type, Type, type_expressionParser);
+gen_parse_function!(parse_top, Top, topParser);
 
 fn parse_string_with_renderer(
     parser_option: AvailableParser,
@@ -185,6 +192,7 @@ fn parse_string_with_renderer(
     match parser_option {
         AvailableParser::Import => parse_import(s, store, show_token_stream),
         AvailableParser::Type => parse_type(s, store, show_token_stream),
+        AvailableParser::Top => parse_top(s, store, show_token_stream),
     }
 }
 
@@ -194,6 +202,7 @@ fn println_result(
     result: Result<ReplParserOutput, ParseError<Position, Token, LexerError>>,
     store: &Store,
     show_cst: bool,
+    show_doc: bool,
     renderer_info: &RenderInfo,
 ) -> () {
     //TODO: pass pretty configuration
@@ -203,9 +212,19 @@ fn println_result(
             if show_cst {
                 println_with(&item, store, renderer_info);
             }
-            let as_doc = group(item.to_document(&pretty_configuration));
-
-            let as_string = render_with(as_doc, store, renderer_info);
+            let as_doc = item.to_document(&pretty_configuration);
+            if show_doc {
+                match renderer_info.debug {
+                    DebugFormatOption::PrettyDebug => {
+                        println!("{:#?}", &as_doc)
+                    }
+                    DebugFormatOption::Debug => println!("{:?}", as_doc),
+                    DebugFormatOption::EquivalenceRepresentation => {
+                        println!("{:#?}", as_doc)
+                    }
+                }
+            }
+            let as_string = render_with(&as_doc, store, renderer_info);
             println!("{}", as_string)
         }
         Err(t) => {
@@ -216,7 +235,7 @@ fn println_result(
                 None => (),
             }
             let report = create_error_report(&t, &error_context);
-            let as_string = render_with(report, store, renderer_info);
+            let as_string = render_with(&report, store, renderer_info);
             println!("{}", as_string)
         }
     }
@@ -262,6 +281,7 @@ fn parse_string(
             result,
             &*(*new_store).borrow(),
             configuration.show_cst,
+            configuration.show_doc,
             &renderer_info,
         )
     } else {
@@ -277,6 +297,7 @@ fn parse_string(
             result,
             &*(*new_store).borrow(),
             configuration.show_cst,
+            configuration.show_doc,
             &renderer_info,
         )
     };
@@ -311,6 +332,12 @@ fn repl(store: Store, configuration: Configuration) -> () {
 }
 
 fn main() {
+    simplelog::TermLogger::init(
+        simplelog::LevelFilter::Info,
+        simplelog::Config::default(),
+        simplelog::TerminalMode::Mixed,
+        simplelog::ColorChoice::Auto,
+    );
     let arguments = crate::arguments::Arguments::parse();
     let store = Store::default();
     match arguments.command {

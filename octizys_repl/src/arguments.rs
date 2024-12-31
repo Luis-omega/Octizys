@@ -13,6 +13,8 @@ pub enum AvailableParser {
     Import,
     #[clap(name = "type", help = "Use the parser for the type expressions.")]
     Type,
+    #[clap(name = "top", help = "Use the parser of a whole file.")]
+    Top,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
@@ -76,6 +78,12 @@ pub struct Configuration {
         help = "Show the CST (Concrete Syntax Tree) generated based on the input."
     )]
     pub show_cst: bool,
+    #[arg(
+        long = "doc",
+        name = "SHOW_DOC",
+        help = "Show the Document (pretty printter AST) of the CST (Concrete Syntax Tree)."
+    )]
+    pub show_doc: bool,
     #[arg(
         short = 'f',
         long = "format",

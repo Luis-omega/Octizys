@@ -1,12 +1,16 @@
 use std::str::FromStr;
 use octizys_cst::{
-  base::{Between,Token,TrailingList,TokenInfo,TokenInfoWithPhantom,ImportedVariable,OperatorName,TrailingListItem,Comma,Colon,Braces,Parens,LogicPathSeparator},
+  base::{Between,Token,TrailingList,TokenInfo,TokenInfoWithPhantom,ImportedVariable,OperatorName,TrailingListItem,Comma,Pipe,Colon,SemiColon,Braces,Parens,LogicPathSeparator},
   comments::{CommentKind,LineCommentStart,Comment},
   imports::{AsPath,Import},
   types::{Type,TypeRecordItem},
   patterns::{PatternMatch,PatternMatchRecordItem, PatternMatchBind},
   expressions::{Expression,CaseItem,Case,ExpressionSelector,ExpressionRecordItem},
   literals::{UintLiteral,UFloatingPointLiteral,InterpolationString,StringLiteral},
+  top::{Top,
+    TopItem,
+    Data, Constructor, DataConstructors
+  }
   };
 use octizys_cst::base;
 use octizys_common::logic_path::LogicPath;
@@ -124,6 +128,8 @@ Parens : Parens = {}
 Braces: Braces = {}
 Comma: Comma = {}
 Colon: Colon = {}
+SemiColon: SemiColon = {}
+Pipe: Pipe = {}
 LogicPathSeparator: LogicPathSeparator = {}
 
 between<left,T,right,phantom> : Between<T,phantom> =
@@ -698,14 +704,43 @@ pub  expression : Expression = {
 };
 
 
+*/
 // --------------------- Data  ---------------------
 
+constructor_definition : Constructor = {
+  <name:local_variable>
+  <type_:type_expression?>
+  =>
+  Constructor{name,type_}
+};
 
-pub data_type : Data = {
-  "public"? "data" local_variable local_variable* "=" separated_list<(local_variable type_expression),"|">
-  "public"? "data" local_variable local_variable* "="
+pub data_constructors : DataConstructors = {
+  <eq:"=">
+  <constructors:separated_list<constructor_definition,"|",Pipe>>
+  =>
+  DataConstructors{
+    eq:eq.into(),
+    constructors
+  }
 }
 
+pub data_type : Data = {
+  <public:"public"?>
+  <data:"data">
+  <name:local_variable>
+  <variables:local_variable*>
+  <constructors:data_constructors?>
+  =>
+    Data {
+      public:public.map(|x| x.into()),
+      data:data.into(),
+      name,
+      variables,
+      constructors
+    }
+};
+
+/*
 pub alias : Alias = {
   "public"? "alias" local_variable local_variable* "=" type_expression
 }
@@ -750,17 +785,34 @@ pub function_definition : FunctionDefinition = {
 }
 
 
+*/
 
 pub top_non_import_item : TopItem = {
-  data_type,
-  alias,
-  newtype,
-  new_instance,
+  data_type => TopItem::Data(<>),
+  //alias,
+  //newtype,
+  //new_instance,
 }
 
-pub top : Cst = {
-  terminated_list<import_declaration,";">?
-  terminated_list<top_non_import_item,";">?
-  LastComments?
+
+pub top : Top = {
+  <imports:terminated_list<import_declaration,";",SemiColon>?>
+  <items:terminated_list<top_non_import_item,";",SemiColon>?>
+  <last_comment: LastComments?>
+  =>?
+  {
+    let last_comment_converted : Option<Comment> =
+      match last_comment{
+        Some(comment_token)=>{
+          let comment = lexer::last_comment_token_to_token(comment_token)?;
+          Some(comment.value)
+          }
+        None => None
+      };
+    Ok(Top{
+      imports,
+      items,
+      last_comment: last_comment_converted
+    })
+  }
 }
-*/

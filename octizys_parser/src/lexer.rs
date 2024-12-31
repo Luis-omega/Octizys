@@ -1258,6 +1258,7 @@ make_lexer_token_to_token!(
 make_lexer_token_to_token!(ufloat, UFloatLiteral, UFloatingPointLiteral);
 make_lexer_token_to_token!(selector, Selector, Identifier);
 make_lexer_token_to_token!(named_hole, NamedHole, u64);
+make_lexer_token_to_token!(last_comment, Comment, Comment);
 
 pub fn aux_base_token_to_token(
     base_token: BaseToken,

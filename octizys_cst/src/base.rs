@@ -42,6 +42,7 @@ make_showable_type!(UnqualifiedKeyword, "unqualified");
 /// - [`RightArrow`]
 /// - [`Colon`]
 /// - [`LogicPathSeparator`]
+/// - [`SemiColon`]
 pub trait Separator: private::Sealed {
     fn to_str() -> NonLineBreakStr;
 }
@@ -72,6 +73,7 @@ make_separator_type!(Comma, ",");
 make_separator_type!(RightArrow, "->");
 make_separator_type!(Colon, ":");
 make_separator_type!(LogicPathSeparator, "::");
+make_separator_type!(SemiColon, ";");
 
 /// Used to statically determine the kind of delimiters to use
 /// and tell rust how to represent it as string.
