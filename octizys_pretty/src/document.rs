@@ -1,5 +1,6 @@
 use std::ops::Add;
 
+use log::{debug, trace};
 use octizys_text_store::store::{
     aproximate_string_width, NonLineBreakStr, NonLineBreakString, Store,
     StoreSymbol,
@@ -23,6 +24,9 @@ enum DocumentInternal {
     /// Flat mode : empty
     /// Break mode : \n
     EmptyBreak,
+    /// Flat mode : space
+    /// Break mode : empty
+    NoBreakSpace,
     ///Union of two or more files
     Concat(Vec<DocumentInternal>),
     ///Keywords and identifiers used in a file
@@ -120,6 +124,12 @@ impl Document {
     /// Break mode : a line break.
     pub fn empty_break() -> Self {
         Document(DocumentInternal::EmptyBreak)
+    }
+
+    /// Flat mode : space.
+    /// Break mode : empty.
+    pub fn no_break_space() -> Self {
+        Document(DocumentInternal::NoBreakSpace)
     }
 
     pub fn concat(items: Vec<Document>) -> Self {
@@ -243,7 +253,7 @@ impl Document {
         store: &'doc Store,
         highlight: fn(&Highlight) -> (String, String),
     ) -> DocumentIterator<'doc> {
-        DocumentIterator::new(self, width, highlight, store).into_iter()
+        DocumentIterator::new(self, width, highlight, store)
     }
 
     pub fn render_to_string<'doc>(
@@ -253,6 +263,17 @@ impl Document {
         store: &'doc Store,
     ) -> String {
         self.into_iter(width, store, highlight).collect()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match &self.0 {
+            DocumentInternal::Empty => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_not_empty(&self) -> bool {
+        !self.is_empty()
     }
 }
 
@@ -265,7 +286,23 @@ impl From<&str> for Document {
 impl Add for Document {
     type Output = Document;
     fn add(self, rhs: Self) -> Self::Output {
-        Document::concat(vec![self, rhs])
+        match (self.0, rhs.0) {
+            (DocumentInternal::Concat(mut s), DocumentInternal::Concat(o)) => {
+                s.extend(o);
+                Document(DocumentInternal::Concat(s))
+            }
+            (DocumentInternal::Concat(mut s), other) => {
+                s.push(other);
+                Document(DocumentInternal::Concat(s))
+            }
+            (other, DocumentInternal::Concat(o)) => {
+                let mut new = Vec::with_capacity(o.capacity() + 1);
+                new.push(other);
+                new.extend(o);
+                Document(DocumentInternal::Concat(new))
+            }
+            (a, b) => Document::concat(vec![Document(a), Document(b)]),
+        }
     }
 }
 
@@ -309,11 +346,15 @@ impl<'doc> DocumentIterator<'doc> {
     fn gen_line_break(&mut self, indentation: u16) -> String {
         let new_str =
             [String::from("\n"), " ".repeat(usize::from(indentation))].join("");
-        self.consumed_width = aproximate_string_width(&new_str);
+        self.consumed_width = aproximate_string_width(&new_str) - 1;
         new_str
     }
 
     fn fits(&self, param: FitsParam) -> bool {
+        debug!(
+            "Entering fits function with line_width= {}, consumed = {}, param = {param:#?}",
+            self.line_width, self.consumed_width
+        );
         if self.line_width <= self.consumed_width {
             return false;
         }
@@ -327,13 +368,21 @@ impl<'doc> DocumentIterator<'doc> {
             let current = match stack.pop() {
                 Some(c) => c,
                 None => match state_stack.split_last() {
-                    None => return true,
+                    None => {
+                        debug!("Empty stack, it fits!");
+                        return true;
+                    }
                     Some((last, remain)) => {
                         state_stack = remain;
                         *last
                     }
                 },
             };
+            trace!(
+                "Loop in fits starts with line_width= {}, remain = {}, current = {current:#?}",
+                self.line_width,
+                remain_width
+            );
             match current.doc {
                 DocumentInternal::Empty => continue,
                 DocumentInternal::SoftBreak => match current.mode {
@@ -347,7 +396,20 @@ impl<'doc> DocumentIterator<'doc> {
                     Mode::Break => return true,
                 },
                 DocumentInternal::HardBreak => return true,
-                DocumentInternal::EmptyBreak => return true,
+                DocumentInternal::EmptyBreak => match current.mode {
+                    Mode::Flat => continue,
+                    Mode::Break => return true,
+                },
+                DocumentInternal::NoBreakSpace => match current.mode {
+                    Mode::Flat => {
+                        if 1 <= remain_width {
+                            remain_width -= 1;
+                        } else {
+                            return false;
+                        }
+                    }
+                    Mode::Break => continue,
+                },
                 DocumentInternal::Concat(v) => {
                     for doc in v.into_iter().rev() {
                         stack.push(current.with_document(doc))
@@ -416,6 +478,11 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.stack.pop()?;
+        trace!(
+            "Document processing, consumed = {:#?}, document{:#?}",
+            self.consumed_width,
+            current
+        );
         match current.doc {
             DocumentInternal::Empty => Some(String::new()),
             DocumentInternal::SoftBreak => match current.mode {
@@ -440,6 +507,14 @@ impl<'doc> Iterator for DocumentIterator<'doc> {
                 Mode::Break => Some(add_highlight(
                     &current.highlight,
                     &self.gen_line_break(current.ident),
+                    self.highlight_renderer,
+                )),
+            },
+            DocumentInternal::NoBreakSpace => match current.mode {
+                Mode::Break => Some(String::new()),
+                Mode::Flat => Some(add_highlight(
+                    &current.highlight,
+                    &self.advance_width_with(String::from(" ")),
                     self.highlight_renderer,
                 )),
             },

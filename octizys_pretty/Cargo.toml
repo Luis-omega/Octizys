@@ -10,3 +10,4 @@ edition = "2021"
 [dependencies]
 octizys_text_store={path="../octizys_text_store"}
 string-interner = "0.17.0"
+log={workspace=true}

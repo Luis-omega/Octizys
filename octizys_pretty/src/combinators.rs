@@ -26,9 +26,23 @@ pub fn empty_break() -> Document {
     Document::empty_break()
 }
 
+/// Flat mode: " "
+/// Break mode : ""
+pub fn no_break_space() -> Document {
+    Document::no_break_space()
+}
+
 /// Concatenates a vector of documents into a single one.
-pub fn concat(items: Vec<Document>) -> Document {
-    Document::concat(items)
+pub fn concat(mut items: Vec<Document>) -> Document {
+    items.retain(Document::is_not_empty);
+    let len = items.len();
+    if len == 0 {
+        empty()
+    } else if len == 1 {
+        items.pop().unwrap()
+    } else {
+        Document::concat(items)
+    }
 }
 
 /// Concatenates an iterator of documents into a single document.
