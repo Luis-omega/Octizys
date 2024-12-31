@@ -1,17 +1,32 @@
 use std::str::FromStr;
 use octizys_cst::{
-  base::{Between,Token,TrailingList,TokenInfo,TokenInfoWithPhantom,ImportedVariable,OperatorName,TrailingListItem,Comma,Pipe,Colon,SemiColon,Braces,Parens,LogicPathSeparator},
+  base::{
+    Between,Token,TrailingList,
+    TokenInfo,TokenInfoWithPhantom,
+    ImportedVariable,OperatorName,
+    TrailingListItem,Comma,Pipe,Colon,
+    SemiColon,Braces,Parens,
+    LogicPathSeparator,
+    AliasKeyword,
+    NewTypeKeyword,
+    DataKeyword,
+  },
   comments::{CommentKind,LineCommentStart,Comment},
   imports::{AsPath,Import},
   types::{Type,TypeRecordItem},
   patterns::{PatternMatch,PatternMatchRecordItem, PatternMatchBind},
   expressions::{Expression,CaseItem,Case,ExpressionSelector,ExpressionRecordItem},
-  literals::{UintLiteral,UFloatingPointLiteral,InterpolationString,StringLiteral},
+  literals::{UintLiteral,UFloatingPointLiteral,
+    InterpolationString,StringLiteral
+  },
   top::{Top,
     TopItem,
-    Data, Constructor, DataConstructors
+    Data, Constructor, DataConstructors,
+    Alias,
+    NewType,
+    TopTypeDefinitionLeft
   }
-  };
+};
 use octizys_cst::base;
 use octizys_common::logic_path::LogicPath;
 use octizys_common::identifier::Identifier;
@@ -91,10 +106,9 @@ extern {
       ,"import" => lexer::Token::Import(TokenInfo)
       ,"data" => lexer::Token::Data(TokenInfo)
       ,"newtype" => lexer::Token::Newtype(TokenInfo)
-      ,"newinstance" => lexer::Token::Newtype(TokenInfo)
-      ,"class" => lexer::Token::Newtype(TokenInfo)
-      ,"instance" => lexer::Token::Newtype(TokenInfo)
-      ,"public" => lexer::Token::Newtype(TokenInfo)
+      ,"class" => lexer::Token::Class(TokenInfo)
+      ,"instance" => lexer::Token::Instance(TokenInfo)
+      ,"public" => lexer::Token::Public(TokenInfo)
       ,"alias" => lexer::Token::Alias(TokenInfo)
       ,"as" => lexer::Token::As(TokenInfo)
       ,"unqualified" => lexer::Token::Unqualified(TokenInfo)
@@ -130,6 +144,9 @@ Comma: Comma = {}
 Colon: Colon = {}
 SemiColon: SemiColon = {}
 Pipe: Pipe = {}
+DataKeyword: DataKeyword = {}
+AliasKeyword: AliasKeyword = {}
+NewTypeKeyword: NewTypeKeyword = {}
 LogicPathSeparator: LogicPathSeparator = {}
 
 between<left,T,right,phantom> : Between<T,phantom> =
@@ -714,7 +731,7 @@ constructor_definition : Constructor = {
   Constructor{name,type_}
 };
 
-pub data_constructors : DataConstructors = {
+data_constructors : DataConstructors = {
   <eq:"=">
   <constructors:separated_list<constructor_definition,"|",Pipe>>
   =>
@@ -724,35 +741,56 @@ pub data_constructors : DataConstructors = {
   }
 }
 
-pub data_type : Data = {
+data_left_part<keyword,Keyword>: TopTypeDefinitionLeft<Keyword>= {
   <public:"public"?>
-  <data:"data">
+  <statement_keyword:keyword>
   <name:local_variable>
   <variables:local_variable*>
+  =>
+    TopTypeDefinitionLeft {
+      public:public.map(|x| TokenInfo::from(x).into()),
+      statement_keyword: TokenInfo::from(statement_keyword).into(),
+      name,
+      variables,
+    }
+}
+
+pub data_type : Data = {
+  <left_part:data_left_part<"data",DataKeyword>>
   <constructors:data_constructors?>
   =>
     Data {
-      public:public.map(|x| x.into()),
-      data:data.into(),
-      name,
-      variables,
+      left_part,
       constructors
     }
 };
 
-/*
 pub alias : Alias = {
-  "public"? "alias" local_variable local_variable* "=" type_expression
-}
+  <left_part:data_left_part<"alias",AliasKeyword>>
+  <eq:"=">
+  <type_:type_expression>
+  =>
+    Alias {
+      left_part,
+      eq:eq.into(),
+      type_
+    }
+};
 
 pub newtype : NewType = {
-  "public"? "newtype" local_variable local_variable* "=" local_variable type_expression
-}
+  <left_part:data_left_part<"newtype",NewTypeKeyword>>
+  <eq:"=">
+  <constructor: constructor_definition>
+  =>
+    NewType {
+      left_part,
+      eq:eq.into(),
+      constructor
+    }
+};
 
-pub new_instance : NewInstance = {
-  "public"? "newinstance" local_variable local_variable* "=" local_variable type_expression
-}
 
+/*
 
 // --------------------- Class  ---------------------
 
@@ -789,9 +827,8 @@ pub function_definition : FunctionDefinition = {
 
 pub top_non_import_item : TopItem = {
   data_type => TopItem::Data(<>),
-  //alias,
-  //newtype,
-  //new_instance,
+  alias => TopItem::Alias(<>),
+  newtype => TopItem::NewType(<>),
 }
 
 

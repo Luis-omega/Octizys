@@ -9,7 +9,7 @@ macro_rules! make_keywords {
 make_keywords!(
     IMPORT :"import"
     ,DATA :"data"
-    ,PUBLIC :"PUBLIC"
+    ,PUBLIC :"public"
     ,UNQUALIFIED : "unqualified"
     ,FORALL : "forall"
     ,CASE:"forall"

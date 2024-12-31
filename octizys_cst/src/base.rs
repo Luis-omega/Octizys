@@ -32,6 +32,10 @@ macro_rules! make_showable_type {
 }
 
 make_showable_type!(UnqualifiedKeyword, "unqualified");
+make_showable_type!(DataKeyword, "data");
+make_showable_type!(AliasKeyword, "alias");
+make_showable_type!(NewTypeKeyword, "newtype");
+make_showable_type!(PublicKeyword, "public");
 
 /// Used to statically determine the kind of separator to use
 /// and tell rust how to represent it as string.

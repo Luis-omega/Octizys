@@ -1,8 +1,8 @@
 use octizys_cst::{
     base::{
-        Between, Delimiters, ImportedVariable, OperatorName, Separator,
-        ShowableToken, Token, TokenInfo, TokenInfoWithPhantom, TrailingList,
-        TrailingListItem,
+        Between, Delimiters, ImportedVariable, OperatorName, SemiColon,
+        Separator, ShowableToken, Token, TokenInfo, TokenInfoWithPhantom,
+        TrailingList, TrailingListItem,
     },
     comments::{
         Comment, CommentBlock, CommentBraceKind, CommentKind, CommentLine,
@@ -14,16 +14,22 @@ use octizys_cst::{
         LetBinding,
     },
     imports::{AsPath, Import},
-    literals::{StringLiteral, UFloatingPointLiteral, UintKind, UintLiteral},
+    literals::{
+        InterpolationString, StringLiteral, UFloatingPointLiteral, UintKind,
+        UintLiteral,
+    },
     patterns::{PatternMatch, PatternMatchBind, PatternMatchRecordItem},
-    top::{Constructor, Data, DataConstructors, Top, TopItem},
+    top::{
+        Alias, Constructor, Data, DataConstructors, NewType, Top, TopItem,
+        TopTypeDefinitionLeft, TopTypeName,
+    },
     types::{Type, TypeRecordItem},
 };
 use octizys_pretty::{
     combinators::{
         concat, concat_iter, empty, empty_break, external_text, group,
-        hard_break, intersperse, nest, no_break_space, repeat, soft_break,
-        static_str,
+        hard_break, intersperse, nest, no_break_space, parens, repeat,
+        soft_break, static_str,
     },
     document::Document,
 };
@@ -81,6 +87,8 @@ pub fn indent(
 ) -> Document {
     group(nest(configuration.indentation_deep, doc))
 }
+
+// --------------------------------- Comments --------------------------------
 
 impl ToDocument<PrettyCSTConfiguration> for CommentLineContent {
     fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
@@ -164,6 +172,8 @@ impl ToDocument<PrettyCSTConfiguration> for Comment {
         }
     }
 }
+
+// --------------------------------- Base --------------------------------
 
 pub fn comments_info_to_document(
     comment: &CommentsInfo,
@@ -375,27 +385,32 @@ where
 
 // --------------------------------- Literals --------------------------------
 
-impl ToDocument<PrettyCSTConfiguration> for UintKind {
-    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        todo!()
-    }
-}
-
 impl ToDocument<PrettyCSTConfiguration> for UintLiteral {
     fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        todo!()
+        external_text(&match self.kind {
+            UintKind::Hex => format!("{:x}", self.value),
+            UintKind::Octal => format!("{:o}", self.value),
+            UintKind::Binary => format!("{:b}", self.value),
+            _ => format!("{}", self.value),
+        })
     }
 }
 
 impl ToDocument<PrettyCSTConfiguration> for StringLiteral {
     fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        todo!()
+        todo!("Formatting for strings is not supported yet!")
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for InterpolationString {
+    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
+        todo!("Formatting for strings is not supported yet!")
     }
 }
 
 impl ToDocument<PrettyCSTConfiguration> for UFloatingPointLiteral {
     fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        todo!()
+        todo!("Formatting for floating point is not supported yet!")
     }
 }
 
@@ -446,6 +461,8 @@ impl ToDocument<PrettyCSTConfiguration> for Import {
             )
     }
 }
+
+// --------------------------------- Pattern --------------------------------
 
 impl ToDocument<PrettyCSTConfiguration> for PatternMatchRecordItem {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
@@ -517,15 +534,9 @@ impl ToDocument<PrettyCSTConfiguration> for PatternMatch {
             PatternMatch::ImportedVariable(tok) => {
                 tok.to_document(configuration)
             }
-            PatternMatch::String(_tok) => {
-                todo!("Strings are delayed for now in the pretty printer")
-            } //tok.to_document(configuration),
-            PatternMatch::UFloat(_tok) => {
-                todo!("Strings are delayed for now in the pretty printer")
-            } //tok.to_document(configuration),
-            PatternMatch::Uint(_tok) => {
-                todo!("Strings are delayed for now in the pretty printer")
-            } //tok.to_document(configuration),
+            PatternMatch::String(tok) => tok.to_document(configuration),
+            PatternMatch::UFloat(tok) => tok.to_document(configuration),
+            PatternMatch::Uint(tok) => tok.to_document(configuration),
             PatternMatch::AnonHole(info) => token_info_to_document(
                 info,
                 configuration,
@@ -549,6 +560,8 @@ impl ToDocument<PrettyCSTConfiguration> for PatternMatch {
         }
     }
 }
+
+// --------------------------------- Type --------------------------------
 
 impl ToDocument<PrettyCSTConfiguration> for TypeRecordItem {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
@@ -684,6 +697,8 @@ impl ToDocument<PrettyCSTConfiguration> for Type {
     }
 }
 
+// --------------------------------- Expression --------------------------------
+
 impl ToDocument<PrettyCSTConfiguration> for LetBinding {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
         self.pattern.to_document(configuration)
@@ -781,22 +796,76 @@ impl ToDocument<PrettyCSTConfiguration> for Case {
 
 impl ToDocument<PrettyCSTConfiguration> for BinaryOperator {
     fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        todo!()
+        todo!("Formatting for BinaryOperator delayed")
     }
 }
 impl ToDocument<PrettyCSTConfiguration> for LambdaExpression {
-    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        todo!()
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        static_str(keywords::LAMBDA_START)
+            + nest(
+                configuration.indentation_deep,
+                soft_break() + self.variable.to_document(configuration),
+            )
+            + static_str(keywords::RIGHT_ARROW)
+            + soft_break()
+            + nest(
+                configuration.indentation_deep,
+                group(self.expression.to_document(configuration)),
+            )
     }
 }
 
 impl ToDocument<PrettyCSTConfiguration> for ApplicationExpression {
-    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        todo!()
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        self.start.to_document(configuration)
+            + nest(
+                configuration.indentation_deep,
+                soft_break()
+                    + intersperse(
+                        self.remain.iter().map(|x| {
+                            let var = x.to_document(configuration);
+
+                            if x.need_parens() {
+                                parens(var)
+                            } else {
+                                var
+                            }
+                        }),
+                        soft_break(),
+                    ),
+            )
     }
 }
 
 impl ToDocument<PrettyCSTConfiguration> for ExpressionRecordItem {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        match self {
+            ExpressionRecordItem::SingleVariable { variable } => {
+                variable.to_document(configuration)
+            }
+            ExpressionRecordItem::Assignation {
+                variable,
+                equal,
+                expression,
+            } => {
+                variable.to_document(configuration)
+                    + soft_break()
+                    + token_info_to_document(
+                        equal,
+                        configuration,
+                        static_str(keywords::EQUALITY),
+                    )
+                    + nest(
+                        configuration.indentation_deep,
+                        soft_break()
+                            + group(expression.to_document(configuration)),
+                    )
+            }
+        }
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for ExpressionSelector {
     fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
         todo!()
     }
@@ -807,11 +876,8 @@ impl ToDocument<PrettyCSTConfiguration> for Expression {
         todo!()
     }
 }
-impl ToDocument<PrettyCSTConfiguration> for ExpressionSelector {
-    fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
-        todo!()
-    }
-}
+
+// --------------------------------- Data --------------------------------
 
 impl ToDocument<PrettyCSTConfiguration> for Constructor {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
@@ -828,6 +894,11 @@ impl ToDocument<PrettyCSTConfiguration> for Constructor {
     }
 }
 
+// TODO: Use custom logic to avoid inserting a pipe at the end of the stream (TrailingList and
+// TrailingListItem are the culprits!)
+// Also, should we allow a Pipe at the start of data constructors?
+// data Nat = | Z | S Nat;
+// That for macros uniformity and for formatting uniformity.
 impl ToDocument<PrettyCSTConfiguration> for DataConstructors {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
         token_info_to_document(
@@ -839,18 +910,18 @@ impl ToDocument<PrettyCSTConfiguration> for DataConstructors {
     }
 }
 
-impl ToDocument<PrettyCSTConfiguration> for Data {
+impl<Keyword> ToDocument<PrettyCSTConfiguration>
+    for TopTypeDefinitionLeft<Keyword>
+where
+    Keyword: TopTypeName,
+{
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
         let public = self
             .public
             .as_ref()
             .map(|_| static_str(keywords::PUBLIC) + soft_break())
             .unwrap_or_else(empty);
-        let data = token_info_to_document(
-            &self.data,
-            configuration,
-            static_str(keywords::DATA),
-        );
+        let keyword = self.statement_keyword.to_document(configuration);
         let name = self.name.to_document(configuration);
         let variables = if self.variables.len() > 0 {
             intersperse(
@@ -860,6 +931,22 @@ impl ToDocument<PrettyCSTConfiguration> for Data {
         } else {
             empty()
         };
+        concat(vec![
+            public,
+            keyword,
+            soft_break(),
+            nest(
+                configuration.indentation_deep,
+                name + soft_break()
+                    + nest(configuration.indentation_deep, variables),
+            ),
+        ])
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for Data {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        let left = self.left_part.to_document(configuration);
         let constructors = self
             .constructors
             .as_ref()
@@ -867,26 +954,103 @@ impl ToDocument<PrettyCSTConfiguration> for Data {
             .unwrap_or_else(empty);
 
         concat(vec![
-            public,
-            data,
-            soft_break(),
+            left,
             nest(
                 configuration.indentation_deep,
-                name + soft_break()
-                    + nest(configuration.indentation_deep, variables)
-                    + soft_break()
-                    + group(constructors),
+                soft_break() + group(constructors),
             ),
         ])
     }
 }
 
+impl ToDocument<PrettyCSTConfiguration> for Alias {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        let left = self.left_part.to_document(configuration);
+        let eq = token_info_to_document(
+            &self.eq,
+            configuration,
+            static_str(keywords::ASIGNATION),
+        );
+        let type_ = self.type_.to_document(configuration);
+
+        concat(vec![
+            left,
+            nest(
+                configuration.indentation_deep,
+                soft_break() + group(eq + soft_break() + type_),
+            ),
+        ])
+    }
+}
+
+impl ToDocument<PrettyCSTConfiguration> for NewType {
+    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
+        let left = self.left_part.to_document(configuration);
+        let eq = token_info_to_document(
+            &self.eq,
+            configuration,
+            static_str(keywords::ASIGNATION),
+        );
+        let constructor = self.constructor.to_document(configuration);
+
+        concat(vec![
+            left,
+            nest(
+                configuration.indentation_deep,
+                soft_break() + group(eq + soft_break() + constructor),
+            ),
+        ])
+    }
+}
+
+// --------------------------------- Top --------------------------------
+
 impl ToDocument<PrettyCSTConfiguration> for TopItem {
     fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
         match self {
             TopItem::Data(d) => d.to_document(configuration),
+            TopItem::Alias(a) => a.to_document(configuration),
+            TopItem::NewType(n) => n.to_document(configuration),
         }
     }
+}
+
+fn gen_top_separation(configuration: &PrettyCSTConfiguration) -> Document {
+    repeat(
+        hard_break(),
+        usize::from(1 + configuration.separe_comments_by),
+    )
+}
+
+fn trailing_list_item_to_document_top<Item>(
+    l: &TrailingListItem<Item, SemiColon>,
+    configuration: &PrettyCSTConfiguration,
+) -> Document
+where
+    Item: ToDocument<PrettyCSTConfiguration>,
+{
+    let separator_doc = Document::static_str(SemiColon::to_str())
+        + gen_top_separation(configuration);
+    token_info_to_document(&l.separator, configuration, separator_doc)
+        + l.item.to_document(configuration)
+}
+
+fn trailing_list_to_document_top<Item>(
+    l: &TrailingList<Item, SemiColon>,
+    configuration: &PrettyCSTConfiguration,
+) -> Document
+where
+    Item: ToDocument<PrettyCSTConfiguration>,
+{
+    concat(vec![
+        l.first.to_document(configuration),
+        concat_iter(
+            l.items
+                .iter()
+                .map(|x| trailing_list_item_to_document_top(x, configuration)),
+        ),
+        static_str(SemiColon::to_str()),
+    ])
 }
 
 impl ToDocument<PrettyCSTConfiguration> for Top {
@@ -894,21 +1058,22 @@ impl ToDocument<PrettyCSTConfiguration> for Top {
         let items = self
             .items
             .as_ref()
-            .map(|x| x.to_document(configuration))
+            .map(|x| trailing_list_to_document_top(x, configuration))
             .unwrap_or_else(empty);
-        let separation = repeat(
-            hard_break(),
-            usize::from(1 + configuration.separe_comments_by),
-        );
+        let separation = gen_top_separation(configuration);
         match &self.imports {
             Some(imports) => match &self.last_comment {
                 Some(last_comment) => {
-                    imports.to_document(configuration)
+                    trailing_list_to_document_top(imports, configuration)
                         + separation
                         + items
                         + last_comment.to_document(configuration)
                 }
-                None => imports.to_document(configuration) + separation + items,
+                None => {
+                    trailing_list_to_document_top(imports, configuration)
+                        + separation
+                        + items
+                }
             },
             None => match &self.last_comment {
                 Some(last_comment) => {

@@ -23,5 +23,5 @@ octizys_text_store = { version = "0.1.0", path = "../octizys_text_store" }
 simplelog = {version = "0.12.2"}
 
 [lints.rust]
-#unused = "allow"
+unused = "allow"
 unsafe_code = "forbid"

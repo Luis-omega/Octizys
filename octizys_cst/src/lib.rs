@@ -4,6 +4,5 @@ pub mod expressions;
 pub mod imports;
 pub mod literals;
 pub mod patterns;
-pub mod pretty;
 pub mod top;
 pub mod types;

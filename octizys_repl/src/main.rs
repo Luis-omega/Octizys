@@ -11,7 +11,7 @@ use octizys_formatter::{cst::PrettyCSTConfiguration, to_document::ToDocument};
 use octizys_macros::Equivalence;
 use octizys_parser::{
     grammar::{import_declarationParser, topParser, type_expressionParser},
-    lexer::{LexerError, Token},
+    lexer::{BaseLexerContext, LexerContext, LexerError, Token},
 };
 use octizys_pretty::{
     combinators::external_text,
@@ -311,7 +311,7 @@ fn repl(store: Store, configuration: Configuration) -> () {
 }
 
 fn main() {
-    simplelog::TermLogger::init(
+    let _ = simplelog::TermLogger::init(
         simplelog::LevelFilter::Info,
         simplelog::Config::default(),
         simplelog::TerminalMode::Mixed,
