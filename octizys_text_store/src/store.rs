@@ -8,12 +8,20 @@ pub fn approximate_string_width(s: &str) -> usize {
     s.chars().count()
 }
 
-///Purpose: Build non line break strings at compilation time
-///Is a intermediate structure used in NonLineBreakString.
+/// Purpose: Build non line break strings at compilation time.
+/// # Panics!
+/// The exposed builder [`NonLineBreakStr::new`] panics if there
+/// is a line break in the string.
+///
+/// We do this since we expect to use it only on literal strings
+/// and trigger the panic at compilation time, do not use it
+/// with not literals!
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NonLineBreakStr(&'static str);
 
 impl NonLineBreakStr {
+    /// #Panics!
+    /// Do not use in strings that aren't literal strings.
     pub const fn new(source: &'static str) -> NonLineBreakStr {
         match string::find(source, "\n") {
             Some(x) => {
