@@ -526,10 +526,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "octizys_compiler"
-version = "0.1.0"
-
-[[package]]
 name = "octizys_core"
 version = "0.1.0"
 dependencies = [

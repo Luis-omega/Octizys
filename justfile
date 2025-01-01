@@ -14,3 +14,6 @@ push: spellcheck
 
 commit: spellcheck
   git commit
+
+install:
+  cargo install --path=octizys_repl
