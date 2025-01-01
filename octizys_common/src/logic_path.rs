@@ -57,10 +57,10 @@ impl LogicPath {
         s: &str,
         store: &mut Store,
     ) -> Result<LogicPath, LogicPathError> {
-        let mut splited: Vec<&str> =
+        let mut split_vector: Vec<&str> =
             s.split(MODULE_LOGIC_PATH_SEPARATOR).collect();
-        splited.pop();
-        let v: Vec<Identifier> = splited
+        split_vector.pop();
+        let v: Vec<Identifier> = split_vector
             .into_iter()
             .map(|x| Identifier::make(x, store))
             .collect::<Result<Vec<Identifier>, IdentifierError>>()

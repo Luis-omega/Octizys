@@ -24,7 +24,7 @@ use octizys_pretty::{
     combinators::{concat, empty, external_text, hard_break, nest, repeat},
     document::Document,
 };
-use octizys_text_store::store::{aproximate_string_width, Store};
+use octizys_text_store::store::{approximate_string_width, Store};
 
 use lalrpop_util::ParseError;
 use paste::paste;
@@ -55,9 +55,9 @@ pub enum BaseToken {
     Div,
     Module,
     ShiftLeft,
-    ShiftRigth,
+    ShiftRight,
     Map,
-    MapConstRigth,
+    MapConstRight,
     MapConstLeft,
     Appliative,
     ApplicativeRight,
@@ -70,7 +70,7 @@ pub enum BaseToken {
     MoreThan,
     And,
     Or,
-    ReverseAppliation,
+    ReverseApplication,
     DollarApplication,
     Asignation,
     At,
@@ -136,7 +136,7 @@ pub enum LexerError {
     /// The internalization of comments failed!
     /// this is a bug.
     CantCreateCommentLine(String, #[equivalence(ignore)] Span),
-    /// We found the begining of a block comment
+    /// We found the beginning of a block comment
     /// but the input didn't match the regex,
     /// in the user side a unbalanced bracket is what
     /// is expected.
@@ -226,17 +226,17 @@ pub enum LexerError {
             "!=" => Ok(Token::NotEqual(info)),
 
             ">" => Ok(Token::MoreThan(info)),
-            ">>" => Ok(Token::ShiftRigth(info)),
+            ">>" => Ok(Token::ShiftRight(info)),
             ">=" => Ok(Token::MoreOrEqual(info)),
 
             "/" => Ok(Token::Div(info)),
             "//" // comments
 
             "&&" => Ok(Token::And(info)),
-            "&" => Ok(Token::ReverseAppliation(info)),
+            "&" => Ok(Token::ReverseApplication(info)),
 
             "$" => Ok(Token::DollarApplication(info)),
-            "$>" => Ok(Token::MapConstRigth(info)),
+            "$>" => Ok(Token::MapConstRight(info)),
 
             "(" => Ok(Token::LParen(info)),
             ")" => Ok(Token::RParen(info)),
@@ -269,7 +269,7 @@ pub enum LexerError {
     HOLE
     NamedHole
     Identifier  // shares start with two groups
-    Ownership_variables // IDENTIFER'
+    Ownership_variables // IDENTIFIER'
 
             "f#\"" //interpolation string
 
@@ -469,10 +469,10 @@ impl<'store, 'source> BaseLexerContext<'source> {
         let matched = m.as_str();
         match matched {
             "--" => make_line_comment(
-                &*HYPEN_COMMENT,
+                &*HYPHEN_COMMENT,
                 self,
                 m,
-                octizys_cst::comments::LineCommentStart::DoubleHypen,
+                octizys_cst::comments::LineCommentStart::DoubleHyphen,
             ),
             "//" => make_line_comment(
                 &*SLASH_COMMENT,
@@ -554,12 +554,12 @@ impl<'store, 'source> BaseLexerContext<'source> {
             "!" => Ok((span, BaseToken::Exclamation)),
             "!=" => Ok((span, BaseToken::NotEqual)),
             ">" => Ok((span, BaseToken::MoreThan)),
-            ">>" => Ok((span, BaseToken::ShiftRigth)),
+            ">>" => Ok((span, BaseToken::ShiftRight)),
             ">=" => Ok((span, BaseToken::MoreOrEqual)),
             "&&" => Ok((span, BaseToken::And)),
-            "&" => Ok((span, BaseToken::ReverseAppliation)),
+            "&" => Ok((span, BaseToken::ReverseApplication)),
             "$" => Ok((span, BaseToken::DollarApplication)),
-            "$>" => Ok((span, BaseToken::MapConstRigth)),
+            "$>" => Ok((span, BaseToken::MapConstRight)),
             _ => Err(LexerError::UnexpectedPunctuationMatch(
                 matched.to_string(),
                 span,
@@ -841,7 +841,7 @@ const SPACES_REGEX: LazyLock<Regex> =
 
 // We need to match at the end for the EOF, otherwise the
 // repl or test may fail the parse!
-static HYPEN_COMMENT: LazyLock<Regex> = LazyLock::new(|| {
+static HYPHEN_COMMENT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^-- *(?<doc>\|)?(?<content>.*)(\n|$)").unwrap()
 });
 
@@ -964,9 +964,9 @@ pub enum Token {
     Div(#[equivalence(ignore)] TokenInfo),
     Module(#[equivalence(ignore)] TokenInfo),
     ShiftLeft(#[equivalence(ignore)] TokenInfo),
-    ShiftRigth(#[equivalence(ignore)] TokenInfo),
+    ShiftRight(#[equivalence(ignore)] TokenInfo),
     Map(#[equivalence(ignore)] TokenInfo),
-    MapConstRigth(#[equivalence(ignore)] TokenInfo),
+    MapConstRight(#[equivalence(ignore)] TokenInfo),
     MapConstLeft(#[equivalence(ignore)] TokenInfo),
     Appliative(#[equivalence(ignore)] TokenInfo),
     ApplicativeRight(#[equivalence(ignore)] TokenInfo),
@@ -979,7 +979,7 @@ pub enum Token {
     MoreThan(#[equivalence(ignore)] TokenInfo),
     And(#[equivalence(ignore)] TokenInfo),
     Or(#[equivalence(ignore)] TokenInfo),
-    ReverseAppliation(#[equivalence(ignore)] TokenInfo),
+    ReverseApplication(#[equivalence(ignore)] TokenInfo),
     DollarApplication(#[equivalence(ignore)] TokenInfo),
     Asignation(#[equivalence(ignore)] TokenInfo),
     At(#[equivalence(ignore)] TokenInfo),
@@ -1058,9 +1058,9 @@ impl From<Token> for TokenInfo {
             Token::Div(info) => (info),
             Token::Module(info) => (info),
             Token::ShiftLeft(info) => (info),
-            Token::ShiftRigth(info) => (info),
+            Token::ShiftRight(info) => (info),
             Token::Map(info) => (info),
-            Token::MapConstRigth(info) => (info),
+            Token::MapConstRight(info) => (info),
             Token::MapConstLeft(info) => (info),
             Token::Appliative(info) => (info),
             Token::ApplicativeRight(info) => (info),
@@ -1073,7 +1073,7 @@ impl From<Token> for TokenInfo {
             Token::MoreThan(info) => (info),
             Token::And(info) => (info),
             Token::Or(info) => (info),
-            Token::ReverseAppliation(info) => (info),
+            Token::ReverseApplication(info) => (info),
             Token::DollarApplication(info) => (info),
             Token::Asignation(info) => (info),
             Token::At(info) => (info),
@@ -1154,9 +1154,9 @@ impl<'a> From<&'a Token> for &'a TokenInfo {
             Token::Div(info) => (info),
             Token::Module(info) => (info),
             Token::ShiftLeft(info) => (info),
-            Token::ShiftRigth(info) => (info),
+            Token::ShiftRight(info) => (info),
             Token::Map(info) => (info),
-            Token::MapConstRigth(info) => (info),
+            Token::MapConstRight(info) => (info),
             Token::MapConstLeft(info) => (info),
             Token::Appliative(info) => (info),
             Token::ApplicativeRight(info) => (info),
@@ -1169,7 +1169,7 @@ impl<'a> From<&'a Token> for &'a TokenInfo {
             Token::MoreThan(info) => (info),
             Token::And(info) => (info),
             Token::Or(info) => (info),
-            Token::ReverseAppliation(info) => (info),
+            Token::ReverseApplication(info) => (info),
             Token::DollarApplication(info) => (info),
             Token::Asignation(info) => (info),
             Token::At(info) => (info),
@@ -1282,9 +1282,9 @@ pub fn aux_base_token_to_token(
         BaseToken::Div => Token::Div(info),
         BaseToken::Module => Token::Module(info),
         BaseToken::ShiftLeft => Token::ShiftLeft(info),
-        BaseToken::ShiftRigth => Token::ShiftRigth(info),
+        BaseToken::ShiftRight => Token::ShiftRight(info),
         BaseToken::Map => Token::Map(info),
-        BaseToken::MapConstRigth => Token::MapConstRigth(info),
+        BaseToken::MapConstRight => Token::MapConstRight(info),
         BaseToken::MapConstLeft => Token::MapConstLeft(info),
         BaseToken::Appliative => Token::Appliative(info),
         BaseToken::ApplicativeRight => Token::ApplicativeRight(info),
@@ -1297,7 +1297,7 @@ pub fn aux_base_token_to_token(
         BaseToken::MoreThan => Token::MoreThan(info),
         BaseToken::And => Token::And(info),
         BaseToken::Or => Token::Or(info),
-        BaseToken::ReverseAppliation => Token::ReverseAppliation(info),
+        BaseToken::ReverseApplication => Token::ReverseApplication(info),
         BaseToken::DollarApplication => Token::DollarApplication(info),
         BaseToken::Asignation => Token::Asignation(info),
         BaseToken::At => Token::At(info),

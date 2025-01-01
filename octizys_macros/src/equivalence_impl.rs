@@ -438,7 +438,7 @@ fn generate_equivalent(
 }
 
 fn generate_where(arguments: &EquivalenceInput) -> proc_macro2::TokenStream {
-    let struct_equivalence_wheres =
+    let struct_equivalence_where_clauses =
         if arguments.relevant_type_parameters.is_empty() {
             quote! {}
         } else {
@@ -452,17 +452,17 @@ fn generate_where(arguments: &EquivalenceInput) -> proc_macro2::TokenStream {
             type_constraints
         };
     match arguments.where_clause.clone() {
-        Some(struct_wheres) => {
+        Some(struct_where_clauses) => {
             quote! {
-                #struct_wheres
-                #struct_equivalence_wheres
+                #struct_where_clauses
+                #struct_equivalence_where_clauses
             }
         }
         None => {
             if arguments.relevant_type_parameters.is_empty() {
                 quote! {}
             } else {
-                quote! { where #struct_equivalence_wheres }
+                quote! { where #struct_equivalence_where_clauses }
             }
         }
     }

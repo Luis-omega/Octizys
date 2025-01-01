@@ -1,3 +1,6 @@
+/// This module contains the basic blocks that can be used to build a accurate parsing tree.
+/// You can think on the types defined here as if you took all the functions (combinators)
+/// of a parser combinators library and created types that reflects their results.
 use std::marker::PhantomData;
 
 use crate::comments::CommentsInfo;
@@ -14,6 +17,9 @@ mod private {
     pub trait Sealed {}
 }
 
+/// We use this to tell to rust “This structure can be resolved at compile time
+/// to this string”. So rust can help us to put in place the right string
+/// at compile time.
 pub trait ShowableToken: private::Sealed {
     fn show() -> NonLineBreakStr;
 }
@@ -234,9 +240,9 @@ pub enum OperatorName {
     Div,
     Module,
     ShiftLeft,
-    ShiftRigth, //TODO: Add "<&>" = \ x y -> y $ x
+    ShiftRight, //TODO: Add "<&>" = \ x y -> y $ x
     Map,
-    MapConstRigth,
+    MapConstRight,
     MapConstLeft, //TODO: add <|> and <?>
     Appliative,
     ApplicativeRight,
@@ -249,7 +255,7 @@ pub enum OperatorName {
     MoreThan,
     And,
     Or,
-    ReverseAppliation,
+    ReverseApplication,
     DollarApplication,
     Asignation,
     At,

@@ -1,5 +1,5 @@
 use octizys_pretty::{combinators::static_str, store::NonLineBreakStr};
-use octizys_text_store::store::{aproximate_string_width, Store};
+use octizys_text_store::store::{approximate_string_width, Store};
 
 use regex::Regex;
 use std::{fmt::Display, sync::LazyLock};
@@ -73,9 +73,9 @@ impl Display for IdentifierError {
 }
 
 /// Keep this in sync with the lexer definition for Identifier
-pub static IDENTIFER_LAZY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+pub static IDENTIFIER_LAZY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?x) #ingore spaces and allow comments
+        r"(?x) #ignore spaces and allow comments
         ^ #match from the begin
         # can begin with underscores, but not digits
         _*
@@ -96,9 +96,9 @@ impl<'a> Identifier {
         if s.is_empty() {
             return Err(IdentifierError::EmptyIdentifier);
         }
-        if IDENTIFER_LAZY_REGEX.is_match(&s) {
+        if IDENTIFIER_LAZY_REGEX.is_match(&s) {
             let symbol = store.regular.unsafe_add(s);
-            let len = aproximate_string_width(s);
+            let len = approximate_string_width(s);
             Ok(Identifier { symbol, len })
         } else {
             return Err(IdentifierError::ContainsInvalidCodePoint(

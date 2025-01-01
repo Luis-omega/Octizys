@@ -111,19 +111,20 @@ fn comment_brace_to_documents(
     brace: &CommentBraceKind,
 ) -> (Document, Document) {
     let number_of_dashes = brace.len() - 1;
-    let hypens =
-        repeat(Document::static_str(keywords::HYPEN), number_of_dashes);
+    let hyphens =
+        repeat(Document::static_str(keywords::HYPHEN), number_of_dashes);
     (
-        Document::from(Document::static_str(keywords::LBRACE)) + hypens.clone(),
-        hypens.clone() + Document::static_str(keywords::RBRACE),
+        Document::from(Document::static_str(keywords::LBRACE))
+            + hyphens.clone(),
+        hyphens.clone() + Document::static_str(keywords::RBRACE),
     )
 }
 
 impl ToDocument<PrettyCSTConfiguration> for LineCommentStart {
     fn to_document(&self, _configuration: &PrettyCSTConfiguration) -> Document {
         match self {
-            LineCommentStart::DoubleHypen => {
-                repeat(Document::static_str(keywords::HYPEN), 2)
+            LineCommentStart::DoubleHyphen => {
+                repeat(Document::static_str(keywords::HYPHEN), 2)
             }
             LineCommentStart::DoubleSlash => {
                 repeat(Document::static_str(keywords::SLASH), 2)
@@ -242,7 +243,7 @@ impl ToDocument<PrettyCSTConfiguration> for OperatorName {
             OperatorName::StatementEnd => keywords::SEMICOLON,
             OperatorName::Dot => keywords::DOT,
             OperatorName::ModuleSeparator => keywords::MODULE_SEPARATOR,
-            OperatorName::Minus => keywords::HYPEN,
+            OperatorName::Minus => keywords::HYPHEN,
             OperatorName::CompositionLeft => keywords::COMPOSITION_LEFT,
             OperatorName::CompositionRight => keywords::COMPOSITION_RIGHT,
             OperatorName::Plus => keywords::PLUS,
@@ -251,9 +252,9 @@ impl ToDocument<PrettyCSTConfiguration> for OperatorName {
             OperatorName::Div => keywords::DIV,
             OperatorName::Module => keywords::PERCENTAGE,
             OperatorName::ShiftLeft => keywords::SHIFT_LEFT,
-            OperatorName::ShiftRigth => keywords::SHIFT_RIGTH,
+            OperatorName::ShiftRight => keywords::SHIFT_RIGHT,
             OperatorName::Map => keywords::MAP,
-            OperatorName::MapConstRigth => keywords::MAP_CONST_RIGTH,
+            OperatorName::MapConstRight => keywords::MAP_CONST_RIGHT,
             OperatorName::MapConstLeft => keywords::MAP_CONST_LEFT,
             OperatorName::Appliative => keywords::APPLIATIVE,
             OperatorName::ApplicativeRight => keywords::APPLICATIVE_RIGHT,
@@ -266,7 +267,7 @@ impl ToDocument<PrettyCSTConfiguration> for OperatorName {
             OperatorName::MoreThan => keywords::MORE_THAN,
             OperatorName::And => keywords::AND,
             OperatorName::Or => keywords::OR,
-            OperatorName::ReverseAppliation => keywords::REVERSE_APPLIATION,
+            OperatorName::ReverseApplication => keywords::REVERSE_APPLICATION,
             OperatorName::DollarApplication => keywords::DOLLAR_APPLICATION,
             OperatorName::Asignation => keywords::ASIGNATION,
             OperatorName::At => keywords::AT,

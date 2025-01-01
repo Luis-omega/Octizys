@@ -2,7 +2,7 @@ use std::ops::Add;
 
 use log::{debug, trace};
 use octizys_text_store::store::{
-    aproximate_string_width, NonLineBreakStr, NonLineBreakString, Store,
+    approximate_string_width, NonLineBreakStr, NonLineBreakString, Store,
     StoreSymbol,
 };
 
@@ -146,7 +146,7 @@ impl Document {
         maybe_words: &str,
     ) -> Option<Self> {
         let symbol = store.regular.try_add(maybe_words)?;
-        let len = aproximate_string_width(maybe_words);
+        let len = approximate_string_width(maybe_words);
         Some(Document(DocumentInternal::StoredRegularText(symbol, len)))
     }
 
@@ -162,7 +162,7 @@ impl Document {
         store: &mut Store,
         s: NonLineBreakString,
     ) -> Self {
-        let len = aproximate_string_width((&s).into());
+        let len = approximate_string_width((&s).into());
         let symbol = store.regular.add(s);
         Document(DocumentInternal::StoredRegularText(symbol, len))
     }
@@ -179,7 +179,7 @@ impl Document {
         store: &mut Store,
         s: NonLineBreakStr,
     ) -> Self {
-        let len = aproximate_string_width(s.into());
+        let len = approximate_string_width(s.into());
         let symbol = store.regular.add_str(s);
         Document(DocumentInternal::StoredRegularText(symbol, len))
     }
@@ -190,7 +190,7 @@ impl Document {
     pub fn external_text(words: &str) -> Self {
         let mut acc = vec![];
         for word in NonLineBreakString::decompose(words) {
-            let len = aproximate_string_width((&word).into());
+            let len = approximate_string_width((&word).into());
             let doc = DocumentInternal::ExternalText(word, len);
             acc.push(doc);
             acc.push(DocumentInternal::HardBreak);
@@ -207,7 +207,7 @@ impl Document {
 
     pub fn static_str(word: NonLineBreakStr) -> Document {
         let s = word.as_str();
-        let len = aproximate_string_width(s);
+        let len = approximate_string_width(s);
         Document(DocumentInternal::StaticText(word, len))
     }
 
@@ -219,7 +219,7 @@ impl Document {
         comments_accumulator.push(String::from(source));
         Document(DocumentInternal::StoredCommentText {
             index,
-            len: aproximate_string_width(source),
+            len: approximate_string_width(source),
         })
     }
 
@@ -339,14 +339,14 @@ impl<'doc> DocumentIterator<'doc> {
     }
 
     fn advance_width_with(&mut self, new_str: String) -> String {
-        self.consumed_width += aproximate_string_width(&new_str);
+        self.consumed_width += approximate_string_width(&new_str);
         new_str
     }
 
     fn gen_line_break(&mut self, indentation: u16) -> String {
         let new_str =
             [String::from("\n"), " ".repeat(usize::from(indentation))].join("");
-        self.consumed_width = aproximate_string_width(&new_str) - 1;
+        self.consumed_width = approximate_string_width(&new_str) - 1;
         new_str
     }
 

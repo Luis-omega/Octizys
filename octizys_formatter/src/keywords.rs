@@ -18,7 +18,7 @@ make_keywords!(
     ,LET: "let"
     ,IN: "in"
     ,UNDERSCORE:"_"
-    ,HYPEN:"-"
+    ,HYPHEN:"-"
     ,SLASH:"/"
     ,LBRACE:"{"
     ,RBRACE:"}"
@@ -43,9 +43,9 @@ make_keywords!(
     ,DIV : "/"
     ,PERCENTAGE : "%"
     ,SHIFT_LEFT : "<<"
-    ,SHIFT_RIGTH : ">>" //TODO: Add "<&>" = \ x y -> y $ x
+    ,SHIFT_RIGHT : ">>" //TODO: Add "<&>" = \ x y -> y $ x
     ,MAP : "<$>"
-    ,MAP_CONST_RIGTH : "$>"
+    ,MAP_CONST_RIGHT : "$>"
     ,MAP_CONST_LEFT : "<$" //TODO: add <|> and <?>
     ,APPLIATIVE : "<*>"
     ,APPLICATIVE_RIGHT : "*>"
@@ -58,7 +58,7 @@ make_keywords!(
     ,MORE_THAN : ">"
     ,AND : "&&"
     ,OR : "||"
-    ,REVERSE_APPLIATION : "&"
+    ,REVERSE_APPLICATION : "&"
     ,DOLLAR_APPLICATION : "$"
     ,ASIGNATION : "="
     ,AT : "@"

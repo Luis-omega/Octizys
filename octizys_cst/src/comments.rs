@@ -127,7 +127,7 @@ impl CommentBraceKind {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Equivalence)]
 pub enum LineCommentStart {
     // --
-    DoubleHypen,
+    DoubleHyphen,
     // //
     DoubleSlash,
 }

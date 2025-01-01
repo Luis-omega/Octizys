@@ -64,10 +64,10 @@ extern {
       ,"/" => lexer::Token::Div(TokenInfo)
       ,"%" => lexer::Token::Module(TokenInfo)
       ,"<<" => lexer::Token::ShiftLeft(TokenInfo)
-      ,">>" => lexer::Token::ShiftRigth(TokenInfo)
+      ,">>" => lexer::Token::ShiftRight(TokenInfo)
       ,"<&>" => lexer::Token::FlippedMap(TokenInfo)
       ,"<$>" => lexer::Token::Map(TokenInfo)
-      ,"$>" => lexer::Token::MapConstRigth(TokenInfo)
+      ,"$>" => lexer::Token::MapConstRight(TokenInfo)
       ,"<$" => lexer::Token::MapConstLeft(TokenInfo)
       ,"<|>" => lexer::Token::Alternative(TokenInfo)
       ,"<?>" => lexer::Token::Annotate(TokenInfo)
@@ -82,7 +82,7 @@ extern {
       ,">" => lexer::Token::MoreThan(TokenInfo)
       ,"&&" => lexer::Token::And(TokenInfo)
       ,"||" => lexer::Token::Or(TokenInfo)
-      ,"&" => lexer::Token::ReverseAppliation(TokenInfo)
+      ,"&" => lexer::Token::ReverseApplication(TokenInfo)
       ,"$" => lexer::Token::DollarApplication(TokenInfo)
       ,"=" => lexer::Token::Asignation(TokenInfo)
       ,"@" => lexer::Token::At(TokenInfo)
@@ -207,9 +207,9 @@ operator_name : Token<OperatorName> = {
       ,"/" => base::Token{value: OperatorName::Div,info:<>.into()}
       ,"%" => base::Token{value: OperatorName::Module,info:<>.into()}
       ,"<<" => base::Token{value: OperatorName::ShiftLeft,info:<>.into()}
-      ,">>" => base::Token{value: OperatorName::ShiftRigth,info:<>.into()}
+      ,">>" => base::Token{value: OperatorName::ShiftRight,info:<>.into()}
       ,"<$>" => base::Token{value: OperatorName::Map,info:<>.into()}
-      ,"$>" => base::Token{value: OperatorName::MapConstRigth,info:<>.into()}
+      ,"$>" => base::Token{value: OperatorName::MapConstRight,info:<>.into()}
       ,"<$" => base::Token{value: OperatorName::MapConstLeft,info:<>.into()}
       ,"<*>" => base::Token{value: OperatorName::Appliative,info:<>.into()}
       ,"*>" => base::Token{value: OperatorName::ApplicativeRight,info:<>.into()}
@@ -222,7 +222,7 @@ operator_name : Token<OperatorName> = {
       ,">" => base::Token{value: OperatorName::MoreThan,info:<>.into()}
       ,"&&" => base::Token{value: OperatorName::And,info:<>.into()}
       ,"||" => base::Token{value: OperatorName::Or,info:<>.into()}
-      ,"&" => base::Token{value: OperatorName::ReverseAppliation,info:<>.into()}
+      ,"&" => base::Token{value: OperatorName::ReverseApplication,info:<>.into()}
       ,"$" => base::Token{value: OperatorName::DollarApplication,info:<>.into()}
       ,"=" => base::Token{value: OperatorName::Asignation,info:<>.into()}
       ,"@" => base::Token{value: OperatorName::At,info:<>.into()}

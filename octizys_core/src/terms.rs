@@ -39,7 +39,7 @@ pub struct Context<'a> {
 }
 
 //pub impl Context{
-//    pub fn solve_name(&self,identifer:Identifier)->Result<> {
+//    pub fn solve_name(&self,identifier:Identifier)->Result<> {
 //
 //    }
 //}

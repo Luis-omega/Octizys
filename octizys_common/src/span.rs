@@ -47,7 +47,7 @@ impl Display for Position {
     }
 }
 
-/// Takes a index and try to find the boundary for a char before the index.
+/// Takes an index and try to find the boundary for a char before the index.
 fn split_string_before(src: &str, i: usize) -> (&str, usize) {
     let mut index = i;
     for _ in [0..4] {
@@ -59,11 +59,11 @@ fn split_string_before(src: &str, i: usize) -> (&str, usize) {
         };
         index = index.saturating_sub(1);
     }
-    // given the 4 bytes boundary we may succed in 4 steps always.
+    // given the 4 bytes boundary we may succeed in 4 steps always.
     return (src, 0);
 }
 
-/// Takes a index and try to find the boundary for a char after the index.
+/// Takes an index and try to find the boundary for a char after the index.
 fn split_string_after(src: &str, i: usize) -> (&str, usize) {
     let mut index = i;
     for _ in [0..4] {
@@ -75,7 +75,7 @@ fn split_string_after(src: &str, i: usize) -> (&str, usize) {
         };
         index = index.saturating_add(1);
     }
-    // given the 4 bytes boundary we may succed in 4 steps always.
+    // given the 4 bytes boundary we may succeed in 4 steps always.
     return (src, src.len());
 }
 

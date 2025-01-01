@@ -14,7 +14,7 @@
 //! We solve all the [to resolve path], register the result in
 //! a [map logical paths to real paths],  find the unparsed files
 //! among them and add them to the [to parse header].
-//! (TODO: implement caching in the resolve path so we can avoid recompiling uneeded)
+//! (TODO: implement caching in the resolve path so we can avoid recompiling unneeded)
 //!
 //! We run this cycle until we got nothing in the [to parse header]
 //! structure.

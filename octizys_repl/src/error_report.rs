@@ -11,7 +11,7 @@ use octizys_pretty::{
         Emphasis,
     },
 };
-use octizys_text_store::store::aproximate_string_width;
+use octizys_text_store::store::approximate_string_width;
 
 use octizys_cst::base::TokenInfo;
 
@@ -148,7 +148,7 @@ fn make_source_error<E: ParserErrorReport>(
             let (_, content, _) = span.get_text_at(context.src, None);
             if span.start.line == span.end.line {
                 let remain_width =
-                    match u16::try_from(aproximate_string_width(content)) {
+                    match u16::try_from(approximate_string_width(content)) {
                         Ok(width) => {
                             context.max_line_width.saturating_sub(width)
                         }
@@ -156,8 +156,8 @@ fn make_source_error<E: ParserErrorReport>(
                     };
                 let (before, _, after) = span
                     .get_text_at(context.src, Some(usize::from(remain_width)));
-                let pre_spaces = aproximate_string_width(before);
-                let pointer = "^".repeat(aproximate_string_width(content));
+                let pre_spaces = approximate_string_width(before);
+                let pointer = "^".repeat(approximate_string_width(content));
                 concat(vec![
                     external_text(before),
                     emphasis(
@@ -194,7 +194,7 @@ fn make_source_error<E: ParserErrorReport>(
         }
         ErrorLocation::Position(position) => {
             let (before, after) = position.get_text_at(context.src, Some(80));
-            let pre_spaces = aproximate_string_width(before);
+            let pre_spaces = approximate_string_width(before);
             let spaces = " ".repeat(pre_spaces) + "^";
             let mut after_iter = after.chars();
             let after_doc = match after_iter.next() {
@@ -283,7 +283,7 @@ impl ParserErrorReport for LexerError {
             LexerError::NonFinishedLineComment(_, _) => common,
             LexerError::NonContentInLineComment(_, _) => common,
             LexerError::CantCreateCommentLine(_, _) => common,
-            LexerError::CouldntMatchBlockComment(_,_, _) => "We found the begining of a block comment but couldn't finished it!",
+            LexerError::CouldntMatchBlockComment(_,_, _) => "We found the beginning of a block comment but couldn't finished it!",
             LexerError::Notu64NamedHole(_, _) => {
                 "Named holes are limited to u64 integers."
             }
@@ -296,24 +296,24 @@ impl ParserErrorReport for LexerError {
     fn get_long_description(&self) -> Option<&str> {
         Some(match self {
             LexerError::UnexpectedCharacter(_) => "While reading the code, we were unable to understand this particular character.",
-            LexerError::UnexpectedPunctuationMatch(_, _) => "The internal way to find punctuation marks and operators failed, it recognized a character that we did'nt suppor!",
-            LexerError::UnexpectedCommentMatch(_, _) => "The intnernal way to find a comment failed after succeding!",
+            LexerError::UnexpectedPunctuationMatch(_, _) => "The internal way to find punctuation marks and operators failed, it recognized a character that we didn't support!",
+            LexerError::UnexpectedCommentMatch(_, _) => "The intnernal way to find a comment failed after succeeding!",
             LexerError::NonFinishedLineComment(_, _) => "We find the start of a comment but not the end for some reason (not unbalanced brackets)",
             LexerError::NonContentInLineComment(_, _) => "We find a comment but we were unable to retrieve the content",
             LexerError::CantCreateCommentLine(_, _) => "We got the content of a comment but the internalizer disagree with us that this comment has the right format!",
-            LexerError::CouldntMatchBlockComment(_,_, _) => "We were looking for a matching end for the comment.\nEither we didn't find it and we consumed all the code looking for it.\nOr something else got wrong in the search (unprobable)",
+            LexerError::CouldntMatchBlockComment(_,_, _) => "We were looking for a matching end for the comment.\nEither we didn't find it, and we consumed all the code looking for it.\nOr something else got wrong in the search (improbable)",
             LexerError::Notu64NamedHole(_, _) => "Internally the named holes are stored as u64 integers.\nThe provided value for the hole is out of the bound for this range.\nPlease modify the hole value to something between 0 and 2^64 -1",
             LexerError::CantCreateIdentifier(_, _) => "Internally we expected something to follow the same rules as an identifier, but it didn't follow those rules",
             LexerError::CantTranslateToToken(_) => "The internal translation between simple Tokens and the CST::Tokens failed!",
-            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => "We find what seems to look like a ownership literal, but something unexpected passed while working with it!",
-            LexerError::CantParseU64(_, _,_) => "We find what seems to look like a u64 literal, but something unexpected passed while working with it!",
+            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => "We find what seems to look like an ownership literal, but something unexpected passed while working with it!",
+            LexerError::CantParseU64(_, _,_) => "We find what seems to look like an u64 literal, but something unexpected passed while working with it!",
         })
     }
     fn get_expected(&self) -> Option<Vec<String>> {
         match self {
             LexerError::CouldntMatchBlockComment(_, kind, _) => {
-                let hypens = "-".repeat(kind.len() - 1);
-                Some(vec![hypens + "}"])
+                let hyphens = "-".repeat(kind.len() - 1);
+                Some(vec![hyphens + "}"])
             }
             _ => None,
         }
@@ -389,10 +389,10 @@ impl ParserErrorReport for ParseError<Position, Token, LexerError> {
     }
     fn get_long_description(&self) -> Option<&str> {
         match self {
-            ParseError::InvalidToken { .. } => Some("The internal library used to parse the code has this disabled by octizys.\nIf you see this, a bug in the parser generator may happened!"),
-            ParseError::UnrecognizedEof { .. } =>Some("You may need to provide more code.\nWe read all what you provided but we still couldn't understand it!"),
-            ParseError::UnrecognizedToken { .. } => Some("Something is wrong with the code structure.\nThere's a chance that the error happenned before this point.\nBut in such case we were able to understand (wrong) the code until we reached this place."),
-            ParseError::ExtraToken { .. } => Some("We belive that we finished reading and understanding your code before we really read everything.\nThis means that you may have other errors in the middle or that you may want to delete the excess of code."),
+            ParseError::InvalidToken { .. } => Some("The internal library used to parse the code has this disabled by octizys.\nIf you see this, a bug in the parser generator may happen!"),
+            ParseError::UnrecognizedEof { .. } =>Some("You may need to provide more code.\nWe read all what you provided, but we still couldn't understand it!"),
+            ParseError::UnrecognizedToken { .. } => Some("Something is wrong with the code structure.\nThere's a chance that the error happened before this point.\nBut in such case we were able to understand (wrong) the code until we reached this place."),
+            ParseError::ExtraToken { .. } => Some("We believe that we finished reading and understanding your code before we really read everything.\nThis means that you may have other errors in the middle or that you may want to delete the excess of code."),
             ParseError::User { error } => error.get_long_description(),
         }
     }

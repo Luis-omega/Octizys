@@ -125,7 +125,7 @@ pub enum Commands {
             short = 'o',
             long = "output",
             name = "FILE",
-            help = "A output file for a image representation of the CST (Concrete Syntax Tree) generated  for the input. If ommited, not image would be generated."
+            help = "A output file for a image representation of the CST (Concrete Syntax Tree) generated  for the input. If omitted, not image would be generated."
         )]
         image_path: Option<PathBuf>,
     },
@@ -139,7 +139,7 @@ pub enum Commands {
             short = 'o',
             long = "output",
             name = "FILE",
-            help = "A output file for a image representation of the CST (Concrete Syntax Tree) generated  for the input. If ommited, not image would be generated."
+            help = "A output file for a image representation of the CST (Concrete Syntax Tree) generated  for the input. If omitted, not image would be generated."
         )]
         image_path: Option<PathBuf>,
     },

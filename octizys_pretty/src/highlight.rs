@@ -167,7 +167,7 @@ impl Default for Highlight {
 pub trait ColorRender {
     /// The first string begin the color, the last one
     /// restores it to the default value.
-    fn render_color(backgrond: Color, foreground: Color) -> (String, String);
+    fn render_color(background: Color, foreground: Color) -> (String, String);
 }
 
 /// A way to translate a emphasis to some markup.
@@ -196,7 +196,10 @@ pub trait HighlightRenderer: ColorRender + EmphasisRender {
 pub enum EmptyRender {}
 
 impl ColorRender for EmptyRender {
-    fn render_color(_backgrond: Color, _foregrond: Color) -> (String, String) {
+    fn render_color(
+        _background: Color,
+        _foreground: Color,
+    ) -> (String, String) {
         (String::new(), String::new())
     }
 }

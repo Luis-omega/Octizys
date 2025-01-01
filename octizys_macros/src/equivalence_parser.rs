@@ -120,9 +120,9 @@ fn find_simple_ignore_attribute(attributes: &Vec<syn::Attribute>) -> bool {
                 }
                 match meta.path.get_ident(){
                     Some(name) =>
-                        return Err(meta.error(format!("Unrecognized attribute {}, currently we only suport ignore!",name))),
+                        return Err(meta.error(format!("Unrecognized attribute {}, currently we only support ignore!",name))),
                     None =>
-                        return Err(meta.error("Unrecognized attribute, currently we only suport ignore!")),
+                        return Err(meta.error("Unrecognized attribute, currently we only support ignore!")),
                 }
             });
             if out.is_ok() {

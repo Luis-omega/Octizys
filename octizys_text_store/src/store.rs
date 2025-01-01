@@ -4,7 +4,7 @@ use string_interner::DefaultStringInterner;
 use string_interner::DefaultSymbol;
 
 //TODO: change this to a better approximate using graphemes
-pub fn aproximate_string_width(s: &str) -> usize {
+pub fn approximate_string_width(s: &str) -> usize {
     s.chars().count()
 }
 
@@ -19,7 +19,7 @@ impl NonLineBreakStr {
             Some(x) => {
                 const_panic::concat_panic!(
                     false,
-                    "String conatins a line break! at index: ",
+                    "String contains a line break! At index:",
                     x
                 );
             }
