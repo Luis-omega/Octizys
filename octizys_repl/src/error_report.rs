@@ -4,8 +4,8 @@ use octizys_cst::base::TokenInfo;
 use octizys_parser::lexer::{LexerError, Token};
 use octizys_pretty::{
     combinators::{
-        concat, emphasis, empty, external_text, foreground, hard_break,
-        intersperse, nest, soft_break, static_str,
+        concat, emphasis, empty, empty_break, external_text, foreground, group,
+        hard_break, intersperse, nest, soft_break, static_str,
     },
     document::Document,
     highlight::{
@@ -169,7 +169,9 @@ pub fn make_report_kind<R: ReportFormat>(
                 ]),
             )
         }
-        ReportTarget::Machine(_) => foreground(color, static_str(kind)),
+        ReportTarget::Machine(_) => {
+            foreground(color, static_str(kind) + static_text!("!:"))
+        }
     }
 }
 
@@ -239,22 +241,28 @@ fn expected_to_document(
             } else {
                 previous_text = static_text!("Expected one of:");
             }
-            let separator = static_text!(",")
-                + if is_human {
-                    soft_break()
-                } else {
-                    static_text!(" ")
-                };
+            let separator = if is_human {
+                soft_break()
+            } else {
+                static_text!(" ")
+            } + static_text!(",");
             previous_text
-                + intersperse(
-                    v.into_iter().map(|x| {
-                        emphasis(
-                            Emphasis::Bold,
-                            foreground(CYAN, external_text(&x)),
-                        )
-                    }),
-                    separator,
-                )
+                + group(nest(
+                    2,
+                    if is_human {
+                        empty_break()
+                    } else {
+                        static_text!(" ")
+                    } + intersperse(
+                        v.into_iter().map(|x| {
+                            emphasis(
+                                Emphasis::Bold,
+                                foreground(CYAN, external_text(&x)),
+                            )
+                        }),
+                        separator,
+                    ),
+                ))
         }
     }
 }

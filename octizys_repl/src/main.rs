@@ -4,7 +4,9 @@ mod error_report;
 use crate::error_report::create_error_report;
 use arguments::{AvailableParser, Configuration, DebugFormatOption};
 use clap::Parser;
-use error_report::{ReportKind, ReportRequest, ReportSourceContext};
+use error_report::{
+    ReportKind, ReportRequest, ReportSourceContext, ReportTarget,
+};
 use lalrpop_util::ParseError;
 use octizys_common::{equivalence::Equivalence, span::Position};
 use octizys_cst::{imports::Import, top::Top, types::Type};
@@ -183,10 +185,15 @@ fn println_result(
     store: &Store,
     show_cst: bool,
     show_doc: bool,
+    use_machine_representation: bool,
     renderer_info: &RenderInfo,
 ) -> () {
     //TODO: pass pretty configuration
     let pretty_configuration = PrettyCSTConfiguration::default();
+    let mut new_render_info = renderer_info.clone();
+    if use_machine_representation {
+        new_render_info.highlight = EmptyRender::render_highlight
+    }
     match result {
         Ok(item) => {
             if show_cst {
@@ -204,7 +211,7 @@ fn println_result(
                     }
                 }
             }
-            let as_string = render_with(&as_doc, store, renderer_info);
+            let as_string = render_with(&as_doc, store, &new_render_info);
             println!("{}", as_string)
         }
         Err(t) => {
@@ -218,15 +225,19 @@ fn println_result(
             let request = ReportRequest {
                 report: &t,
                 source_context: error_context,
-                //TODO add option for this
-                target: Default::default(),
+                //TODO add and option for choosing between new user and adanced.
+                target: if use_machine_representation {
+                    ReportTarget::Machine(Default::default())
+                } else {
+                    ReportTarget::Human(Default::default())
+                },
                 //TODO: FIXME: change this! it require major changes in the lexer
                 //as we plan to change the parser error to support this!
                 kind: ReportKind::Error,
             };
             let report = create_error_report(&request);
-            let as_string = render_with(&report, store, renderer_info);
-            println!("{}", as_string)
+            let as_string = render_with(&report, store, &new_render_info);
+            eprintln!("{}", as_string)
         }
     }
 }
@@ -272,6 +283,7 @@ fn parse_string(
             &*(*new_store).borrow(),
             configuration.show_cst,
             configuration.show_doc,
+            configuration.use_machine_representation,
             &renderer_info,
         )
     } else {
@@ -288,6 +300,7 @@ fn parse_string(
             &*(*new_store).borrow(),
             configuration.show_cst,
             configuration.show_doc,
+            configuration.use_machine_representation,
             &renderer_info,
         )
     };

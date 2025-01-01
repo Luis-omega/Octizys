@@ -111,6 +111,12 @@ This affects the available colors and styles."
         help = "Show the passed arguments and exit."
     )]
     pub show_arguments: bool,
+    #[arg(
+        short = 'm',
+        long = "machine",
+        help = "Set it if you want error messages in a format that can be parsed with a regular expression (mostly)."
+    )]
+    pub use_machine_representation: bool,
 }
 
 #[derive(Subcommand, Debug)]
