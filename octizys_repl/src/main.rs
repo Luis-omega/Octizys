@@ -1,9 +1,10 @@
 mod arguments;
 mod error_report;
 
-use crate::error_report::{create_error_report, ParserErrorContext};
+use crate::error_report::create_error_report;
 use arguments::{AvailableParser, Configuration, DebugFormatOption};
 use clap::Parser;
+use error_report::{ReportKind, ReportRequest, ReportSourceContext};
 use lalrpop_util::ParseError;
 use octizys_common::{equivalence::Equivalence, span::Position};
 use octizys_cst::{imports::Import, top::Top, types::Type};
@@ -207,13 +208,23 @@ fn println_result(
             println!("{}", as_string)
         }
         Err(t) => {
-            let mut error_context = ParserErrorContext::default();
+            let mut error_context = ReportSourceContext::default();
+            // TODO: add setter to ReportSourceContext and use it instead of expossing this
             error_context.src = &input;
             match file_name {
                 Some(name) => error_context.src_name = name,
                 None => (),
             }
-            let report = create_error_report(&t, &error_context);
+            let request = ReportRequest {
+                report: &t,
+                source_context: error_context,
+                //TODO add option for this
+                target: Default::default(),
+                //TODO: FIXME: change this! it require major changes in the lexer
+                //as we plan to change the parser error to support this!
+                kind: ReportKind::Error,
+            };
+            let report = create_error_report(&request);
             let as_string = render_with(&report, store, renderer_info);
             println!("{}", as_string)
         }
