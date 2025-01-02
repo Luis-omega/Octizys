@@ -1,11 +1,17 @@
 [workspace]
-members = [ "octizys_common", "octizys_core", "octizys_cst", "octizys_doc", "octizys_formatter", "octizys_macros","octizys_parser", "octizys_pretty", "octizys_sast", "octizys_text_store", "octizys_repl"]
-default-members = ["octizys_repl"]
+members = [ "octizys_common", "octizys_core", "octizys_cst", "octizys_doc", "octizys_formatter", "octizys_macros","octizys_parser", "octizys_pretty", "octizys_sast", "octizys_text_store", "octizys_command_line"]
+default-members = ["octizys_command_line"]
 
 [package]
 name = "octizys"
 version = "0.1.0"
 edition = "2021"
+
+[[bin]]
+name = "octizys"
+test = false
+bench = false
+path = "octizys_command_line/src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
