@@ -4,18 +4,6 @@ use std::path::PathBuf;
 #[derive(
     ValueEnum, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
 )]
-pub enum AvailableParser {
-    #[clap(name = "import", help = "Use the parser for import statements.")]
-    Import,
-    #[clap(name = "type", help = "Use the parser for the type expressions.")]
-    Type,
-    #[clap(name = "top", help = "Use the parser of a whole file.")]
-    Top,
-}
-
-#[derive(
-    ValueEnum, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
 pub enum AvailableRenderers {
     #[clap(
         name = "plain",
@@ -89,8 +77,6 @@ pub struct DebugCommand {
         default_value = "top",
         help = "The parser to use on the input."
     )]
-    pub parser: AvailableParser,
-    #[arg(long = "phase", help = "Show the result of the specific phase.")]
     pub phases: Vec<Phase>,
 }
 

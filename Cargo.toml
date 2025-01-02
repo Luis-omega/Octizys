@@ -11,7 +11,7 @@ edition = "2021"
 name = "octizys"
 test = false
 bench = false
-path = "octizys_command_line/src/main.rs"
+path = "octizys_command_line/"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

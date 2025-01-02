@@ -3,8 +3,7 @@ mod error_report;
 
 use crate::error_report::create_error_report;
 use arguments::{
-    AvailableParser, DebugCommand, DebugFormatOption, FormatterConfiguration,
-    Phase,
+    DebugCommand, DebugFormatOption, FormatterConfiguration, Phase,
 };
 use clap::Parser;
 use error_report::{
@@ -274,7 +273,6 @@ fn compile_file(
 
 fn debug_file(
     path_or_source: Result<PathBuf, String>,
-    parser: AvailableParser,
     options: &GlobalOptions,
     store: &mut Store,
 ) -> () {
@@ -335,12 +333,9 @@ fn main() {
                 },
             };
             match option_path_or_source {
-                Some(path_or_source) => debug_file(
-                    path_or_source,
-                    command.parser,
-                    &options,
-                    &mut store,
-                ),
+                Some(path_or_source) => {
+                    debug_file(path_or_source, &options, &mut store)
+                }
                 None => return (),
             }
         }
