@@ -4,8 +4,8 @@ use octizys_cst::base::TokenInfo;
 use octizys_parser::lexer::{LexerError, Token};
 use octizys_pretty::{
     combinators::{
-        concat, emphasis, empty, empty_break, external_text, foreground, group,
-        hard_break, intersperse, nest, soft_break, static_str,
+        self, concat, emphasis, empty, empty_break, external_text, foreground,
+        group, hard_break, intersperse, nest, soft_break, static_str,
     },
     document::Document,
     highlight::{
@@ -124,7 +124,7 @@ pub trait ReportFormat {
     fn get_short_description(&self) -> NonLineBreakStr;
     fn get_long_description(&self, target: &ReportTarget) -> Option<Document>;
     fn get_expected(&self) -> Option<Vec<String>>;
-    fn get_location(&self) -> Location;
+    fn get_location(&self) -> Option<Location>;
 }
 
 pub struct ReportRequest<'source, T>
@@ -208,7 +208,7 @@ pub fn make_report_info_start<R: ReportFormat>(
             MODERATE_GREEN,
             external_text(request.source_context.src_name),
         ),
-        location.to_document(),
+        location.map_or_else(combinators::empty, |x| Location::to_document(&x)),
     ]);
     concat(vec![
         kind,
@@ -267,8 +267,10 @@ fn expected_to_document(
     }
 }
 
-fn make_source_error<R: ReportFormat>(request: &ReportRequest<R>) -> Document {
-    let location = request.report.get_location();
+fn make_source_error<R: ReportFormat>(
+    request: &ReportRequest<R>,
+    location: Location,
+) -> Document {
     match location {
         Location::Span(span) => {
             //We need to get this first
@@ -371,7 +373,10 @@ pub fn create_error_report<R: ReportFormat>(
     request: &ReportRequest<R>,
 ) -> Document {
     let header = make_report_info_start(request);
-    let source = make_source_error(request);
+    let location = request.report.get_location();
+    let has_location = location.is_some();
+    let source = location
+        .map_or_else(combinators::empty, |x| make_source_error(request, x));
     let long_description =
         match request.report.get_long_description(&request.target) {
             Some(d) => d,
@@ -379,7 +384,11 @@ pub fn create_error_report<R: ReportFormat>(
         };
     concat(vec![
         header,
-        nest(4, hard_break() + source),
+        if has_location {
+            nest(4, hard_break() + source)
+        } else {
+            combinators::empty()
+        },
         nest(2, hard_break() + long_description),
     ])
 }
@@ -478,8 +487,8 @@ impl ReportFormat for LexerError {
             _ => None,
         }
     }
-    fn get_location(&self) -> Location {
-        match self {
+    fn get_location(&self) -> Option<Location> {
+        Some(match self {
             LexerError::UnexpectedCharacter(p) => Location::Position(p.clone()),
             LexerError::UnexpectedPunctuationMatch(_, span) => {
                 Location::Span(span.clone())
@@ -514,7 +523,7 @@ impl ReportFormat for LexerError {
             LexerError::CantParseU64(_, _, span) => {
                 Location::Span(span.clone())
             }
-        }
+        })
     }
 }
 
@@ -567,21 +576,21 @@ impl ReportFormat for ParseError<Position, Token, LexerError> {
             ParseError::User { error } => error.get_expected(),
         }
     }
-    fn get_location(&self) -> Location {
+    fn get_location(&self) -> Option<Location> {
         match self {
             ParseError::InvalidToken { location } => {
-                Location::Position(location.to_owned())
+                Some(Location::Position(location.to_owned()))
             }
             ParseError::UnrecognizedEof { location, .. } => {
-                Location::Position(location.to_owned())
+                Some(Location::Position(location.to_owned()))
             }
             ParseError::UnrecognizedToken {
                 token: (_, token, _),
                 ..
-            } => Location::Span(<&TokenInfo>::from(token).span),
+            } => Some(Location::Span(<&TokenInfo>::from(token).span)),
             ParseError::ExtraToken {
                 token: (_, token, _),
-            } => Location::Span(<&TokenInfo>::from(token).span),
+            } => Some(Location::Span(<&TokenInfo>::from(token).span)),
             ParseError::User { error } => error.get_location(),
         }
     }

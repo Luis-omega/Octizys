@@ -199,7 +199,7 @@ pub enum Commands {
     // TODO: allow format of multiple directories and files.
     #[command(about = "Format a file")]
     Format {
-        #[arg(short = 'p', long = "path", help = "A file to be formatted.")]
+        #[arg(help = "A file to be formatted.")]
         path: PathBuf,
         // TODO: Alternatively an output directory.
         #[arg(
@@ -215,6 +215,7 @@ pub enum Commands {
         // TODO: Add other commands like:
         // - Load file
         // - History (with maximum history and path to store it.)
+        // TODO: FIXME Sanitize prompt, it cannot have line breaks (just because is weird).
         #[arg(
             short = 'p',
             long = "prompt",
