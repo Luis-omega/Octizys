@@ -69,13 +69,22 @@ pub enum Phase {
 #[derive(Parser, Clone, Debug)]
 #[group(required = true, multiple = false)]
 pub struct DebugCommand {
+    #[arg(
+        short = 's',
+        long = "string",
+        help = "A string to be used to test the pipeline."
+    )]
     pub source_string: Option<String>,
+    #[arg(
+        short = 'f',
+        long = "file",
+        help = "A file to be used to test the pipeline."
+    )]
     pub source_path: Option<PathBuf>,
     #[arg(
         short = 'p',
-        long = "parser",
-        default_value = "top",
-        help = "The parser to use on the input."
+        long = "phase",
+        help = "A compiler phase that you want the debug to show the result for."
     )]
     pub phases: Vec<Phase>,
 }
@@ -177,7 +186,7 @@ pub enum Commands {
     #[command(name = "compile")]
     #[command(about = "Compile the given file.")]
     Compile {
-        #[arg(short = 'p', long = "path", help = "A file to be compiled.")]
+        #[arg(help = "A file to be compiled.")]
         path: PathBuf,
         #[arg(
             short = 'p',

@@ -381,6 +381,12 @@ fn debug_file(
     };
 }
 
+//TODO: CRITICAL:
+// Put a roundtrip test and report a diff tree if it fails!
+// TODO:
+// use the output parameter
+//
+// TODO: Cleanup, remove the unused things (see Cargo.toml)
 fn format_file(
     source_path: PathBuf,
     output: Option<PathBuf>,
