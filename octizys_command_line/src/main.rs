@@ -406,6 +406,8 @@ fn repl(
     options: &GlobalOptions,
     store: Rc<RefCell<Store>>,
 ) -> () {
+    // TODO:  Add option to choose color
+    // TODO: Add commands in repl (maybe use the larlpop parser for that!);
     let prompt_document = foreground(MODERATE_GREEN, external_text(&prompt));
     let rendered_prompt =
         render_with(&prompt_document, &*(*store).borrow(), options);
