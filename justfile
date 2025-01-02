@@ -16,4 +16,4 @@ commit: spellcheck
   git commit
 
 install:
-  cargo install --path=octizys_repl
+  cargo install --path=octizys_command_line

@@ -1,10 +1,10 @@
 [package]
-name = "repl"
+name = "octizys_command_line"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "octizys_repl"
+name = "octizys"
 test = false
 bench = false
 path = "src/main.rs"
