@@ -1426,7 +1426,7 @@ pub fn split_comments_by_line(
     (same_line, not_same_line)
 }
 
-//TODO: In case we have multiple block comments in a line
+// TODO: In case we have multiple block comments in a line
 // this algorithm will store the second, third, ..., comments to the
 // next token. Is this what we want? is a uncommon case but still need to be handled.
 /// We already consumed all the comments before a token, and we
