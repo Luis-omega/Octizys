@@ -2,7 +2,10 @@ mod arguments;
 mod error_report;
 
 use crate::error_report::create_error_report;
-use arguments::{AvailableParser, Configuration, DebugFormatOption};
+use arguments::{
+    AvailableParser, DebugCommand, DebugFormatOption, FormatterConfiguration,
+    Phase,
+};
 use clap::Parser;
 use error_report::{
     ReportKind, ReportRequest, ReportSourceContext, ReportTarget,
@@ -26,10 +29,10 @@ use octizys_pretty::{
 };
 use octizys_text_store::store::Store;
 use simplelog;
-use std::cell::RefCell;
-use std::fmt::Debug;
-use std::path::PathBuf;
 use std::rc::Rc;
+use std::{borrow::Borrow, path::PathBuf};
+use std::{cell::RefCell, collections::HashSet};
+use std::{collections::HashMap, fmt::Debug};
 
 //TODO:
 //TEst the following :
@@ -55,42 +58,72 @@ use std::rc::Rc;
 //
 //
 
-#[derive(Debug, Equivalence)]
-enum ReplParserOutput {
-    Import(Import),
-    Type(Type),
-    Top(Top),
-}
-
-impl ReplParserOutput {
-    fn to_document(&self, configuration: &PrettyCSTConfiguration) -> Document {
-        match self {
-            ReplParserOutput::Import(i) => i.to_document(configuration),
-            ReplParserOutput::Type(t) => t.to_document(configuration),
-            ReplParserOutput::Top(t) => t.to_document(configuration),
-        }
-    }
-
-    fn represent(&self) -> Document {
-        match self {
-            ReplParserOutput::Import(i) => i.represent(),
-            ReplParserOutput::Type(t) => t.represent(),
-            ReplParserOutput::Top(t) => t.represent(),
-        }
-    }
-}
-
 #[derive(Clone)]
-struct RenderInfo {
+struct GlobalOptions {
     debug: DebugFormatOption,
     column_width: usize,
     highlight: fn(&Highlight) -> (String, String),
+    pretty_configuration: PrettyCSTConfiguration,
+    phases: HashSet<Phase>,
+    use_machine_representation: bool,
+}
+
+impl GlobalOptions {
+    fn from_format_configuration(
+        debug: DebugFormatOption,
+        configuration: &FormatterConfiguration,
+        phases: HashSet<Phase>,
+    ) -> GlobalOptions {
+        let pretty_configuration: PrettyCSTConfiguration =
+            PrettyCSTConfiguration {
+                indentation_deep: configuration.indentation_deep,
+                leading_commas: configuration.leading_commas,
+                add_trailing_separator: configuration.add_trailing_separator,
+                move_documentantion_before_object: configuration
+                    .move_documentantion_before_object,
+                //TODO: check the comment on Arguments for this option.
+                indent_comment_blocks: false,
+                //TODO: I think this option must be this kind of global.
+                separe_comments_by: configuration.separe_by,
+                compact_comments: configuration.compact_comments,
+            };
+        let mut highlight = match configuration.renderer {
+            arguments::AvailableRenderers::PlainText => {
+                EmptyRender::render_highlight
+            }
+            arguments::AvailableRenderers::AnsiC4 => {
+                TerminalRender4::render_highlight
+            }
+            arguments::AvailableRenderers::AnsiC8 => {
+                TerminalRender8::render_highlight
+            }
+            arguments::AvailableRenderers::AnsiC24 => {
+                TerminalRender24::render_highlight
+            }
+        };
+        if configuration.use_machine_representation {
+            highlight = EmptyRender::render_highlight
+        }
+        GlobalOptions {
+            debug,
+            column_width: configuration.column_width,
+            highlight,
+            pretty_configuration,
+            phases,
+            use_machine_representation: configuration
+                .use_machine_representation,
+        }
+    }
+
+    fn has_phase(&self, p: &Phase) -> bool {
+        self.phases.contains(&p)
+    }
 }
 
 fn println_with<'store, T>(
     value: &T,
     store: &'store Store,
-    options: &RenderInfo,
+    options: &GlobalOptions,
 ) -> ()
 where
     T: Debug + Equivalence,
@@ -103,7 +136,7 @@ where
 fn render_with<'store>(
     document: &Document,
     store: &'store Store,
-    options: &RenderInfo,
+    options: &GlobalOptions,
 ) -> String
 where
 {
@@ -123,85 +156,42 @@ where
     }
 }
 
-macro_rules! gen_parse_function {
-    ($function_name:ident, $name:ident,$parser_name:ident) => {
-        fn $function_name(
-            s: &str,
-            store: Rc<RefCell<Store>>,
-            show_token_stream: Option<RenderInfo>,
-        ) -> Result<ReplParserOutput, ParseError<Position, Token, LexerError>> {
-            let mut base_context = BaseLexerContext::new(s, store.clone());
-            let iterator = LexerContext::new(None, &mut base_context);
-            match show_token_stream {
-                Some(renderer_info) => {
-                    let new_iterator = iterator.inspect(|x| match x.clone() {
-                        Ok((_, tok, _)) => println_with(
-                            &tok,
-                            &*(*store).borrow(),
-                            &renderer_info,
-                        ),
-                        Err(e) => println_with(
-                            &e,
-                            &*(*store).borrow(),
-                            &renderer_info,
-                        ),
-                    });
-                    $parser_name::new()
-                        .parse(new_iterator)
-                        .map(|x| ReplParserOutput::$name(x))
-                }
-                None => $parser_name::new()
-                    .parse(iterator)
-                    .map(|x| ReplParserOutput::$name(x)),
-            }
-        }
-    };
-}
-
-gen_parse_function!(parse_import, Import, import_declarationParser);
-gen_parse_function!(parse_type, Type, type_expressionParser);
-gen_parse_function!(parse_top, Top, topParser);
-
-fn parse_string_with_renderer(
-    parser_option: AvailableParser,
-    s: &str,
+fn parse_string_with_options(
+    source: &str,
+    options: &GlobalOptions,
     store: Rc<RefCell<Store>>,
-    show_token_stream: Option<RenderInfo>,
-) -> Result<
-    ReplParserOutput,
-    ParseError<Position, octizys_parser::lexer::Token, LexerError>,
-> {
-    match parser_option {
-        AvailableParser::Import => parse_import(s, store, show_token_stream),
-        AvailableParser::Type => parse_type(s, store, show_token_stream),
-        AvailableParser::Top => parse_top(s, store, show_token_stream),
+) -> Result<Top, ParseError<Position, octizys_parser::lexer::Token, LexerError>>
+{
+    let mut base_context = BaseLexerContext::new(source, store.clone());
+    let iterator = LexerContext::new(None, &mut base_context);
+    if options.has_phase(&Phase::Lexer) {
+        let new_iterator = iterator.inspect(|x| match x.clone() {
+            Ok((_, tok, _)) => {
+                println_with(&tok, &*(*store).borrow(), &options)
+            }
+            Err(e) => println_with(&e, &*(*store).borrow(), &options),
+        });
+        topParser::new().parse(new_iterator)
+    } else {
+        topParser::new().parse(iterator)
     }
 }
 
-fn println_result(
-    input: &str,
-    file_name: Option<&str>,
-    result: Result<ReplParserOutput, ParseError<Position, Token, LexerError>>,
-    store: &Store,
-    show_cst: bool,
-    show_doc: bool,
-    use_machine_representation: bool,
-    renderer_info: &RenderInfo,
+fn println_result<'s>(
+    input: &'s str,
+    file_name: Option<&'s str>,
+    result: Result<Top, ParseError<Position, Token, LexerError>>,
+    options: &'s GlobalOptions,
+    store: &'s Store,
 ) -> () {
-    //TODO: pass pretty configuration
-    let pretty_configuration = PrettyCSTConfiguration::default();
-    let mut new_render_info = renderer_info.clone();
-    if use_machine_representation {
-        new_render_info.highlight = EmptyRender::render_highlight
-    }
     match result {
         Ok(item) => {
-            if show_cst {
-                println_with(&item, store, renderer_info);
+            if options.has_phase(&Phase::Parser) {
+                println_with(&item, store, options);
             }
-            let as_doc = item.to_document(&pretty_configuration);
-            if show_doc {
-                match renderer_info.debug {
+            let as_doc = item.to_document(&options.pretty_configuration);
+            if options.has_phase(&Phase::Document) {
+                match options.debug {
                     DebugFormatOption::PrettyDebug => {
                         println!("{:#?}", &as_doc)
                     }
@@ -211,12 +201,12 @@ fn println_result(
                     }
                 }
             }
-            let as_string = render_with(&as_doc, store, &new_render_info);
+            let as_string = render_with(&as_doc, store, options);
             println!("{}", as_string)
         }
         Err(t) => {
             let mut error_context = ReportSourceContext::default();
-            // TODO: add setter to ReportSourceContext and use it instead of expossing this
+            // TODO: add setter to ReportSourceContext and use it instead of exposing this
             error_context.src = &input;
             match file_name {
                 Some(name) => error_context.src_name = name,
@@ -225,18 +215,18 @@ fn println_result(
             let request = ReportRequest {
                 report: &t,
                 source_context: error_context,
-                //TODO add and option for choosing between new user and adanced.
-                target: if use_machine_representation {
+                // TODO add and option for choosing between new user and advanced.
+                target: if options.use_machine_representation {
                     ReportTarget::Machine(Default::default())
                 } else {
                     ReportTarget::Human(Default::default())
                 },
-                //TODO: FIXME: change this! it require major changes in the lexer
+                // TODO: FIXME: change this! it requires major changes in the lexer
                 //as we plan to change the parser error to support this!
                 kind: ReportKind::Error,
             };
             let report = create_error_report(&request);
-            let as_string = render_with(&report, store, &new_render_info);
+            let as_string = render_with(&report, store, &options);
             eprintln!("{}", as_string)
         }
     }
@@ -245,92 +235,62 @@ fn println_result(
 fn parse_string(
     string: &str,
     file_path: Option<&str>,
-    image_path: Option<PathBuf>,
     store: Store,
-    configuration: Configuration,
+    options: &GlobalOptions,
 ) -> () {
-    let highlight = match configuration.renderer {
-        arguments::AvailableRenderers::PlainText => {
-            EmptyRender::render_highlight
-        }
-        arguments::AvailableRenderers::AnsiC4 => {
-            TerminalRender4::render_highlight
-        }
-        arguments::AvailableRenderers::AnsiC8 => {
-            TerminalRender8::render_highlight
-        }
-        arguments::AvailableRenderers::AnsiC24 => {
-            TerminalRender24::render_highlight
-        }
-    };
     let new_store = Rc::new(RefCell::new(store));
-    let renderer_info = RenderInfo {
-        debug: configuration.display_format,
-        column_width: configuration.column_width,
-        highlight: highlight,
-    };
-    if configuration.show_tokens {
-        let result = parse_string_with_renderer(
-            configuration.parser,
-            string,
-            new_store.clone(),
-            Some(renderer_info.clone()),
-        );
-        println_result(
-            string,
-            file_path,
-            result,
-            &*(*new_store).borrow(),
-            configuration.show_cst,
-            configuration.show_doc,
-            configuration.use_machine_representation,
-            &renderer_info,
-        )
-    } else {
-        let result = parse_string_with_renderer(
-            configuration.parser,
-            string,
-            new_store.clone(),
-            None,
-        );
-        println_result(
-            string,
-            file_path,
-            result,
-            &*(*new_store).borrow(),
-            configuration.show_cst,
-            configuration.show_doc,
-            configuration.use_machine_representation,
-            &renderer_info,
-        )
-    };
+    let result = parse_string_with_options(string, &options, new_store.clone());
+    println_result(
+        string,
+        file_path,
+        result,
+        &options,
+        &*(*new_store).borrow(),
+    );
 }
 
-fn parse_file(
-    file_path: PathBuf,
-    image_path: Option<PathBuf>,
-    store: Store,
-    configuration: Configuration,
-) -> () {
+fn parse_file(file_path: PathBuf, store: Store, options: &GlobalOptions) -> () {
     match ::std::fs::read_to_string(file_path.clone()) {
         Ok(content) => {
             let path = match std::path::absolute(file_path.clone().as_path()) {
                 Ok(p) => p.to_str().map(String::from),
                 Err(_) => file_path.to_str().map(String::from),
             };
-            parse_string(
-                &content,
-                path.as_deref(),
-                image_path,
-                store,
-                configuration,
-            )
+            parse_string(&content, path.as_deref(), store, options)
         }
-        Err(_) => println!("Can't read file: {file_path:?}"),
+        // TODO: use the report system to report this (is an overkill but since we have it…)
+        Err(_) => eprintln!("Can't read file: {file_path:?}"),
     }
 }
 
-fn repl(store: Store, configuration: Configuration) -> () {
+fn compile_file(
+    source_path: PathBuf,
+    output: Option<PathBuf>,
+    options: &GlobalOptions,
+    store: &mut Store,
+) -> () {
+    todo!()
+}
+
+fn debug_file(
+    path_or_source: Result<PathBuf, String>,
+    parser: AvailableParser,
+    options: &GlobalOptions,
+    store: &mut Store,
+) -> () {
+    todo!()
+}
+
+fn format_file(
+    source_path: PathBuf,
+    output: Option<PathBuf>,
+    options: &GlobalOptions,
+    store: &mut Store,
+) -> () {
+    todo!()
+}
+
+fn repl(prompt: String, options: &GlobalOptions, store: &mut Store) -> () {
     todo!()
 }
 
@@ -342,32 +302,63 @@ fn main() {
         simplelog::ColorChoice::Auto,
     );
     let arguments = crate::arguments::Arguments::parse();
-    let store = Store::default();
+    let mut store = Store::default();
+    if arguments.show_arguments {
+        println!("{:#?}", arguments);
+        return;
+    }
+    let formatter_configuration = arguments.formatter_configuration;
+
     match arguments.command {
-        arguments::Commands::ParseString {
-            string,
-            configuration,
-            image_path,
-        } => {
-            if configuration.show_arguments {
-                println!("{:#?}", configuration)
-            } else {
-                parse_string(&string, None, image_path, store, configuration)
+        arguments::Commands::Compile { path, output } => {
+            let options = GlobalOptions::from_format_configuration(
+                arguments.display_format,
+                &formatter_configuration,
+                HashSet::new(),
+            );
+            compile_file(path, output, &options, &mut store)
+        }
+        arguments::Commands::Debug { command } => {
+            let options = GlobalOptions::from_format_configuration(
+                arguments.display_format,
+                &formatter_configuration,
+                HashSet::from_iter(command.phases),
+            );
+            let option_path_or_source = match command.source_string {
+                Some(s) => Some(Err(s)),
+                None => match command.source_path {
+                    Some(p) => Some(Ok(p)),
+                    None => {
+                        println!("Error!: Needed source_path or string to parse!\nAborting!");
+                        None
+                    }
+                },
+            };
+            match option_path_or_source {
+                Some(path_or_source) => debug_file(
+                    path_or_source,
+                    command.parser,
+                    &options,
+                    &mut store,
+                ),
+                None => return (),
             }
         }
-        arguments::Commands::ParseFile {
-            path,
-            configuration,
-            image_path,
-        } => {
-            if configuration.show_arguments {
-                println!("{:#?}", configuration)
-            } else {
-                parse_file(path, image_path, store, configuration)
-            }
+        arguments::Commands::Format { path, output } => {
+            let options = GlobalOptions::from_format_configuration(
+                arguments.display_format,
+                &formatter_configuration,
+                HashSet::new(),
+            );
+            format_file(path, output, &options, &mut store)
         }
-        arguments::Commands::REPL { configuration } => {
-            repl(store, configuration)
+        arguments::Commands::REPL { prompt } => {
+            let options = GlobalOptions::from_format_configuration(
+                arguments.display_format,
+                &formatter_configuration,
+                HashSet::new(),
+            );
+            repl(prompt, &options, &mut store)
         }
     };
 }
