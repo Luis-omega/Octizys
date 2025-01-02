@@ -140,10 +140,10 @@ where
 fn position_to_document(p: &Position) -> Document {
     concat(vec![
         static_text!("Line{"),
-        external_text(p.line.to_string().as_str()),
+        external_text((1 + p.line).to_string().as_str()),
         external_text("}"),
         static_text!("::Column{"),
-        external_text(p.column.to_string().as_str()),
+        external_text((1 + p.column).to_string().as_str()),
         static_text!("}"),
     ])
 }
