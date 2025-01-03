@@ -208,7 +208,7 @@ impl ReportFormat for OctizysParserReport {
         self.report.get_report_name()
     }
     fn get_location_maybe(&self) -> Option<Location> {
-        self.report.get_location_maybe()
+        Some(self.location)
     }
     fn get_long_description(&self, target: &ReportTarget) -> Option<Document> {
         self.report.get_long_description(target)

@@ -2,11 +2,14 @@ mod arguments;
 
 use arguments::FormatterConfiguration;
 use clap::Parser;
+use octizys_common::equivalence::Equivalence;
 use octizys_common::report::{
     create_error_report, IOError, ReportTarget, ReportUserKind,
 };
+use octizys_cst::top::Top;
 use octizys_formatter::{cst::PrettyCSTConfiguration, to_document::ToDocument};
 use octizys_parser::parser::{parse_file, parse_string};
+use octizys_pretty::highlight;
 use octizys_pretty::{
     combinators::{external_text, foreground},
     document::Document,
@@ -141,12 +144,35 @@ fn compile_file(
     }
 }
 
-//TODO: CRITICAL:
-// Put a roundtrip test and report a diff tree if it fails!
+fn check_idempotence(
+    top: &Top,
+    options: &GlobalOptions,
+    store: Rc<RefCell<Store>>,
+) -> Result<Document, Document> {
+    let highlight = EmptyRender::render_highlight;
+    let format_options = GlobalOptions {
+        highlight,
+        ..options.clone()
+    };
+    let doc = top.to_document(&options.pretty_configuration);
+    let string = render_with(&doc, store.clone(), &format_options);
+    let second_result = parse_string(&string, None, store.clone());
+    match second_result {
+        Ok(second_top) => top.equivalence_or_diff(&second_top).map(|_| doc),
+        Err(e) => {
+            let request = e.build_report_request(
+                options.target,
+                String::from("OctizysCommandLine"),
+                options.column_width,
+            );
+            let report = create_error_report(&request);
+            Err(report)
+        }
+    }
+}
+
 // TODO:
 // use the output parameter
-//
-// TODO: Cleanup, remove the unused things (see Cargo.toml)
 fn format_file(
     source_path: PathBuf,
     _output: Option<PathBuf>,
@@ -154,11 +180,24 @@ fn format_file(
     store: Rc<RefCell<Store>>,
 ) -> () {
     match parse_file(source_path, store.clone()) {
-        Ok(top) => {
-            let doc = top.to_document(&options.pretty_configuration);
-            let string = render_with(&doc, store, options);
-            println!("{}", string);
-        }
+        Ok(top) => match check_idempotence(&top, options, store.clone()) {
+            Ok(doc) => {
+                let string = render_with(&doc, store, options);
+                println!("{}", string);
+            }
+            Err(doc) => {
+                let string = render_with(&doc, store.clone(), options);
+                let origina_string = render_with(
+                    &top.to_document(&options.pretty_configuration),
+                    store,
+                    options,
+                );
+                eprintln!(
+                    "We failed to format! Couln't parse the second time, showing original resutl:\n{}",origina_string
+                );
+                eprintln!("{}", string);
+            }
+        },
         Err(e) => {
             let request = e.build_report_request(
                 options.target,
@@ -167,6 +206,7 @@ fn format_file(
             );
             let report = create_error_report(&request);
             let report_str = render_with(&report, store, options);
+            eprintln!("We failed to format!");
             eprintln!("{}", report_str)
         }
     }
