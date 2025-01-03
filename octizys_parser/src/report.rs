@@ -1,8 +1,9 @@
 use std::num::ParseIntError;
 
+use lalrpop_util::ParseError;
 use octizys_common::{
     report::{ReportFormat, ReportKind, ReportTarget},
-    span::Location,
+    span::{Location, Position},
 };
 use octizys_cst::comments::CommentBraceKind;
 use octizys_macros::Equivalence;

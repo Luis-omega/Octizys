@@ -1,30 +1,41 @@
-use std::path::PathBuf;
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
+
+use lalrpop_util::ParseError;
+use octizys_common::span::Position;
+use octizys_cst::top::Top;
+use octizys_pretty::store::Store;
+
+use crate::{
+    grammar::topParser,
+    lexer::{BaseLexerContext, LexerContext, Token},
+    report::OctizysParserReport,
+};
 
 #[derive(Debug)]
 pub enum ParsedFile {}
 
-#[derive(Debug)]
-pub enum ParserError {}
-
-fn parse(str: String) -> Result<(), ParserError> {
-    todo!()
+fn parse_string(
+    str: &str,
+    store: Rc<RefCell<Store>>,
+) -> Result<Top, ParseError<Position, Token, OctizysParserReport>> {
+    let mut base_context = BaseLexerContext::new(&str, store);
+    let iterator = LexerContext::new(None, &mut base_context);
+    topParser::new().parse(iterator)
 }
 
-// TODO(optimization):
-// use a Stream instead of a String, that would defeat
-// the point of it being pure.
-/// This don't load the file, it expect the full file in [content]
-/// the [path_name] is required only for error report
 pub fn parse_file(
     path_name: PathBuf,
-    content: String,
-) -> Result<(), ParserError> {
-    todo!("parsing file")
-}
-
-pub fn parse_file_imports(
-    path_name: PathBuf,
-    content: String,
-) -> Result<(), ParserError> {
-    todo!("parsing file imports")
+    store: Rc<RefCell<Store>>,
+) -> Result<(), OctizysParserReport> {
+    todo!("We need to think in a way to merge extraneous errors here")
+    //match ::std::fs::read_to_string(path_name.clone()) {
+    //    Ok(content) => {
+    //        let path = match std::path::absolute(path_name.clone().as_path()) {
+    //            Ok(p) => p.to_str().map(String::from),
+    //            Err(_) => path_name.to_str().map(String::from),
+    //        };
+    //        parse_string(content, path.as_deref(), store)
+    //    }
+    //    Err(_) => Err(OctizysError::FileLoadError { path: file_path }),
+    //}
 }
