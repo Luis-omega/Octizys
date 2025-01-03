@@ -2,41 +2,27 @@ mod arguments;
 
 use arguments::FormatterConfiguration;
 use clap::Parser;
-use lalrpop_util::ParseError;
 use octizys_common::report::{
-    create_error_report, IOError, ReportFormat, ReportKind, ReportRequest,
-    ReportSourceContext, ReportTarget, ReportUserKind,
+    create_error_report, IOError, ReportTarget, ReportUserKind,
 };
-use octizys_common::span::Location;
-use octizys_common::{equivalence::Equivalence, span::Position};
-use octizys_cst::{imports::Import, top::Top, types::Type};
 use octizys_formatter::{cst::PrettyCSTConfiguration, to_document::ToDocument};
-use octizys_macros::Equivalence;
 use octizys_parser::parser::{parse_file, parse_string};
-use octizys_parser::{
-    grammar::{import_declarationParser, topParser, type_expressionParser},
-    lexer::{self, BaseLexerContext, LexerContext, Token},
-    report::OctizysParserReport,
-};
 use octizys_pretty::{
-    combinators::{external_text, foreground, static_str},
+    combinators::{external_text, foreground},
     document::Document,
     highlight::{
         base_colors::MODERATE_GREEN, EmptyRender, Highlight, HighlightRenderer,
         TerminalRender24, TerminalRender4, TerminalRender8,
     },
-    store::NonLineBreakStr,
 };
 use octizys_text_store::store::Store;
 use simplelog;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::{
-    borrow::Borrow,
     io::{self, Write},
     path::PathBuf,
 };
-use std::{cell::RefCell, collections::HashSet};
-use std::{collections::HashMap, fmt::Debug};
-use std::{rc::Rc, result};
 
 //TODO:
 //TEst the following :
@@ -136,12 +122,12 @@ where
 
 fn compile_file(
     source_path: PathBuf,
-    output: Option<PathBuf>,
+    _output: Option<PathBuf>,
     options: &GlobalOptions,
     store: Rc<RefCell<Store>>,
 ) -> () {
     match parse_file(source_path, store.clone()) {
-        Ok(top) => (),
+        Ok(_top) => (),
         Err(e) => {
             let request = e.build_report_request(
                 options.target,
@@ -163,7 +149,7 @@ fn compile_file(
 // TODO: Cleanup, remove the unused things (see Cargo.toml)
 fn format_file(
     source_path: PathBuf,
-    output: Option<PathBuf>,
+    _output: Option<PathBuf>,
     options: &GlobalOptions,
     store: Rc<RefCell<Store>>,
 ) -> () {
@@ -198,7 +184,7 @@ fn repl(
     loop {
         let mut buffer = String::new();
         print!("{}", rendered_prompt);
-        io::stdout().flush();
+        let _ = io::stdout().flush();
         match io::stdin().read_line(&mut buffer) {
             Ok(_) => match parse_string(&buffer, None, store.clone()) {
                 Ok(top) => {
@@ -249,7 +235,7 @@ fn main() {
         simplelog::TerminalMode::Mixed,
         simplelog::ColorChoice::Auto,
     );
-    let mut real_store = Store::default();
+    let real_store = Store::default();
     let store = Rc::new(RefCell::new(real_store));
     if arguments.show_arguments {
         println!("{:#?}", arguments);
