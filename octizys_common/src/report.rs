@@ -1,7 +1,11 @@
+use std::path::PathBuf;
+
+#[cfg(feature = "lalrpop")]
+use crate::span::{HasLocation, Position};
+#[cfg(feature = "lalrpop")]
 use lalrpop_util::ParseError;
-use octizys_common::span::{Position, Span};
-use octizys_cst::base::TokenInfo;
-use octizys_parser::lexer::{LexerError, Token};
+
+use crate::span::Location;
 use octizys_pretty::{
     combinators::{
         self, concat, emphasis, empty, empty_break, external_text, foreground,
@@ -12,28 +16,23 @@ use octizys_pretty::{
         base_colors::{CYAN, MAGENTA, MODERATE_GREEN, RED},
         Color, Emphasis,
     },
+    static_text,
     store::NonLineBreakStr,
 };
 use octizys_text_store::store::approximate_string_width;
 
-macro_rules! static_text {
-    ($text:expr) => {
-        static_str(NonLineBreakStr::new($text))
-    };
-}
-
 #[derive(Debug)]
 pub struct ReportSourceContext<'source> {
     pub src: &'source str,
-    pub src_name: &'source str,
-    pub max_line_width: u16,
+    pub src_name: String,
+    pub max_line_width: usize,
 }
 
 impl<'a> Default for ReportSourceContext<'a> {
     fn default() -> Self {
         ReportSourceContext {
             src: &"",
-            src_name: &"octizys_repl",
+            src_name: String::from("octizys_repl"),
             max_line_width: 80,
         }
     }
@@ -93,38 +92,12 @@ impl ReportKind {
     }
 }
 
-pub enum Location {
-    Span(Span),
-    Position(Position),
-}
-
-impl Location {
-    fn to_document(&self) -> Document {
-        match self {
-            Location::Span(s) => {
-                let start = position_to_document(&s.start);
-                let end = position_to_document(&s.end);
-                concat(vec![
-                    static_text!("::From::"),
-                    start,
-                    static_text!("::To::"),
-                    end,
-                ])
-            }
-            Location::Position(p) => {
-                let pos = position_to_document(p);
-                static_text!("::At::") + pos
-            }
-        }
-    }
-}
-
 pub trait ReportFormat {
     fn get_report_name(&self) -> NonLineBreakStr;
     fn get_short_description(&self) -> NonLineBreakStr;
     fn get_long_description(&self, target: &ReportTarget) -> Option<Document>;
     fn get_expected(&self) -> Option<Vec<String>>;
-    fn get_location(&self) -> Option<Location>;
+    fn get_location_maybe(&self) -> Option<Location>;
 }
 
 pub struct ReportRequest<'source, T>
@@ -132,20 +105,11 @@ where
     T: ReportFormat,
 {
     pub report: &'source T,
+    // If you want to pass them empty, the ReportFormat
+    // trait must return None on error location.
     pub source_context: ReportSourceContext<'source>,
     pub target: ReportTarget,
     pub kind: ReportKind,
-}
-
-fn position_to_document(p: &Position) -> Document {
-    concat(vec![
-        static_text!("Line{"),
-        external_text((1 + p.line).to_string().as_str()),
-        external_text("}"),
-        static_text!("::Column{"),
-        external_text((1 + p.column).to_string().as_str()),
-        static_text!("}"),
-    ])
 }
 
 pub fn make_report_kind<R: ReportFormat>(
@@ -198,15 +162,14 @@ pub fn make_report_kind<R: ReportFormat>(
 pub fn make_report_info_start<R: ReportFormat>(
     request: &ReportRequest<R>,
 ) -> Document {
-    let location = request.report.get_location();
+    let location = request.report.get_location_maybe();
     let kind = make_report_kind(request.report, &request.kind, &request.target);
-    let error_name = request.report.get_report_name();
     let short_description = request.report.get_short_description();
     let location_doc = concat(vec![
         foreground(CYAN, external_text("-->")),
         foreground(
             MODERATE_GREEN,
-            external_text(request.source_context.src_name),
+            external_text(&request.source_context.src_name),
         ),
         location.map_or_else(combinators::empty, |x| Location::to_document(&x)),
     ]);
@@ -277,14 +240,10 @@ fn make_source_error<R: ReportFormat>(
             let (_, content, _) =
                 span.get_text_at(request.source_context.src, None);
             if span.start.line == span.end.line {
-                let remain_width =
-                    match u16::try_from(approximate_string_width(content)) {
-                        Ok(width) => request
-                            .source_context
-                            .max_line_width
-                            .saturating_sub(width),
-                        Err(_) => 0,
-                    };
+                let remain_width = request
+                    .source_context
+                    .max_line_width
+                    .saturating_sub(approximate_string_width(content));
                 let (before, _, after) = span.get_text_at(
                     request.source_context.src,
                     Some(usize::from(remain_width)),
@@ -369,11 +328,12 @@ fn make_source_error<R: ReportFormat>(
     }
 }
 
+/// Use it to render a report request.
 pub fn create_error_report<R: ReportFormat>(
     request: &ReportRequest<R>,
 ) -> Document {
     let header = make_report_info_start(request);
-    let location = request.report.get_location();
+    let location = request.report.get_location_maybe();
     let has_location = location.is_some();
     let source = location
         .map_or_else(combinators::empty, |x| make_source_error(request, x));
@@ -393,141 +353,12 @@ pub fn create_error_report<R: ReportFormat>(
     ])
 }
 
-impl ReportFormat for LexerError {
-    fn get_report_name(&self) -> NonLineBreakStr {
-        // DO NOT REMOVE THE NonLineBreakStr out of the match!
-        // It performs a compile time check on the passed string,
-        // it would panic at run time if moved to the top match.
-        match self {
-            LexerError::UnexpectedCharacter(_) => {
-                NonLineBreakStr::new("UnexpectedCharacter")
-            }
-            LexerError::UnexpectedPunctuationMatch(_, _) => {
-                NonLineBreakStr::new("Internal:UnexpectedPunctuationMatch")
-            }
-            LexerError::UnexpectedCommentMatch(_, _) => {
-                NonLineBreakStr::new("Internal:UnexpectedCommentMatch")
-            }
-            LexerError::NonFinishedLineComment(_, _) => {
-                NonLineBreakStr::new("Internal:NonFinishedLineComment")
-            }
-            LexerError::NonContentInLineComment(_, _) => {
-                NonLineBreakStr::new("Internal:NonContentInLineComment")
-            }
-            LexerError::CantCreateCommentLine(_, _) => {
-                NonLineBreakStr::new("Internal:CantCreateCommentLine")
-            }
-            LexerError::CouldntMatchBlockComment(_, _, _) => {
-                NonLineBreakStr::new("CouldntMatchBlockComment")
-            }
-            LexerError::Notu64NamedHole(_, _) => {
-                NonLineBreakStr::new("Notu64NamedHole")
-            }
-            LexerError::CantCreateIdentifier(_, _) => {
-                NonLineBreakStr::new("Internal:CantCreateIdentifier")
-            }
-            LexerError::CantTranslateToToken(_) => {
-                NonLineBreakStr::new("Internal:CantTranslateToToken")
-            }
-            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => {
-                NonLineBreakStr::new("Internal:UnexpectedOwnershipLiteralMatch")
-            }
-            LexerError::CantParseU64(_, _, _) => {
-                NonLineBreakStr::new("Internal:CantParseU64")
-            }
-        }
-    }
-    fn get_short_description(&self) -> NonLineBreakStr {
-        let common =
-            NonLineBreakStr::new("This is a bug in octizys, please report it!");
-        // DO NOT REMOVE THE NonLineBreakStr out of the match!
-        // It performs a compile time check on the passed string,
-        // it would panic at run time if moved to the top match.
-        match self {
-            LexerError::UnexpectedCharacter(_) => {
-                NonLineBreakStr::new("The provided character doesn't correspond to a valid program.")
-            }
-            LexerError::UnexpectedPunctuationMatch(_, _) => common,
-            LexerError::UnexpectedCommentMatch(_, _) => common,
-            LexerError::NonFinishedLineComment(_, _) => common,
-            LexerError::NonContentInLineComment(_, _) => common,
-            LexerError::CantCreateCommentLine(_, _) => common,
-            LexerError::CouldntMatchBlockComment(_,_, _) => NonLineBreakStr::new("We found the beginning of a block comment but couldn't finished it!"),
-            LexerError::Notu64NamedHole(_, _) => {
-                NonLineBreakStr::new("Named holes are limited to u64 integers.")
-            }
-            LexerError::CantCreateIdentifier(_, _) => common,
-            LexerError::CantTranslateToToken(_) => common,
-            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => common,
-            LexerError::CantParseU64(_, _,_) => common,
-        }
-    }
-    fn get_long_description(&self, _target: &ReportTarget) -> Option<Document> {
-        Some(external_text(match self {
-            LexerError::UnexpectedCharacter(_) => "While reading the code, we were unable to understand this particular character.",
-            LexerError::UnexpectedPunctuationMatch(_, _) => "The internal way to find punctuation marks and operators failed, it recognized a character that we didn't support!",
-            LexerError::UnexpectedCommentMatch(_, _) => "The intnernal way to find a comment failed after succeeding!",
-            LexerError::NonFinishedLineComment(_, _) => "We find the start of a comment but not the end for some reason (not unbalanced brackets)",
-            LexerError::NonContentInLineComment(_, _) => "We find a comment but we were unable to retrieve the content",
-            LexerError::CantCreateCommentLine(_, _) => "We got the content of a comment but the internalizer disagree with us that this comment has the right format!",
-            LexerError::CouldntMatchBlockComment(_,_, _) => "We were looking for a matching end for the comment.\nEither we didn't find it, and we consumed all the code looking for it.\nOr something else got wrong in the search (improbable)",
-            LexerError::Notu64NamedHole(_, _) => "Internally the named holes are stored as u64 integers.\nThe provided value for the hole is out of the bound for this range.\nPlease modify the hole value to something between 0 and 2^64 -1",
-            LexerError::CantCreateIdentifier(_, _) => "Internally we expected something to follow the same rules as an identifier, but it didn't follow those rules",
-            LexerError::CantTranslateToToken(_) => "The internal translation between simple Tokens and the CST::Tokens failed!",
-            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => "We find what seems to look like an ownership literal, but something unexpected passed while working with it!",
-            LexerError::CantParseU64(_, _,_) => "We find what seems to look like an u64 literal, but something unexpected passed while working with it!",
-        }))
-    }
-    fn get_expected(&self) -> Option<Vec<String>> {
-        match self {
-            LexerError::CouldntMatchBlockComment(_, kind, _) => {
-                let hyphens = "-".repeat(kind.len() - 1);
-                Some(vec![hyphens + "}"])
-            }
-            _ => None,
-        }
-    }
-    fn get_location(&self) -> Option<Location> {
-        Some(match self {
-            LexerError::UnexpectedCharacter(p) => Location::Position(p.clone()),
-            LexerError::UnexpectedPunctuationMatch(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::UnexpectedCommentMatch(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::NonFinishedLineComment(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::NonContentInLineComment(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CantCreateCommentLine(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CouldntMatchBlockComment(_, _, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::Notu64NamedHole(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CantCreateIdentifier(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CantTranslateToToken(token) => {
-                Location::Span(<&Token as Into<&TokenInfo>>::into(token).span)
-            }
-            LexerError::UnexpectedOwnershipLiteralMatch(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CantParseU64(_, _, span) => {
-                Location::Span(span.clone())
-            }
-        })
-    }
-}
-
-impl ReportFormat for ParseError<Position, Token, LexerError> {
+#[cfg(feature = "lalrpop")]
+impl<T, E> ReportFormat for ParseError<Position, T, E>
+where
+    E: ReportFormat,
+    T: HasLocation,
+{
     fn get_report_name(&self) -> NonLineBreakStr {
         NonLineBreakStr::new(match self {
             ParseError::InvalidToken { .. } => "Internal:InvalidToken",
@@ -576,7 +407,7 @@ impl ReportFormat for ParseError<Position, Token, LexerError> {
             ParseError::User { error } => error.get_expected(),
         }
     }
-    fn get_location(&self) -> Option<Location> {
+    fn get_location_maybe(&self) -> Option<Location> {
         match self {
             ParseError::InvalidToken { location } => {
                 Some(Location::Position(location.to_owned()))
@@ -587,11 +418,100 @@ impl ReportFormat for ParseError<Position, Token, LexerError> {
             ParseError::UnrecognizedToken {
                 token: (_, token, _),
                 ..
-            } => Some(Location::Span(<&TokenInfo>::from(token).span)),
+            } => Some(token.get_location()),
             ParseError::ExtraToken {
                 token: (_, token, _),
-            } => Some(Location::Span(<&TokenInfo>::from(token).span)),
-            ParseError::User { error } => error.get_location(),
+            } => Some(token.get_location()),
+            ParseError::User { error } => error.get_location_maybe(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum IOError {
+    FileLoadError { path: PathBuf },
+    REPlCantReadLine { error: std::io::ErrorKind },
+}
+
+impl IOError {
+    pub fn build_report_request(
+        &self,
+        target: ReportTarget,
+        alternative_name: String,
+        line_width: usize,
+    ) -> ReportRequest<IOError> {
+        let mut source_context: ReportSourceContext = Default::default();
+        source_context.max_line_width = line_width;
+        let kind = ReportKind::Error;
+        match self {
+            IOError::FileLoadError { path } => {
+                let name = path
+                    .to_str()
+                    .map(String::from)
+                    .unwrap_or_else(|| alternative_name);
+                source_context.src_name = name;
+                ReportRequest {
+                    report: self,
+                    source_context,
+                    target,
+                    kind,
+                }
+            }
+            IOError::REPlCantReadLine { .. } => {
+                source_context.src_name = alternative_name;
+                ReportRequest {
+                    report: self,
+                    source_context,
+                    target,
+                    kind,
+                }
+            }
+        }
+    }
+}
+
+impl ReportFormat for IOError {
+    fn get_expected(&self) -> Option<Vec<String>> {
+        match self {
+            IOError::FileLoadError { .. } => None,
+            IOError::REPlCantReadLine { .. } => None,
+        }
+    }
+    fn get_report_name(&self) -> NonLineBreakStr {
+        match self {
+            IOError::FileLoadError { .. } => {
+                NonLineBreakStr::new("OctizysCommandLineArgument")
+            }
+            IOError::REPlCantReadLine { .. } => {
+                NonLineBreakStr::new("OctizysREPL")
+            }
+        }
+    }
+    fn get_location_maybe(&self) -> Option<Location> {
+        match self {
+            IOError::FileLoadError { .. } => None,
+            IOError::REPlCantReadLine { .. } => None,
+        }
+    }
+    fn get_long_description(&self, _target: &ReportTarget) -> Option<Document> {
+        match self {
+            IOError::FileLoadError { path } => Some(external_text(
+                //TODO: make it more fancy
+                &format!("Couldn't open the file:{:#?}", path),
+            )),
+            IOError::REPlCantReadLine { error } => Some(external_text(
+                &format!("While trying to read a line:{:}", error),
+            )),
+        }
+    }
+    fn get_short_description(&self) -> NonLineBreakStr {
+        match self {
+            IOError::FileLoadError { .. } => {
+                NonLineBreakStr::new("Can't open a file!")
+            }
+            IOError::REPlCantReadLine { .. } => {
+                NonLineBreakStr::new("Can't read line!")
+            }
         }
     }
 }

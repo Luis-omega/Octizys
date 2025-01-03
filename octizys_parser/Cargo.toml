@@ -15,6 +15,7 @@ octizys_formatter = {path = "../octizys_formatter",features=["cst"]}
 lalrpop-util = {workspace=true}
 paste = {workspace=true}
 regex = {workspace=true}
+log.workspace = true
 
 
 

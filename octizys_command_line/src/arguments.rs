@@ -4,6 +4,20 @@ use std::path::PathBuf;
 #[derive(
     ValueEnum, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
 )]
+pub enum DebugLevel {
+    #[clap(name = "error", help = "Only log Errors.")]
+    Error,
+    #[clap(name = "info", help = "Log Errors and Info.")]
+    Info,
+    #[clap(name = "debug", help = "Log Debug, Info and Errors.")]
+    Debug,
+    #[clap(name = "trace", help = "Log everything.")]
+    Trace,
+}
+
+#[derive(
+    ValueEnum, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub enum AvailableRenderers {
     #[clap(
         name = "plain",
@@ -25,68 +39,6 @@ pub enum AvailableRenderers {
         help = "For terminals that support the 24 bits (true color) color scheme."
     )]
     AnsiC24,
-}
-
-#[derive(
-    ValueEnum, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
-pub enum DebugFormatOption {
-    #[clap(
-        name = "pretty",
-        help = "Use the rust pretty print debug option {:#?}."
-    )]
-    PrettyDebug,
-    #[clap(name = "normal", help = "Use the rust regular debug option {:?}.")]
-    Debug,
-    #[clap(
-        name = "equiv",
-        help = "Use the Equivalence trait (defined in octizys) to create a S-Expression."
-    )]
-    EquivalenceRepresentation,
-}
-
-#[derive(
-    ValueEnum, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
-pub enum Phase {
-    #[clap(name = "lexer", help = "Show the lexer token stream.")]
-    Lexer,
-    #[clap(name = "parser", help = "Show the parsing result (currently CST).")]
-    Parser,
-    #[clap(
-        name = "documents",
-        help = "Show the `Document` generated for structures before rendering."
-    )]
-    Document,
-    #[clap(name = "ast", help = "Show the AST.")]
-    Ast,
-    #[clap(name = "typed-ast", help = "Show the AST after type inference.")]
-    FullyTypedAST,
-    #[clap(name = "core", help = "Show the desugared code `Core`.")]
-    Core,
-}
-
-#[derive(Parser, Clone, Debug)]
-#[group(required = true, multiple = false)]
-pub struct DebugCommand {
-    #[arg(
-        short = 's',
-        long = "string",
-        help = "A string to be used to test the pipeline."
-    )]
-    pub source_string: Option<String>,
-    #[arg(
-        short = 'f',
-        long = "file",
-        help = "A file to be used to test the pipeline."
-    )]
-    pub source_path: Option<PathBuf>,
-    #[arg(
-        short = 'p',
-        long = "phase",
-        help = "A compiler phase that you want the debug to show the result for."
-    )]
-    pub phases: Vec<Phase>,
 }
 
 #[derive(Parser, Clone, Debug)]
@@ -161,6 +113,11 @@ This also disables the color output."
     )]
     pub use_machine_representation: bool,
     #[arg(
+        long = "advanced-errors",
+        help = "With this option all the errors become more technical and less beginner friendly."
+    )]
+    pub use_advanced_errors: bool,
+    #[arg(
         short = 'r',
         long = "renderer",
         default_value = "ansi24",
@@ -195,14 +152,6 @@ pub enum Commands {
             help = "A file to place the compilation output."
         )]
         output: Option<PathBuf>,
-    },
-    #[command(name = "debug")]
-    #[command(
-        about = "Run the compiler cycle but print to standard output all intermediate results."
-    )]
-    Debug {
-        #[command(flatten)]
-        command: DebugCommand,
     },
     #[command(name = "format")]
     // TODO: allow format of multiple directories and files.
@@ -248,14 +197,13 @@ pub struct Arguments {
         help = "Show the passed arguments and exit."
     )]
     pub show_arguments: bool,
-    //TODO: handle it
     #[arg(
-        long = "debug-format",
-        name = "DEBUG_FORMAT",
-        default_value = "normal",
-        help = "The option used inside format to show intermediate structures"
+        short = 'd',
+        long = "debug-level",
+        default_value = "info",
+        help = "Set the debug level."
     )]
-    pub display_format: DebugFormatOption,
+    pub debug_level: DebugLevel,
     #[command(flatten)]
     pub formatter_configuration: FormatterConfiguration,
 }

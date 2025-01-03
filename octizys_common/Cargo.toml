@@ -10,6 +10,10 @@ octizys_text_store={path="../octizys_text_store"}
 octizys_pretty={path="../octizys_pretty"}
 regex = {workspace=true}
 string-interner = {workspace=true}
+lalrpop-util = {workspace = true,optional=true}
 
 [dev-dependencies]
 paste = {workspace=true}
+
+[features]
+lalrpop = ["lalrpop-util"]

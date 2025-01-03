@@ -4,6 +4,18 @@ use crate::document::*;
 use crate::highlight::{Color, Emphasis};
 use octizys_text_store::store::{NonLineBreakStr, Store};
 
+/// Takes a literal string and creates a document with it.
+/// The string must not have line breaks, that will
+/// cause a panic at compilation time (ie, compilation error).
+#[macro_export]
+macro_rules! static_text {
+    ($text:literal) => {
+        $crate::combinators::static_str(
+            ::octizys_text_store::store::NonLineBreakStr::new($text),
+        )
+    };
+}
+
 pub fn empty() -> Document {
     Document::empty()
 }
@@ -74,8 +86,9 @@ pub fn external_text(words: &str) -> Document {
     Document::external_text(words)
 }
 
-/// Takes a static str reference that is guaranteed at compile
-/// time to not have `\n` inside and build a document.
+/// Do not use, use instead `static_text`.
+/// If you use this, the safe way is to create [`word`]
+/// at compilation time!
 pub fn static_str(word: NonLineBreakStr) -> Document {
     Document::static_str(word)
 }

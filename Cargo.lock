@@ -535,6 +535,7 @@ dependencies = [
 name = "octizys_common"
 version = "0.1.0"
 dependencies = [
+ "lalrpop-util",
  "octizys_pretty",
  "octizys_text_store",
  "paste",
@@ -592,6 +593,7 @@ version = "0.1.0"
 dependencies = [
  "lalrpop",
  "lalrpop-util",
+ "log",
  "octizys_common",
  "octizys_cst",
  "octizys_formatter",

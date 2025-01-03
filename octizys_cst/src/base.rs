@@ -7,7 +7,7 @@ use crate::comments::CommentsInfo;
 use octizys_common::equivalence::Equivalence;
 use octizys_common::identifier::Identifier;
 use octizys_common::logic_path::LogicPath;
-use octizys_common::span::{Position, Span};
+use octizys_common::span::{HasLocation, Location, Position, Span};
 use octizys_macros::Equivalence;
 use octizys_pretty::combinators::static_str;
 use octizys_text_store::store::NonLineBreakStr;
@@ -125,6 +125,12 @@ make_delimiter_type!(Braces, "{", "}");
 pub struct TokenInfo {
     pub comments: CommentsInfo,
     pub span: Span,
+}
+
+impl HasLocation for TokenInfo {
+    fn get_location(&self) -> octizys_common::span::Location {
+        Location::Span(self.span.clone())
+    }
 }
 
 impl TokenInfo {

@@ -1,5 +1,11 @@
 use std::{fmt::Display, ops::Add};
 
+use octizys_pretty::{
+    combinators::{concat, external_text},
+    document::Document,
+    static_text,
+};
+
 /// Represents a Position on a file.
 /// The Eq and Ord instances are based only on the index, is
 /// user responsibility to be congruent with this.
@@ -210,4 +216,47 @@ impl Span {
             }
         }
     }
+}
+
+/// A location in source text.
+#[derive(Debug, Copy, Clone, Hash)]
+pub enum Location {
+    Span(Span),
+    Position(Position),
+}
+
+pub trait HasLocation {
+    fn get_location(&self) -> Location;
+}
+
+impl Location {
+    pub fn to_document(&self) -> Document {
+        match self {
+            Location::Span(s) => {
+                let start = position_to_document(&s.start);
+                let end = position_to_document(&s.end);
+                concat(vec![
+                    static_text!("::From::"),
+                    start,
+                    static_text!("::To::"),
+                    end,
+                ])
+            }
+            Location::Position(p) => {
+                let pos = position_to_document(p);
+                static_text!("::At::") + pos
+            }
+        }
+    }
+}
+
+fn position_to_document(p: &Position) -> Document {
+    concat(vec![
+        static_text!("Line{"),
+        external_text((1 + p.line).to_string().as_str()),
+        external_text("}"),
+        static_text!("::Column{"),
+        external_text((1 + p.column).to_string().as_str()),
+        static_text!("}"),
+    ])
 }
