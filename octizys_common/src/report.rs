@@ -25,7 +25,7 @@ use octizys_text_store::store::approximate_string_width;
 pub struct ReportSourceContext<'source> {
     pub src: &'source str,
     pub src_name: String,
-    pub max_line_width: u16,
+    pub max_line_width: usize,
 }
 
 impl<'a> Default for ReportSourceContext<'a> {
@@ -240,14 +240,10 @@ fn make_source_error<R: ReportFormat>(
             let (_, content, _) =
                 span.get_text_at(request.source_context.src, None);
             if span.start.line == span.end.line {
-                let remain_width =
-                    match u16::try_from(approximate_string_width(content)) {
-                        Ok(width) => request
-                            .source_context
-                            .max_line_width
-                            .saturating_sub(width),
-                        Err(_) => 0,
-                    };
+                let remain_width = request
+                    .source_context
+                    .max_line_width
+                    .saturating_sub(approximate_string_width(content));
                 let (before, _, after) = span.get_text_at(
                     request.source_context.src,
                     Some(usize::from(remain_width)),
@@ -332,6 +328,7 @@ fn make_source_error<R: ReportFormat>(
     }
 }
 
+/// Use it to render a report request.
 pub fn create_error_report<R: ReportFormat>(
     request: &ReportRequest<R>,
 ) -> Document {
@@ -441,7 +438,7 @@ impl IOError {
         &self,
         target: ReportTarget,
         alternative_name: String,
-        line_width: u16,
+        line_width: usize,
     ) -> ReportRequest<IOError> {
         let mut source_context: ReportSourceContext = Default::default();
         source_context.max_line_width = line_width;

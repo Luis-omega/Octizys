@@ -29,11 +29,11 @@ pub enum OctizysParserError {
 }
 
 impl OctizysParserError {
-    fn build_report_request(
+    pub fn build_report_request(
         &self,
         target: ReportTarget,
         alternative_name: String,
-        line_width: u16,
+        line_width: usize,
     ) -> ReportRequest<OctizysParserError> {
         match self {
             OctizysParserError::AtParsing {
@@ -129,7 +129,7 @@ impl ReportFormat for OctizysParserError {
     }
 }
 
-fn parse_string(
+pub fn parse_string(
     source: &str,
     source_name: Option<PathBuf>,
     store: Rc<RefCell<Store>>,
