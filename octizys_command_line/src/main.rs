@@ -9,7 +9,6 @@ use octizys_common::report::{
 use octizys_cst::top::Top;
 use octizys_formatter::{cst::PrettyCSTConfiguration, to_document::ToDocument};
 use octizys_parser::parser::{parse_file, parse_string};
-use octizys_pretty::highlight;
 use octizys_pretty::{
     combinators::{external_text, foreground},
     document::Document,
@@ -192,6 +191,7 @@ fn format_file(
                     store,
                     options,
                 );
+                //TODO: use the error report mechanism for this!
                 eprintln!(
                     "We failed to format! Couln't parse the second time, showing original resutl:\n{}",origina_string
                 );
@@ -260,7 +260,7 @@ fn repl(
     }
 }
 
-//TODO: add debug level
+// TODO: Set the exit code error for the shell
 fn main() {
     let arguments = crate::arguments::Arguments::parse();
     let debug_level = match arguments.debug_level {
