@@ -11,6 +11,8 @@ use octizys_pretty::{
     combinators::external_text, document::Document, store::NonLineBreakStr,
 };
 
+use crate::tokens::Token;
+
 #[derive(Debug, Clone, Equivalence)]
 pub enum LexerReportKind {
     UnexpectedCharacter,
@@ -44,7 +46,7 @@ pub enum LexerReportKind {
     /// [`Token`] in this file to a [`octizys_cst::base::Token`],
     /// they are mainly used in the parser and shouldn't fail!
     /// this is a bug.
-    CantTranslateToToken,
+    CantTranslateToToken(Token),
     /// We found a match for a ownership_literal but
     /// then it wasn't a match! most probably the
     /// regex was update without updating the handler!
@@ -91,7 +93,7 @@ impl ReportFormat for LexerReportKind {
             LexerReportKind::CantCreateIdentifier => {
                 NonLineBreakStr::new("Internal:CantCreateIdentifier")
             }
-            LexerReportKind::CantTranslateToToken => {
+            LexerReportKind::CantTranslateToToken(_) => {
                 NonLineBreakStr::new("Internal:CantTranslateToToken")
             }
             LexerReportKind::UnexpectedOwnershipLiteralMatch => {
@@ -122,7 +124,7 @@ impl ReportFormat for LexerReportKind {
                 NonLineBreakStr::new("Named holes are limited to u64 integers.")
             }
             LexerReportKind::CantCreateIdentifier => common,
-            LexerReportKind::CantTranslateToToken => common,
+            LexerReportKind::CantTranslateToToken(_) => common,
             LexerReportKind::UnexpectedOwnershipLiteralMatch => common,
             LexerReportKind::CantParseU64(_)=> common,
         }
@@ -138,7 +140,7 @@ impl ReportFormat for LexerReportKind {
             LexerReportKind::CouldntMatchBlockComment(_)=> "We were looking for a matching end for the comment.\nEither we didn't find it, and we consumed all the code looking for it.\nOr something else got wrong in the search (improbable)",
             LexerReportKind::Notu64NamedHole => "Internally the named holes are stored as u64 integers.\nThe provided value for the hole is out of the bound for this range.\nPlease modify the hole value to something between 0 and 2^64 -1",
             LexerReportKind::CantCreateIdentifier => "Internally we expected something to follow the same rules as an identifier, but it didn't follow those rules",
-            LexerReportKind::CantTranslateToToken => "The internal translation between simple Tokens and the CST::Tokens failed!",
+            LexerReportKind::CantTranslateToToken(_) => "The internal translation between simple Tokens and the CST::Tokens failed!",
             LexerReportKind::UnexpectedOwnershipLiteralMatch => "We find what seems to look like an ownership literal, but something unexpected passed while working with it!",
             LexerReportKind::CantParseU64(_)=> "We find what seems to look like an u64 literal, but something unexpected passed while working with it!",
         }))

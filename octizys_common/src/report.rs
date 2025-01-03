@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 #[cfg(feature = "lalrpop")]
 use crate::span::{HasLocation, Position};
 #[cfg(feature = "lalrpop")]
@@ -22,7 +24,7 @@ use octizys_text_store::store::approximate_string_width;
 #[derive(Debug)]
 pub struct ReportSourceContext<'source> {
     pub src: &'source str,
-    pub src_name: &'source str,
+    pub src_name: String,
     pub max_line_width: u16,
 }
 
@@ -30,7 +32,7 @@ impl<'a> Default for ReportSourceContext<'a> {
     fn default() -> Self {
         ReportSourceContext {
             src: &"",
-            src_name: &"octizys_repl",
+            src_name: String::from("octizys_repl"),
             max_line_width: 80,
         }
     }
@@ -103,6 +105,8 @@ where
     T: ReportFormat,
 {
     pub report: &'source T,
+    // If you want to pass them empty, the ReportFormat
+    // trait must return None on error location.
     pub source_context: ReportSourceContext<'source>,
     pub target: ReportTarget,
     pub kind: ReportKind,
@@ -165,7 +169,7 @@ pub fn make_report_info_start<R: ReportFormat>(
         foreground(CYAN, external_text("-->")),
         foreground(
             MODERATE_GREEN,
-            external_text(request.source_context.src_name),
+            external_text(&request.source_context.src_name),
         ),
         location.map_or_else(combinators::empty, |x| Location::to_document(&x)),
     ]);
@@ -422,6 +426,95 @@ where
                 token: (_, token, _),
             } => Some(token.get_location()),
             ParseError::User { error } => error.get_location_maybe(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum IOError {
+    FileLoadError { path: PathBuf },
+    REPlCantReadLine { error: std::io::ErrorKind },
+}
+
+impl IOError {
+    pub fn build_report_request(
+        &self,
+        target: ReportTarget,
+        alternative_name: String,
+        line_width: u16,
+    ) -> ReportRequest<IOError> {
+        let mut source_context: ReportSourceContext = Default::default();
+        source_context.max_line_width = line_width;
+        let kind = ReportKind::Error;
+        match self {
+            IOError::FileLoadError { path } => {
+                let name = path
+                    .to_str()
+                    .map(String::from)
+                    .unwrap_or_else(|| alternative_name);
+                source_context.src_name = name;
+                ReportRequest {
+                    report: self,
+                    source_context,
+                    target,
+                    kind,
+                }
+            }
+            IOError::REPlCantReadLine { .. } => {
+                source_context.src_name = alternative_name;
+                ReportRequest {
+                    report: self,
+                    source_context,
+                    target,
+                    kind,
+                }
+            }
+        }
+    }
+}
+
+impl ReportFormat for IOError {
+    fn get_expected(&self) -> Option<Vec<String>> {
+        match self {
+            IOError::FileLoadError { .. } => None,
+            IOError::REPlCantReadLine { .. } => None,
+        }
+    }
+    fn get_report_name(&self) -> NonLineBreakStr {
+        match self {
+            IOError::FileLoadError { .. } => {
+                NonLineBreakStr::new("OctizysCommandLineArgument")
+            }
+            IOError::REPlCantReadLine { .. } => {
+                NonLineBreakStr::new("OctizysREPL")
+            }
+        }
+    }
+    fn get_location_maybe(&self) -> Option<Location> {
+        match self {
+            IOError::FileLoadError { .. } => None,
+            IOError::REPlCantReadLine { .. } => None,
+        }
+    }
+    fn get_long_description(&self, _target: &ReportTarget) -> Option<Document> {
+        match self {
+            IOError::FileLoadError { path } => Some(external_text(
+                //TODO: make it more fancy
+                &format!("Couldn't open the file:{:#?}", path),
+            )),
+            IOError::REPlCantReadLine { error } => Some(external_text(
+                &format!("While trying to read a line:{:}", error),
+            )),
+        }
+    }
+    fn get_short_description(&self) -> NonLineBreakStr {
+        match self {
+            IOError::FileLoadError { .. } => {
+                NonLineBreakStr::new("Can't open a file!")
+            }
+            IOError::REPlCantReadLine { .. } => {
+                NonLineBreakStr::new("Can't read line!")
+            }
         }
     }
 }

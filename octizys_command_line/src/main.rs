@@ -306,7 +306,7 @@ fn println_result<'s>(
                 Some(name) => name,
                 None => String::from("OctizysCLI"),
             };
-            error_context.src_name = &source_name;
+            error_context.src_name = source_name;
             let request = ReportRequest {
                 report: t,
                 source_context: error_context,

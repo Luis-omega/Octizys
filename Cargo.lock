@@ -593,6 +593,7 @@ version = "0.1.0"
 dependencies = [
  "lalrpop",
  "lalrpop-util",
+ "log",
  "octizys_common",
  "octizys_cst",
  "octizys_formatter",

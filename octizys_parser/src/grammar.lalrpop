@@ -32,6 +32,7 @@ use octizys_common::logic_path::LogicPath;
 use octizys_common::identifier::Identifier;
 use octizys_common::span::Position;
 use crate::lexer;
+use crate::tokens;
 
 grammar;
 
@@ -165,13 +166,13 @@ boxed<T> : Box<T> = T => Box::new(<>);
 
 // --------------------- Terminal translation ---------------------
 
-pub string :Token<StringLiteral> = StringLiteral =>? lexer::string_token_to_token(<>);
+pub string :Token<StringLiteral> = StringLiteral =>? tokens::string_token_to_token(<>);
 
-pub interpolation_string :Token<InterpolationString> = InterpolationString =>? lexer::interpolation_token_to_token(<>);
+pub interpolation_string :Token<InterpolationString> = InterpolationString =>? tokens::interpolation_token_to_token(<>);
 
-uint : Token<UintLiteral> = UintLiteral =>? lexer::uint_token_to_token(<>);
+uint : Token<UintLiteral> = UintLiteral =>? tokens::uint_token_to_token(<>);
 
-ufloat : Token<UFloatingPointLiteral> = UFloatLiteral =>? lexer::ufloat_token_to_token(<>);
+ufloat : Token<UFloatingPointLiteral> = UFloatLiteral =>? tokens::ufloat_token_to_token(<>);
 
 logic_path: Token<LogicPath>  ={
   <l:identifier> <s:"::"> => {
@@ -189,7 +190,7 @@ logic_path: Token<LogicPath>  ={
   },
 };
 
-identifier : Token<Identifier> = Identifier =>? lexer::identifier_token_to_token(<>);
+identifier : Token<Identifier> = Identifier =>? tokens::identifier_token_to_token(<>);
 operator_name : Token<OperatorName> = {
       "?" => base::Token{value: OperatorName::Interrogation,info:<>.into()}
       ,"!" => base::Token{value: OperatorName::Exclamation,info:<>.into()}
@@ -235,7 +236,7 @@ operator_name : Token<OperatorName> = {
       ,"\\" => base::Token{value: OperatorName::LambdaStart,info:<>.into()}
 };
 
-selector : Token<Identifier> = Selector =>? lexer::selector_token_to_token(<>);
+selector : Token<Identifier> = Selector =>? tokens::selector_token_to_token(<>);
 
 //We can hack the lexer to do the split of the path from the
 //head, but we choose to do this instead.
@@ -841,7 +842,7 @@ pub top : Top = {
     let last_comment_converted : Option<Comment> =
       match last_comment{
         Some(comment_token)=>{
-          let comment = lexer::last_comment_token_to_token(comment_token)?;
+          let comment = tokens::last_comment_token_to_token(comment_token)?;
           Some(comment.value)
           }
         None => None
