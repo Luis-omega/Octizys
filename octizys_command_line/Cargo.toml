@@ -13,7 +13,7 @@ path = "src/main.rs"
 clap = { version = "4.5.23", features = ["derive"] }
 lalrpop-util = {workspace=true}
 log.workspace = true
-octizys_common = { version = "0.1.0", path = "../octizys_common" }
+octizys_common = { version = "0.1.0", path = "../octizys_common" , features=["lalrpop"]}
 octizys_cst = { version = "0.1.0", path = "../octizys_cst" }
 octizys_formatter = { version = "0.1.0", path = "../octizys_formatter" }
 octizys_macros = { version = "0.1.0", path = "../octizys_macros" }

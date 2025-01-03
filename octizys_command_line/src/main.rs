@@ -1,15 +1,15 @@
 mod arguments;
-mod error_report;
 
-use crate::error_report::create_error_report;
 use arguments::{
     DebugCommand, DebugFormatOption, FormatterConfiguration, Phase,
 };
 use clap::Parser;
-use error_report::{
-    ReportFormat, ReportKind, ReportRequest, ReportSourceContext, ReportTarget,
-};
 use lalrpop_util::ParseError;
+use octizys_common::report::{
+    create_error_report, ReportFormat, ReportKind, ReportRequest,
+    ReportSourceContext, ReportTarget,
+};
+use octizys_common::span::Location;
 use octizys_common::{equivalence::Equivalence, span::Position};
 use octizys_cst::{imports::Import, top::Top, types::Type};
 use octizys_formatter::{cst::PrettyCSTConfiguration, to_document::ToDocument};
@@ -122,10 +122,10 @@ impl<'source> ReportFormat for OctizysError {
         }
     }
 
-    fn get_location(&self) -> Option<error_report::Location> {
+    fn get_location_maybe(&self) -> Option<Location> {
         match self {
-            OctizysError::LexicalError(e, _) => e.get_location(),
-            OctizysError::ParseError(e, _) => e.get_location(),
+            OctizysError::LexicalError(e, _) => e.get_location_maybe(),
+            OctizysError::ParseError(e, _) => e.get_location_maybe(),
             OctizysError::FileLoadError { path } => None,
             OctizysError::REPlCantReadLine { error } => None,
         }

@@ -2,20 +2,19 @@ use octizys_common::{
     equivalence::Equivalence,
     identifier::Identifier,
     logic_path::LogicPath,
-    span::{Position, Span},
+    report::{ReportFormat, ReportTarget},
+    span::{HasLocation, Location, Position, Span},
 };
 use octizys_cst::{
     base::{TokenInfo, TokenInfoWithPhantom},
-    comments::CommentKind,
+    comments::{
+        Comment, CommentBlock, CommentBraceKind, CommentKind, CommentLine,
+        CommentLineContent, CommentsInfo, LineCommentStart,
+    },
+    expressions::Let,
     literals::{
         InterpolationString, StringLiteral, UFloatingPointLiteral, UintKind,
         UintLiteral,
-    },
-};
-use octizys_cst::{
-    comments::{
-        Comment, CommentBlock, CommentBraceKind, CommentLine,
-        CommentLineContent, CommentsInfo, LineCommentStart,
     },
     types::{OwnershipLiteral, OwnershipVariable},
 };
@@ -23,6 +22,7 @@ use octizys_macros::Equivalence;
 use octizys_pretty::{
     combinators::{concat, empty, external_text, hard_break, nest, repeat},
     document::Document,
+    store::NonLineBreakStr,
 };
 use octizys_text_store::store::{approximate_string_width, Store};
 
@@ -170,127 +170,145 @@ pub enum LexerError {
     ),
 }
 
-/*
-            "\s"  // all spaces
-            "\n"  // line break
+impl HasLocation for LexerError {
+    fn get_location(&self) -> Location {
+        match self {
+            LexerError::UnexpectedCharacter(p) => Location::Position(p.clone()),
+            LexerError::UnexpectedPunctuationMatch(_, span) => {
+                Location::Span(span.clone())
+            }
+            LexerError::UnexpectedCommentMatch(_, span) => {
+                Location::Span(span.clone())
+            }
+            LexerError::NonFinishedLineComment(_, span) => {
+                Location::Span(span.clone())
+            }
+            LexerError::NonContentInLineComment(_, span) => {
+                Location::Span(span.clone())
+            }
+            LexerError::CantCreateCommentLine(_, span) => {
+                Location::Span(span.clone())
+            }
+            LexerError::CouldntMatchBlockComment(_, _, span) => {
+                Location::Span(span.clone())
+            }
+            LexerError::Notu64NamedHole(_, span) => {
+                Location::Span(span.clone())
+            }
+            LexerError::CantCreateIdentifier(_, span) => {
+                Location::Span(span.clone())
+            }
+            LexerError::CantTranslateToToken(token) => {
+                Location::Span(<&Token as Into<&TokenInfo>>::into(token).span)
+            }
+            LexerError::UnexpectedOwnershipLiteralMatch(_, span) => {
+                Location::Span(span.clone())
+            }
+            LexerError::CantParseU64(_, _, span) => {
+                Location::Span(span.clone())
+            }
+        }
+    }
+}
 
-            "?" => Ok(Token::Interrogation(info)),
-            "#" => Ok(Token::Hash(info)),
-            "," => Ok(Token::Comma(info)),
-            ";" => Ok(Token::StatementEnd(info)),
-            "+" => Ok(Token::Plus(info)),
-            "^" => Ok(Token::Power(info)),
-            "%" => Ok(Token::Module(info)),
-            "@" => Ok(Token::At(info)),
-
-            SELECTOR
-            "." => Ok(Token::Dot(info)),
-
-            ":" => Ok(Token::Colon(info)),
-            "::" => Ok(Token::ModuleSeparator(info)),
-
-            "-" => Ok(Token::Minus(info)),
-            "-}" //close comment block
-            "->" => Ok(Token::RightArrow(info)),
-            "--" // close comment block
-            "--}" //close comment block
-            "---}" //close comment block
-            "-- |"
-            "----}" //close comment block
-
-
-            "|" => Ok(Token::Pipe(info)),
-            "|>" => Ok(Token::CompositionLeft(info)),
-            "||" => Ok(Token::Or(info)),
-
-            "<" => Ok(Token::LessThan(info)),
-            "<|" => Ok(Token::CompositionRight(info)),
-            "<|>" //TODO
-            "<=" => Ok(Token::LessOrEqual(info)),
-            "<-" => Ok(Token::LeftArrow(info)),
-            "<$" => Ok(Token::MapConstLeft(info)),
-            "<$>" => Ok(Token::Map(info)),
-            "<*" => Ok(Token::ApplicativeLeft(info)),
-            "<<" => ShiftLeft,
-            "<*>" => Ok(Token::Appliative(info)),
-            "<&>" //TODO
-            "<?>" //TODO
-//
-            "*" => Ok(Token::Star(info)),
-            "*>" => Ok(Token::ApplicativeRight(info)),
-
-            "=" => Ok(Token::Asignation(info)),
-            "==" => Ok(Token::Equality(info)),
-
-            "!" => Ok(Token::Exclamation(info)),
-            "!=" => Ok(Token::NotEqual(info)),
-
-            ">" => Ok(Token::MoreThan(info)),
-            ">>" => Ok(Token::ShiftRight(info)),
-            ">=" => Ok(Token::MoreOrEqual(info)),
-
-            "/" => Ok(Token::Div(info)),
-            "//" // comments
-
-            "&&" => Ok(Token::And(info)),
-            "&" => Ok(Token::ReverseApplication(info)),
-
-            "$" => Ok(Token::DollarApplication(info)),
-            "$>" => Ok(Token::MapConstRight(info)),
-
-            "(" => Ok(Token::LParen(info)),
-            ")" => Ok(Token::RParen(info)),
-
-            "[" => Ok(Token::LBracket(info)),
-            "]" => Ok(Token::RBracket(info)),
-
-
-            "{" => Ok(Token::LBrace(info)),
-            "{-" //comment block starts
-            "{--"
-            "{---"
-            "{----"
-
-            "}" => Ok(Token::RBrace(info)),
-
-
-            "\\" => Ok(Token::LambdaStart(info)),
-
-            UINT_WITH_TYPE // like 10_usize or 88_u32
-            UINT
-            FLOAT //shares conflict with two.
-            "0(0|_)*" // Zero
-            "0o[0-9]+" // octal
-            "0x[0-9]+" // hex
-
-            "'" // char?
-
-            "\"" // string start or ends
-    HOLE
-    NamedHole
-    Identifier  // shares start with two groups
-    Ownership_variables // IDENTIFIER'
-
-            "f#\"" //interpolation string
-
-            "r#\"" //raw string start
-            "r##\""
-            "r###\""
-            "r####\""
-
-            "\"#" //raw/interpolation string end
-            "\"##"
-            "\"###"
-            "\"####"
-
-    INFIX_IDENTIFIER
-
-
-    //TODO: add pragmas syntax
-
-    //TODO: write a spec with all the symbols and meanings
-    //TODO: define unit test for all
-*/
+impl ReportFormat for LexerError {
+    fn get_report_name(&self) -> NonLineBreakStr {
+        // DO NOT REMOVE THE NonLineBreakStr out of the match!
+        // It performs a compile time check on the passed string,
+        // it would panic at run time if moved to the top match.
+        match self {
+            LexerError::UnexpectedCharacter(_) => {
+                NonLineBreakStr::new("UnexpectedCharacter")
+            }
+            LexerError::UnexpectedPunctuationMatch(_, _) => {
+                NonLineBreakStr::new("Internal:UnexpectedPunctuationMatch")
+            }
+            LexerError::UnexpectedCommentMatch(_, _) => {
+                NonLineBreakStr::new("Internal:UnexpectedCommentMatch")
+            }
+            LexerError::NonFinishedLineComment(_, _) => {
+                NonLineBreakStr::new("Internal:NonFinishedLineComment")
+            }
+            LexerError::NonContentInLineComment(_, _) => {
+                NonLineBreakStr::new("Internal:NonContentInLineComment")
+            }
+            LexerError::CantCreateCommentLine(_, _) => {
+                NonLineBreakStr::new("Internal:CantCreateCommentLine")
+            }
+            LexerError::CouldntMatchBlockComment(_, _, _) => {
+                NonLineBreakStr::new("CouldntMatchBlockComment")
+            }
+            LexerError::Notu64NamedHole(_, _) => {
+                NonLineBreakStr::new("Notu64NamedHole")
+            }
+            LexerError::CantCreateIdentifier(_, _) => {
+                NonLineBreakStr::new("Internal:CantCreateIdentifier")
+            }
+            LexerError::CantTranslateToToken(_) => {
+                NonLineBreakStr::new("Internal:CantTranslateToToken")
+            }
+            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => {
+                NonLineBreakStr::new("Internal:UnexpectedOwnershipLiteralMatch")
+            }
+            LexerError::CantParseU64(_, _, _) => {
+                NonLineBreakStr::new("Internal:CantParseU64")
+            }
+        }
+    }
+    fn get_short_description(&self) -> NonLineBreakStr {
+        let common =
+            NonLineBreakStr::new("This is a bug in octizys, please report it!");
+        // DO NOT REMOVE THE NonLineBreakStr out of the match!
+        // It performs a compile time check on the passed string,
+        // it would panic at run time if moved to the top match.
+        match self {
+            LexerError::UnexpectedCharacter(_) => {
+                NonLineBreakStr::new("The provided character doesn't correspond to a valid program.")
+            }
+            LexerError::UnexpectedPunctuationMatch(_, _) => common,
+            LexerError::UnexpectedCommentMatch(_, _) => common,
+            LexerError::NonFinishedLineComment(_, _) => common,
+            LexerError::NonContentInLineComment(_, _) => common,
+            LexerError::CantCreateCommentLine(_, _) => common,
+            LexerError::CouldntMatchBlockComment(_,_, _) => NonLineBreakStr::new("We found the beginning of a block comment but couldn't finished it!"),
+            LexerError::Notu64NamedHole(_, _) => {
+                NonLineBreakStr::new("Named holes are limited to u64 integers.")
+            }
+            LexerError::CantCreateIdentifier(_, _) => common,
+            LexerError::CantTranslateToToken(_) => common,
+            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => common,
+            LexerError::CantParseU64(_, _,_) => common,
+        }
+    }
+    fn get_long_description(&self, _target: &ReportTarget) -> Option<Document> {
+        Some(external_text(match self {
+            LexerError::UnexpectedCharacter(_) => "While reading the code, we were unable to understand this particular character.",
+            LexerError::UnexpectedPunctuationMatch(_, _) => "The internal way to find punctuation marks and operators failed, it recognized a character that we didn't support!",
+            LexerError::UnexpectedCommentMatch(_, _) => "The intnernal way to find a comment failed after succeeding!",
+            LexerError::NonFinishedLineComment(_, _) => "We find the start of a comment but not the end for some reason (not unbalanced brackets)",
+            LexerError::NonContentInLineComment(_, _) => "We find a comment but we were unable to retrieve the content",
+            LexerError::CantCreateCommentLine(_, _) => "We got the content of a comment but the internalizer disagree with us that this comment has the right format!",
+            LexerError::CouldntMatchBlockComment(_,_, _) => "We were looking for a matching end for the comment.\nEither we didn't find it, and we consumed all the code looking for it.\nOr something else got wrong in the search (improbable)",
+            LexerError::Notu64NamedHole(_, _) => "Internally the named holes are stored as u64 integers.\nThe provided value for the hole is out of the bound for this range.\nPlease modify the hole value to something between 0 and 2^64 -1",
+            LexerError::CantCreateIdentifier(_, _) => "Internally we expected something to follow the same rules as an identifier, but it didn't follow those rules",
+            LexerError::CantTranslateToToken(_) => "The internal translation between simple Tokens and the CST::Tokens failed!",
+            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => "We find what seems to look like an ownership literal, but something unexpected passed while working with it!",
+            LexerError::CantParseU64(_, _,_) => "We find what seems to look like an u64 literal, but something unexpected passed while working with it!",
+        }))
+    }
+    fn get_expected(&self) -> Option<Vec<String>> {
+        match self {
+            LexerError::CouldntMatchBlockComment(_, kind, _) => {
+                let hyphens = "-".repeat(kind.len() - 1);
+                Some(vec![hyphens + "}"])
+            }
+            _ => None,
+        }
+    }
+    fn get_location_maybe(&self) -> Option<Location> {
+        Some(self.get_location())
+    }
+}
 
 /// An abstraction for a [`Stream`] of characters over a [`str`].
 #[derive(Debug)]
@@ -1036,6 +1054,12 @@ pub enum Token {
     LastComments(#[equivalence(ignore)] TokenInfo, Vec<Comment>),
     OwnershipLiteral(#[equivalence(ignore)] TokenInfo, OwnershipLiteral),
     OwnershipVariable(#[equivalence(ignore)] TokenInfo, OwnershipVariable),
+}
+
+impl HasLocation for Token {
+    fn get_location(&self) -> Location {
+        <&TokenInfo>::from(self).get_location()
+    }
 }
 
 impl From<Token> for TokenInfo {
