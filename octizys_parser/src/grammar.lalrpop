@@ -44,7 +44,7 @@ grammar;
 
 extern {
     type Location = Position;
-    type Error = lexer::LexerError;
+    type Error = crate::report::OctizysParserReport;
 
     enum lexer::Token {
       "?" => lexer::Token::Interrogation(TokenInfo)

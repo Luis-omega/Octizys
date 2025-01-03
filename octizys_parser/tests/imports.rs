@@ -1,14 +1,13 @@
 use octizys_common::equivalence::assert_equivalent;
 use octizys_common::equivalence::Equivalence;
+use octizys_common::report::create_error_report;
 use octizys_common::span::{Position, Span};
 use octizys_cst::imports::Import;
 use octizys_formatter::cst::PrettyCSTConfiguration;
 use octizys_formatter::to_document::ToDocument;
-use octizys_parser::error_report::{create_error_report, ParserErrorContext};
 use octizys_parser::grammar::import_declarationParser;
-use octizys_parser::lexer::{
-    BaseLexerContext, BaseToken, LexerContext, LexerError, Token,
-};
+use octizys_parser::lexer::{BaseLexerContext, BaseToken, LexerContext, Token};
+use octizys_parser::report::OctizysParserReport;
 use octizys_pretty::highlight::{
     EmptyRender, HighlightRenderer, TerminalRender24,
 };
@@ -21,7 +20,8 @@ fn parse<T: ToDocument<PrettyCSTConfiguration> + Clone>(
     source: &str,
     parser: fn(
         LexerContext,
-    ) -> Result<T, ParseError<Position, Token, LexerError>>,
+    )
+        -> Result<T, ParseError<Position, Token, OctizysParserReport>>,
 ) -> (T, String) {
     let mut store = Store::default();
     let configuration = PrettyCSTConfiguration::default();
@@ -56,7 +56,8 @@ fn roundtrip<
     source: &str,
     parser: fn(
         LexerContext,
-    ) -> Result<T, ParseError<Position, Token, LexerError>>,
+    )
+        -> Result<T, ParseError<Position, Token, OctizysParserReport>>,
 ) {
     println!("ORIGINAL:{}", source.replace("\n", "\\n"));
     let (result1, source2) = parse(source, parser);
@@ -69,7 +70,7 @@ fn roundtrip<
 
 fn parse_import(
     context: LexerContext,
-) -> Result<Import, ParseError<Position, Token, LexerError>> {
+) -> Result<Import, ParseError<Position, Token, OctizysParserReport>> {
     let p = import_declarationParser::new();
     p.parse(context)
 }

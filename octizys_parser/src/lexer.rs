@@ -2,7 +2,7 @@ use octizys_common::{
     equivalence::Equivalence,
     identifier::Identifier,
     logic_path::LogicPath,
-    report::{ReportFormat, ReportTarget},
+    report::{ReportFormat, ReportKind, ReportTarget},
     span::{HasLocation, Location, Position, Span},
 };
 use octizys_cst::{
@@ -33,6 +33,8 @@ use std::{
     borrow::BorrowMut, cell::RefCell, num::ParseIntError, rc::Rc,
     sync::LazyLock,
 };
+
+use crate::report::{LexerReportKind, OctizysParserReport, ParserReport};
 
 /// We lex the stream in two phases, the first one retrieve a
 /// iterator of this type.
@@ -117,199 +119,6 @@ pub enum BaseToken {
     OwnershipVariable(OwnershipVariable),
 }
 
-#[derive(Debug, Clone, Equivalence)]
-pub enum LexerError {
-    UnexpectedCharacter(#[equivalence(ignore)] Position),
-    /// Punctuation match matched a non know character
-    /// This is a bug.
-    UnexpectedPunctuationMatch(String, #[equivalence(ignore)] Span),
-    /// Comment match matched a non know character
-    /// This is a bug.
-    UnexpectedCommentMatch(String, #[equivalence(ignore)] Span),
-    /// A line comment pattern match failed.
-    /// This is a bug.
-    NonFinishedLineComment(String, #[equivalence(ignore)] Span),
-    /// A line comment with empty body is fine but
-    /// the regex should still return a empty match.
-    /// This is a bug.
-    NonContentInLineComment(String, #[equivalence(ignore)] Span),
-    /// The internalization of comments failed!
-    /// this is a bug.
-    CantCreateCommentLine(String, #[equivalence(ignore)] Span),
-    /// We found the beginning of a block comment
-    /// but the input didn't match the regex,
-    /// in the user side a unbalanced bracket is what
-    /// is expected.
-    CouldntMatchBlockComment(
-        String,
-        CommentBraceKind,
-        #[equivalence(ignore)] Span,
-    ),
-    Notu64NamedHole(String, #[equivalence(ignore)] Span),
-    /// We expected a identifier and the regex should guarantee it!
-    /// but if not...
-    /// this is a bug.
-    CantCreateIdentifier(String, #[equivalence(ignore)] Span),
-    /// We have some unsafe functions that translate a
-    /// [`Token`] in this file to a [`octizys_cst::base::Token`],
-    /// they are mainly used in the parser and shouldn't fail!
-    /// this is a bug.
-    CantTranslateToToken(Token),
-    /// We found a match for a ownership_literal but
-    /// then it wasn't a match! most probably the
-    /// regex was update without updating the handler!
-    /// this is a bug.
-    UnexpectedOwnershipLiteralMatch(String, #[equivalence(ignore)] Span),
-    /// Can't parse a u64 but we already know that the string
-    /// is a valid rust u64, this signals a bug!
-    CantParseU64(
-        String,
-        //TODO: Implement Equivalence for ParseIntError
-        #[equivalence(ignore)] ParseIntError,
-        #[equivalence(ignore)] Span,
-    ),
-}
-
-impl HasLocation for LexerError {
-    fn get_location(&self) -> Location {
-        match self {
-            LexerError::UnexpectedCharacter(p) => Location::Position(p.clone()),
-            LexerError::UnexpectedPunctuationMatch(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::UnexpectedCommentMatch(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::NonFinishedLineComment(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::NonContentInLineComment(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CantCreateCommentLine(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CouldntMatchBlockComment(_, _, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::Notu64NamedHole(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CantCreateIdentifier(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CantTranslateToToken(token) => {
-                Location::Span(<&Token as Into<&TokenInfo>>::into(token).span)
-            }
-            LexerError::UnexpectedOwnershipLiteralMatch(_, span) => {
-                Location::Span(span.clone())
-            }
-            LexerError::CantParseU64(_, _, span) => {
-                Location::Span(span.clone())
-            }
-        }
-    }
-}
-
-impl ReportFormat for LexerError {
-    fn get_report_name(&self) -> NonLineBreakStr {
-        // DO NOT REMOVE THE NonLineBreakStr out of the match!
-        // It performs a compile time check on the passed string,
-        // it would panic at run time if moved to the top match.
-        match self {
-            LexerError::UnexpectedCharacter(_) => {
-                NonLineBreakStr::new("UnexpectedCharacter")
-            }
-            LexerError::UnexpectedPunctuationMatch(_, _) => {
-                NonLineBreakStr::new("Internal:UnexpectedPunctuationMatch")
-            }
-            LexerError::UnexpectedCommentMatch(_, _) => {
-                NonLineBreakStr::new("Internal:UnexpectedCommentMatch")
-            }
-            LexerError::NonFinishedLineComment(_, _) => {
-                NonLineBreakStr::new("Internal:NonFinishedLineComment")
-            }
-            LexerError::NonContentInLineComment(_, _) => {
-                NonLineBreakStr::new("Internal:NonContentInLineComment")
-            }
-            LexerError::CantCreateCommentLine(_, _) => {
-                NonLineBreakStr::new("Internal:CantCreateCommentLine")
-            }
-            LexerError::CouldntMatchBlockComment(_, _, _) => {
-                NonLineBreakStr::new("CouldntMatchBlockComment")
-            }
-            LexerError::Notu64NamedHole(_, _) => {
-                NonLineBreakStr::new("Notu64NamedHole")
-            }
-            LexerError::CantCreateIdentifier(_, _) => {
-                NonLineBreakStr::new("Internal:CantCreateIdentifier")
-            }
-            LexerError::CantTranslateToToken(_) => {
-                NonLineBreakStr::new("Internal:CantTranslateToToken")
-            }
-            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => {
-                NonLineBreakStr::new("Internal:UnexpectedOwnershipLiteralMatch")
-            }
-            LexerError::CantParseU64(_, _, _) => {
-                NonLineBreakStr::new("Internal:CantParseU64")
-            }
-        }
-    }
-    fn get_short_description(&self) -> NonLineBreakStr {
-        let common =
-            NonLineBreakStr::new("This is a bug in octizys, please report it!");
-        // DO NOT REMOVE THE NonLineBreakStr out of the match!
-        // It performs a compile time check on the passed string,
-        // it would panic at run time if moved to the top match.
-        match self {
-            LexerError::UnexpectedCharacter(_) => {
-                NonLineBreakStr::new("The provided character doesn't correspond to a valid program.")
-            }
-            LexerError::UnexpectedPunctuationMatch(_, _) => common,
-            LexerError::UnexpectedCommentMatch(_, _) => common,
-            LexerError::NonFinishedLineComment(_, _) => common,
-            LexerError::NonContentInLineComment(_, _) => common,
-            LexerError::CantCreateCommentLine(_, _) => common,
-            LexerError::CouldntMatchBlockComment(_,_, _) => NonLineBreakStr::new("We found the beginning of a block comment but couldn't finished it!"),
-            LexerError::Notu64NamedHole(_, _) => {
-                NonLineBreakStr::new("Named holes are limited to u64 integers.")
-            }
-            LexerError::CantCreateIdentifier(_, _) => common,
-            LexerError::CantTranslateToToken(_) => common,
-            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => common,
-            LexerError::CantParseU64(_, _,_) => common,
-        }
-    }
-    fn get_long_description(&self, _target: &ReportTarget) -> Option<Document> {
-        Some(external_text(match self {
-            LexerError::UnexpectedCharacter(_) => "While reading the code, we were unable to understand this particular character.",
-            LexerError::UnexpectedPunctuationMatch(_, _) => "The internal way to find punctuation marks and operators failed, it recognized a character that we didn't support!",
-            LexerError::UnexpectedCommentMatch(_, _) => "The intnernal way to find a comment failed after succeeding!",
-            LexerError::NonFinishedLineComment(_, _) => "We find the start of a comment but not the end for some reason (not unbalanced brackets)",
-            LexerError::NonContentInLineComment(_, _) => "We find a comment but we were unable to retrieve the content",
-            LexerError::CantCreateCommentLine(_, _) => "We got the content of a comment but the internalizer disagree with us that this comment has the right format!",
-            LexerError::CouldntMatchBlockComment(_,_, _) => "We were looking for a matching end for the comment.\nEither we didn't find it, and we consumed all the code looking for it.\nOr something else got wrong in the search (improbable)",
-            LexerError::Notu64NamedHole(_, _) => "Internally the named holes are stored as u64 integers.\nThe provided value for the hole is out of the bound for this range.\nPlease modify the hole value to something between 0 and 2^64 -1",
-            LexerError::CantCreateIdentifier(_, _) => "Internally we expected something to follow the same rules as an identifier, but it didn't follow those rules",
-            LexerError::CantTranslateToToken(_) => "The internal translation between simple Tokens and the CST::Tokens failed!",
-            LexerError::UnexpectedOwnershipLiteralMatch(_, _) => "We find what seems to look like an ownership literal, but something unexpected passed while working with it!",
-            LexerError::CantParseU64(_, _,_) => "We find what seems to look like an u64 literal, but something unexpected passed while working with it!",
-        }))
-    }
-    fn get_expected(&self) -> Option<Vec<String>> {
-        match self {
-            LexerError::CouldntMatchBlockComment(_, kind, _) => {
-                let hyphens = "-".repeat(kind.len() - 1);
-                Some(vec![hyphens + "}"])
-            }
-            _ => None,
-        }
-    }
-    fn get_location_maybe(&self) -> Option<Location> {
-        Some(self.get_location())
-    }
-}
-
 /// An abstraction for a [`Stream`] of characters over a [`str`].
 #[derive(Debug)]
 pub struct BaseLexerContext<'source> {
@@ -328,12 +137,34 @@ pub struct BaseLexerContext<'source> {
     store: Rc<RefCell<Store>>,
 }
 
+fn make_error_report_with_span<T>(
+    lexer_kind: LexerReportKind,
+    s: Span,
+) -> Option<Result<T, OctizysParserReport>> {
+    Some(Err(OctizysParserReport {
+        kind: ReportKind::Error,
+        report: ParserReport::Lexer(lexer_kind),
+        location: Location::Span(s),
+    }))
+}
+
+fn make_error_report_with_position<T>(
+    lexer_kind: LexerReportKind,
+    p: Position,
+) -> Option<Result<T, OctizysParserReport>> {
+    Some(Err(OctizysParserReport {
+        kind: ReportKind::Error,
+        report: ParserReport::Lexer(lexer_kind),
+        location: Location::Position(p),
+    }))
+}
+
 fn make_block_comment(
     re: &Regex,
     context: &mut BaseLexerContext,
     m: Match,
     brace_kind: CommentBraceKind,
-) -> Option<Result<(Span, BaseToken), LexerError>> {
+) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
     let matched = m.as_str();
     match re.captures(&context.index) {
         Some(c) => {
@@ -357,19 +188,18 @@ fn make_block_comment(
                 }
                 //TODO: This is most likely for a non closed comment, we may look for possible
                 //closings of the comment, store that in the info?
-                None => Some(Err(LexerError::NonFinishedLineComment(
-                    matched.to_string(),
+                None => make_error_report_with_span(
+                    LexerReportKind::NonFinishedLineComment,
                     span,
-                ))),
+                ),
             }
         }
         None => {
             let span = context.advance_non_line_breaks(matched);
-            Some(Err(LexerError::CouldntMatchBlockComment(
-                matched.to_string(),
-                brace_kind,
+            make_error_report_with_span(
+                LexerReportKind::CouldntMatchBlockComment(brace_kind),
                 span,
-            )))
+            )
         }
     }
 }
@@ -379,7 +209,7 @@ fn make_line_comment(
     context: &mut BaseLexerContext,
     m: Match,
     line_start: LineCommentStart,
-) -> Option<Result<(Span, BaseToken), LexerError>> {
+) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
     let matched = m.as_str();
     match SLASH_COMMENT.captures(&context.index) {
         Some(c) => {
@@ -405,24 +235,24 @@ fn make_line_comment(
                                 span,
                             }),
                         ))),
-                        None => Some(Err(LexerError::CantCreateCommentLine(
-                            matched.to_string(),
+                        None => make_error_report_with_span(
+                            LexerReportKind::CantCreateCommentLine,
                             span,
-                        ))),
+                        ),
                     }
                 }
-                None => Some(Err(LexerError::NonFinishedLineComment(
-                    matched.to_string(),
+                None => make_error_report_with_span(
+                    LexerReportKind::NonFinishedLineComment,
                     span,
-                ))),
+                ),
             }
         }
         None => {
             let span = context.advance_non_line_breaks(matched);
-            Some(Err(LexerError::NonFinishedLineComment(
-                matched.to_string(),
+            make_error_report_with_span(
+                LexerReportKind::NonFinishedLineComment,
                 span,
-            )))
+            )
         }
     }
 }
@@ -483,7 +313,7 @@ impl<'store, 'source> BaseLexerContext<'source> {
     fn comment(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         match matched {
             "--" => make_line_comment(
@@ -524,10 +354,10 @@ impl<'store, 'source> BaseLexerContext<'source> {
             ),
             _ => {
                 let span = self.advance_non_line_breaks(matched);
-                Some(Err(LexerError::UnexpectedCommentMatch(
-                    matched.to_string(),
+                make_error_report_with_span(
+                    LexerReportKind::UnexpectedCommentMatch,
                     span,
-                )))
+                )
             }
         }
     }
@@ -535,7 +365,7 @@ impl<'store, 'source> BaseLexerContext<'source> {
     fn punctuation_or_operator(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         Some(match matched {
@@ -578,73 +408,76 @@ impl<'store, 'source> BaseLexerContext<'source> {
             "&" => Ok((span, BaseToken::ReverseApplication)),
             "$" => Ok((span, BaseToken::DollarApplication)),
             "$>" => Ok((span, BaseToken::MapConstRight)),
-            _ => Err(LexerError::UnexpectedPunctuationMatch(
-                matched.to_string(),
-                span,
-            )),
+            _ => Err(OctizysParserReport {
+                kind: ReportKind::Error,
+                report: ParserReport::Lexer(
+                    LexerReportKind::UnexpectedPunctuationMatch,
+                ),
+                location: Location::Span(span),
+            }),
         })
     }
 
     fn bracket_start(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
-        Some(match matched {
-            "(" => Ok((span, BaseToken::LParen)),
-            "[" => Ok((span, BaseToken::LBracket)),
-            "{" => Ok((span, BaseToken::LBrace)),
-            _ => Err(LexerError::UnexpectedPunctuationMatch(
-                matched.to_string(),
+        match matched {
+            "(" => Some(Ok((span, BaseToken::LParen))),
+            "[" => Some(Ok((span, BaseToken::LBracket))),
+            "{" => Some(Ok((span, BaseToken::LBrace))),
+            _ => make_error_report_with_span(
+                LexerReportKind::UnexpectedPunctuationMatch,
                 span,
-            )),
-        })
+            ),
+        }
     }
 
     fn bracket_end(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
-        Some(match matched {
-            ")" => Ok((span, BaseToken::RParen)),
-            "]" => Ok((span, BaseToken::RBracket)),
-            "}" => Ok((span, BaseToken::RBrace)),
-            _ => Err(LexerError::UnexpectedPunctuationMatch(
-                matched.to_string(),
+        match matched {
+            ")" => Some(Ok((span, BaseToken::RParen))),
+            "]" => Some(Ok((span, BaseToken::RBracket))),
+            "}" => Some(Ok((span, BaseToken::RBrace))),
+            _ => make_error_report_with_span(
+                LexerReportKind::UnexpectedPunctuationMatch,
                 span,
-            )),
-        })
+            ),
+        }
     }
 
     fn string_start(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         todo!()
     }
 
     fn named_hole(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         match matched[1..].parse::<u64>() {
             Ok(x) => Some(Ok((span, BaseToken::NamedHole(x)))),
-            Err(_) => Some(Err(LexerError::Notu64NamedHole(
-                matched.to_string(),
+            Err(_) => make_error_report_with_span(
+                LexerReportKind::Notu64NamedHole,
                 span,
-            ))),
+            ),
         }
     }
 
     fn identifier(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         match matched {
@@ -668,10 +501,10 @@ impl<'store, 'source> BaseLexerContext<'source> {
                 &mut *(*self.store).borrow_mut(),
             ) {
                 Ok(iden) => Some(Ok((span, BaseToken::Identifier(iden)))),
-                _ => Some(Err(LexerError::CantCreateIdentifier(
-                    matched.to_string(),
+                _ => make_error_report_with_span(
+                    LexerReportKind::CantCreateIdentifier,
                     span,
-                ))),
+                ),
             },
         }
     }
@@ -679,7 +512,7 @@ impl<'store, 'source> BaseLexerContext<'source> {
     fn infix_identifier(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         match Identifier::make(
@@ -687,17 +520,17 @@ impl<'store, 'source> BaseLexerContext<'source> {
             &mut *(*self.store).borrow_mut(),
         ) {
             Ok(iden) => Some(Ok((span, BaseToken::InfixIdentifier(iden)))),
-            _ => Some(Err(LexerError::CantCreateIdentifier(
-                matched.to_string(),
+            _ => make_error_report_with_span(
+                LexerReportKind::CantCreateIdentifier,
                 span,
-            ))),
+            ),
         }
     }
 
     fn anon_hole(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         Some(Ok((span, BaseToken::AnonHole)))
@@ -706,7 +539,7 @@ impl<'store, 'source> BaseLexerContext<'source> {
     fn ownership_literal(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         match matched {
@@ -722,17 +555,17 @@ impl<'store, 'source> BaseLexerContext<'source> {
                 span,
                 BaseToken::OwnershipLiteral(OwnershipLiteral::Inf),
             ))),
-            _ => Some(Err(LexerError::UnexpectedOwnershipLiteralMatch(
-                matched.to_string(),
+            _ => make_error_report_with_span(
+                LexerReportKind::UnexpectedOwnershipLiteralMatch,
                 span,
-            ))),
+            ),
         }
     }
 
     fn ownership_variable(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         //This is safe since ownership_variables start with `'`, an ascii
@@ -748,17 +581,17 @@ impl<'store, 'source> BaseLexerContext<'source> {
                     variable: idn,
                 }),
             ))),
-            _ => Some(Err(LexerError::CantCreateIdentifier(
-                matched.to_string(),
+            _ => make_error_report_with_span(
+                LexerReportKind::CantCreateIdentifier,
                 span,
-            ))),
+            ),
         }
     }
 
     fn octal(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         match u64::from_str_radix(&matched[2..], 8) {
@@ -769,18 +602,17 @@ impl<'store, 'source> BaseLexerContext<'source> {
                     value,
                 }),
             ))),
-            Err(e) => Some(Err(LexerError::CantParseU64(
-                String::from(matched),
-                e,
+            Err(e) => make_error_report_with_span(
+                LexerReportKind::CantParseU64(e),
                 span,
-            ))),
+            ),
         }
     }
 
     fn hex(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         match u64::from_str_radix(&matched[2..], 16) {
@@ -791,18 +623,17 @@ impl<'store, 'source> BaseLexerContext<'source> {
                     value,
                 }),
             ))),
-            Err(e) => Some(Err(LexerError::CantParseU64(
-                String::from(matched),
-                e,
+            Err(e) => make_error_report_with_span(
+                LexerReportKind::CantParseU64(e),
                 span,
-            ))),
+            ),
         }
     }
 
     fn binary(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         match u64::from_str_radix(&matched[2..], 2) {
@@ -813,11 +644,10 @@ impl<'store, 'source> BaseLexerContext<'source> {
                     value,
                 }),
             ))),
-            Err(e) => Some(Err(LexerError::CantParseU64(
-                String::from(matched),
-                e,
+            Err(e) => make_error_report_with_span(
+                LexerReportKind::CantParseU64(e),
                 span,
-            ))),
+            ),
         }
     }
 
@@ -825,7 +655,7 @@ impl<'store, 'source> BaseLexerContext<'source> {
     fn numeric(
         &mut self,
         m: Match,
-    ) -> Option<Result<(Span, BaseToken), LexerError>> {
+    ) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
         let matched = m.as_str();
         let span = self.advance_non_line_breaks(matched);
         let re_parsed = NUMBER.captures(matched).unwrap();
@@ -839,11 +669,10 @@ impl<'store, 'source> BaseLexerContext<'source> {
                         value,
                     }),
                 ))),
-                Err(e) => Some(Err(LexerError::CantParseU64(
-                    String::from(matched),
-                    e,
+                Err(e) => make_error_report_with_span(
+                    LexerReportKind::CantParseU64(e),
                     span,
-                ))),
+                ),
             },
         }
     }
@@ -908,22 +737,23 @@ fn find_match_group<'source, 'store, 'context>(
         fn(
             &'context mut BaseLexerContext<'source>,
             m: Match,
-        ) -> Option<Result<(Span, BaseToken), LexerError>>,
+        ) -> Option<Result<(Span, BaseToken), OctizysParserReport>>,
     )>,
-) -> Option<Result<(Span, BaseToken), LexerError>> {
-    let mut out = Some(Err(LexerError::UnexpectedCharacter(blc.position)));
+) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
     for (name, f) in v {
         match c.name(name) {
             Some(m) => return f(blc, m),
             None => (),
         }
     }
-
-    out
+    make_error_report_with_position(
+        LexerReportKind::UnexpectedCharacter,
+        blc.position,
+    )
 }
 
 impl<'store, 'source> Iterator for BaseLexerContext<'source> {
-    type Item = Result<(Span, BaseToken), LexerError>;
+    type Item = Result<(Span, BaseToken), OctizysParserReport>;
     fn next(&mut self) -> Option<Self::Item> {
         self.consume_spaces();
         //println!("BASE_CONTEXT:{:?}", self);
@@ -958,7 +788,10 @@ impl<'store, 'source> Iterator for BaseLexerContext<'source> {
                     ("numeric", BaseLexerContext::numeric),
                 ],
             ),
-            None => Some(Err(LexerError::UnexpectedCharacter(self.position))),
+            None => make_error_report_with_position(
+                LexerReportKind::UnexpectedCharacter,
+                self.position,
+            ),
         }
     }
 }
@@ -1257,14 +1090,18 @@ impl<'a> From<&'a Token> for &'a TokenInfo {
 macro_rules! make_lexer_token_to_token {
     ($name:tt, $output_constructor:tt, $output_type:tt) => {
         paste!{
-            pub fn [< $name _token_to_token >](t:Token)->Result<octizys_cst::base::Token<$output_type>,ParseError<Position,Token,LexerError>>{
+            pub fn [< $name _token_to_token >](t:Token)->Result<octizys_cst::base::Token<$output_type>,ParseError<Position,Token,OctizysParserReport>>{
                 match t {
                     Token::$output_constructor(info,value) => Ok(octizys_cst::base::Token{value,info}),
                     _ => Err(
                         ParseError::User{
-                            error: LexerError::CantTranslateToToken(t.clone())
-                            }
-                        )
+                            error: OctizysParserReport{
+                                kind: ReportKind::Error,
+                                report:ParserReport::Lexer(LexerReportKind::CantTranslateToToken),
+                                location: t.get_location()
+                            },
+                        }
+                    )
                 }
             }
         }
@@ -1379,15 +1216,16 @@ pub enum BaseOrComments {
 
 #[derive(Debug)]
 pub struct LexerContext<'src> {
-    previous_token:
-        Option<Result<(Span, BaseOrComments), (Vec<Comment>, LexerError)>>,
+    previous_token: Option<
+        Result<(Span, BaseOrComments), (Vec<Comment>, OctizysParserReport)>,
+    >,
     lexer: &'src mut BaseLexerContext<'src>,
 }
 
 impl<'src> LexerContext<'src> {
     pub fn new(
         previous_token: Option<
-            Result<(Span, BaseOrComments), (Vec<Comment>, LexerError)>,
+            Result<(Span, BaseOrComments), (Vec<Comment>, OctizysParserReport)>,
         >,
         lexer: &'src mut BaseLexerContext<'src>,
     ) -> Self {
@@ -1400,12 +1238,12 @@ impl<'src> LexerContext<'src> {
 
 // TODO: make this an iterator to consume lazily if needed
 pub fn accumulate_comments<
-    I: Iterator<Item = Result<(Span, BaseToken), LexerError>>,
+    I: Iterator<Item = Result<(Span, BaseToken), OctizysParserReport>>,
 >(
     lexer: &mut I,
     acc: &mut Vec<Comment>,
-) -> Option<Result<(Span, BaseToken), LexerError>> {
-    let mut out: Option<Result<(Span, BaseToken), LexerError>> = None;
+) -> Option<Result<(Span, BaseToken), OctizysParserReport>> {
+    let mut out: Option<Result<(Span, BaseToken), OctizysParserReport>> = None;
     loop {
         match lexer.next() {
             Some(maybe_token) => match maybe_token {
@@ -1461,7 +1299,9 @@ pub fn complete_token_or_save(
     current_token: BaseToken,
     context: &mut LexerContext,
     mut info: TokenInfo,
-) -> Option<Result<(Position, Token, Position), (Vec<Comment>, LexerError)>> {
+) -> Option<
+    Result<(Position, Token, Position), (Vec<Comment>, OctizysParserReport)>,
+> {
     let mut acc = vec![];
     let next_token = accumulate_comments(context.lexer, &mut acc);
     let (to_attach, remain) = split_comments_by_line(info.span.end.line, acc);
@@ -1526,7 +1366,9 @@ fn make_last_comment_token(
 /// To call at the beginning of lexing.
 fn parse_token(
     context: &mut LexerContext,
-) -> Option<Result<(Position, Token, Position), (Vec<Comment>, LexerError)>> {
+) -> Option<
+    Result<(Position, Token, Position), (Vec<Comment>, OctizysParserReport)>,
+> {
     let mut acc = vec![];
     let current_value = accumulate_comments(&mut context.lexer, &mut acc);
     match current_value {
@@ -1546,7 +1388,7 @@ fn parse_token(
 }
 
 impl<'store, 'src> Iterator for LexerContext<'src> {
-    type Item = Result<(Position, Token, Position), LexerError>;
+    type Item = Result<(Position, Token, Position), OctizysParserReport>;
     fn next(&mut self) -> Option<Self::Item> {
         //println!("{:?}", self);
         match &self.previous_token {

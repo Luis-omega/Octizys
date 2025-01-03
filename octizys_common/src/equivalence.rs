@@ -1,13 +1,16 @@
 use octizys_pretty::combinators::{
-    self, background, between_static, hard_break, intersperse, nest,
+    self, background, between_static, foreground, hard_break, intersperse, nest,
 };
 use octizys_pretty::document::Document;
 
 use octizys_pretty::highlight::{
     Color, Color24Bits, Color4Bits, Color8Bits, Highlight,
 };
+use octizys_pretty::static_text;
 use octizys_pretty::store::Store;
 use octizys_text_store::store::NonLineBreakStr;
+
+use crate::report::ReportKind;
 
 pub const EXPECTED_BACKGROUND_COLOR: Color = Color {
     color24: Color24Bits { r: 0, g: 117, b: 0 },
@@ -167,6 +170,39 @@ impl<T: Equivalence> Equivalence for Box<T> {
     }
     fn represent(&self) -> Document {
         Equivalence::represent(self.as_ref())
+    }
+}
+
+impl Equivalence for ReportKind {
+    fn represent(&self) -> Document {
+        match self {
+            ReportKind::Error => static_text!("Error"),
+            ReportKind::Warning => static_text!("Warning"),
+            ReportKind::Info => static_text!("Info"),
+            ReportKind::Note => static_text!("Note"),
+        }
+    }
+    fn equivalent(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ReportKind::Error, ReportKind::Error) => true,
+            (ReportKind::Warning, ReportKind::Warning) => true,
+            (ReportKind::Info, ReportKind::Info) => true,
+            (ReportKind::Info, ReportKind::Note) => true,
+            (ReportKind::Note, ReportKind::Note) => true,
+            _ => false,
+        }
+    }
+    fn equivalence_or_diff(&self, other: &Self) -> Result<(), Document> {
+        match (self, other) {
+            (ReportKind::Error, ReportKind::Error) => Ok(()),
+            (ReportKind::Warning, ReportKind::Warning) => Ok(()),
+            (ReportKind::Info, ReportKind::Info) => Ok(()),
+            (ReportKind::Info, ReportKind::Note) => Ok(()),
+            (ReportKind::Note, ReportKind::Note) => Ok(()),
+            _ => Err(foreground(EXPECTED_BACKGROUND_COLOR, self.represent())
+                + hard_break()
+                + foreground(ERROR_BACKGROUND_COLOR, other.represent())),
+        }
     }
 }
 

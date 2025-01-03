@@ -16,7 +16,8 @@ use octizys_formatter::{cst::PrettyCSTConfiguration, to_document::ToDocument};
 use octizys_macros::Equivalence;
 use octizys_parser::{
     grammar::{import_declarationParser, topParser, type_expressionParser},
-    lexer::{self, BaseLexerContext, LexerContext, LexerError, Token},
+    lexer::{self, BaseLexerContext, LexerContext, Token},
+    report::OctizysParserReport,
 };
 use octizys_pretty::{
     combinators::{external_text, foreground, static_str},
@@ -65,10 +66,17 @@ use std::{rc::Rc, result};
 
 #[derive(Clone)]
 enum OctizysError {
-    LexicalError(LexerError, String),
-    ParseError(ParseError<Position, lexer::Token, LexerError>, String),
-    FileLoadError { path: PathBuf },
-    REPlCantReadLine { error: std::io::ErrorKind },
+    LexicalError(OctizysParserReport, String),
+    ParseError(
+        ParseError<Position, lexer::Token, OctizysParserReport>,
+        String,
+    ),
+    FileLoadError {
+        path: PathBuf,
+    },
+    REPlCantReadLine {
+        error: std::io::ErrorKind,
+    },
 }
 
 impl OctizysError {
@@ -85,7 +93,9 @@ impl OctizysError {
 impl<'source> ReportFormat for OctizysError {
     fn get_short_description(&self) -> octizys_pretty::store::NonLineBreakStr {
         match self {
-            OctizysError::LexicalError(e, _) => e.get_short_description(),
+            OctizysError::LexicalError(e, _) => {
+                e.report.get_short_description()
+            }
             OctizysError::ParseError(e, _) => e.get_short_description(),
             OctizysError::FileLoadError { .. } => {
                 NonLineBreakStr::new("Can't open a file!")
@@ -243,8 +253,10 @@ fn parse_string_with_options(
     source: &str,
     options: &GlobalOptions,
     store: Rc<RefCell<Store>>,
-) -> Result<Top, ParseError<Position, octizys_parser::lexer::Token, LexerError>>
-{
+) -> Result<
+    Top,
+    ParseError<Position, octizys_parser::lexer::Token, OctizysParserReport>,
+> {
     let mut base_context = BaseLexerContext::new(source, store.clone());
     let iterator = LexerContext::new(None, &mut base_context);
     if options.has_phase(&Phase::Lexer) {
@@ -304,9 +316,17 @@ fn println_result<'s>(
                 } else {
                     ReportTarget::Human(Default::default())
                 },
-                // TODO: FIXME: change this! it requires major changes in the lexer
-                //as we plan to change the parser error to support this!
-                kind: ReportKind::Error,
+                kind: match t {
+                    OctizysError::LexicalError(r, _) => r.kind,
+                    OctizysError::ParseError(p, _) => match p {
+                        ParseError::User { error } => error.kind,
+                        _ => ReportKind::Error,
+                    },
+                    OctizysError::FileLoadError { .. } => ReportKind::Error,
+                    OctizysError::REPlCantReadLine { error } => {
+                        ReportKind::Error
+                    }
+                },
             };
             let report = create_error_report(&request);
             let as_string = render_with(&report, store, &options);
